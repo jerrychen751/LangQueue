@@ -17,6 +17,7 @@
     | { type: 'INJECT_PROMPT_RESULT'; payload: { ok: boolean; reason?: string } }
     | { type: 'INJECT_PROMPT_ERROR'; payload: { reason: string } }
     | { type: 'COMPAT_STATUS'; payload: { ready: boolean } }
+    | { type: 'CLICK_SEND' }
 
   const scriptMark = '__langqueue_claude_content__'
   if ((window as unknown as Record<string, unknown>)[scriptMark]) return
@@ -441,6 +442,23 @@
       })
       return true
     }
+    if (message.type === 'CLICK_SEND') {
+      const clicked = clickSendButton()
+      if (!clicked && inputEl && isVisible(inputEl as HTMLElement)) {
+        const el = inputEl as HTMLElement
+        // Try Meta+Enter then Ctrl+Enter like in chaining fallback
+        const combos: Array<{ metaKey: boolean; ctrlKey: boolean }> = [
+          { metaKey: true, ctrlKey: false },
+          { metaKey: false, ctrlKey: true },
+        ]
+        for (const combo of combos) {
+          const down = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, metaKey: combo.metaKey, ctrlKey: combo.ctrlKey } as unknown as KeyboardEventInit)
+          const up = new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, metaKey: combo.metaKey, ctrlKey: combo.ctrlKey } as unknown as KeyboardEventInit)
+          el.dispatchEvent(down)
+          el.dispatchEvent(up)
+        }
+      }
+    }
     if (message.type === 'COMPAT_CHECK') {
       const ready = Boolean(findInput())
       sendResponse({ type: 'COMPAT_STATUS', payload: { ready } })
@@ -449,12 +467,15 @@
       const payload = (message as Extract<KnownMessage, { type: 'RUN_CHAIN' }>).payload
       if (!payload || !Array.isArray(payload.steps) || payload.steps.length === 0) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: 0, totalSteps: 0, status: 'error', error: 'NO_STEPS' } })
+        try { sendResponse({ ok: false, reason: 'NO_STEPS' }) } catch { void 0 }
         return
       }
       if (isChainRunning) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: 0, totalSteps: payload.steps.length, status: 'error', error: 'ALREADY_RUNNING' } })
+        try { sendResponse({ ok: false, reason: 'ALREADY_RUNNING' }) } catch { void 0 }
         return
       }
+      try { sendResponse({ ok: true }) } catch { void 0 }
       isChainRunning = true
       currentChainAborted = false
       executeChain(payload.steps, payload.insertionModeOverride).finally(() => {

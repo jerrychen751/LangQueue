@@ -407,12 +407,15 @@
       const payload = (message as Extract<KnownMessage, { type: 'RUN_CHAIN' }>).payload
       if (!payload || !Array.isArray(payload.steps) || payload.steps.length === 0) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: 0, totalSteps: 0, status: 'error', error: 'NO_STEPS' } })
+        try { sendResponse({ ok: false, reason: 'NO_STEPS' }) } catch { void 0 }
         return
       }
       if (isChainRunning) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: 0, totalSteps: payload.steps.length, status: 'error', error: 'ALREADY_RUNNING' } })
+        try { sendResponse({ ok: false, reason: 'ALREADY_RUNNING' }) } catch { void 0 }
         return
       }
+      try { sendResponse({ ok: true }) } catch { void 0 }
       isChainRunning = true
       currentChainAborted = false
       executeChain(payload.steps, payload.insertionModeOverride).finally(() => {

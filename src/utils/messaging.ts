@@ -6,6 +6,7 @@ import type {
   RunChainMessage,
   CancelChainMessage,
   ChainStep,
+  ClickSendMessage,
 } from '../types/messages'
 import type { Platform } from '../types'
 
@@ -44,6 +45,19 @@ export async function sendPromptToTab(promptContent: string): Promise<void> {
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Injection failed'
+    throw new Error(message)
+  }
+}
+
+export async function clickSendOnTab(): Promise<void> {
+  const tab = await getActiveTab()
+  if (!tab?.id || !tab.url) throw new Error('No active tab')
+  const platform = detectPlatformFromUrl(tab.url)
+  if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) throw new Error('Not on a compatible AI chat page')
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'CLICK_SEND' } as ClickSendMessage)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Click send failed'
     throw new Error(message)
   }
 }

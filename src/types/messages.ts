@@ -15,6 +15,7 @@ export type CompatCheckMessage = { type: 'COMPAT_CHECK' }
 export type CompatStatusMessage = { type: 'COMPAT_STATUS'; payload: { ready: boolean } }
 export type InjectPromptResultMessage = { type: 'INJECT_PROMPT_RESULT'; payload: { ok: boolean; reason?: string } }
 export type InjectPromptErrorMessage = { type: 'INJECT_PROMPT_ERROR'; payload: { reason: 'TEXTAREA_NOT_FOUND' | 'UNKNOWN' } }
+export type ClickSendMessage = { type: 'CLICK_SEND' }
 
 // Prompt chaining types
 export type ChainStep = {
@@ -54,5 +55,6 @@ export type KnownMessage =
   | RunChainMessage
   | ChainProgressMessage
   | CancelChainMessage
+  | ClickSendMessage
 
 

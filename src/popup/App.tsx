@@ -5,7 +5,7 @@ import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
 import type { Prompt, SavedChain } from '../types'
 import { getAllPrompts, updatePrompt, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain } from '../utils/storage'
-import { sendPromptToTab, detectActivePlatform, runChainOnTab } from '../utils/messaging'
+import { sendPromptToTab, detectActivePlatform, runChainOnTab, clickSendOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
 import { checkTabCompatibility } from '../utils/messaging'
 import FilterBar, { type SortOption } from '../components/FilterBar'
@@ -288,10 +288,9 @@ export default function App() {
                   onDelete={handleDelete}
                 onInsert={handleInsert}
                 onSend={async (prompt) => {
-                  // Insert then auto-send and await with default delay via a one-step chain for reliability
-                  const steps: ChainStep[] = [{ content: prompt.content, autoSend: true, awaitResponse: true, delayMs: 500 }]
                   try {
-                    await runChainOnTab(steps, 'overwrite')
+                    await sendPromptToTab(prompt.content) // mirror card click injection
+                    await clickSendOnTab()
                     showToast({ variant: 'success', message: 'Sent' })
                     window.close()
                   } catch (err: unknown) {
