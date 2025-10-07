@@ -13,15 +13,32 @@
   if ((window as unknown as Record<string, unknown>)[scriptMark]) return
   ;(window as unknown as Record<string, unknown>)[scriptMark] = true
 
-  const SELECTOR = 'div[contenteditable="true"][role="textbox"], textarea'
   let inputEl: HTMLTextAreaElement | HTMLElement | null = null
-  let floatingBtn: HTMLButtonElement | null = null
+
+  function isVisible(el: Element): boolean {
+    const htmlEl = el as HTMLElement
+    if (!htmlEl) return false
+    if (htmlEl.offsetParent !== null) return true
+    // handle position: fixed/absolute elements
+    return htmlEl.getClientRects().length > 0
+  }
 
   function findInput(): HTMLTextAreaElement | HTMLElement | null {
-    const el = document.querySelector(SELECTOR) as HTMLElement | null
-    if (!el) return null
-    if (el.tagName === 'TEXTAREA') return el as HTMLTextAreaElement
-    if (el.getAttribute('contenteditable') === 'true') return el
+    // 1) Visible contenteditable (preferred on ChatGPT UI)
+    const ceCandidates = Array.from(document.querySelectorAll('div[contenteditable="true"][role="textbox"]')) as HTMLElement[]
+    const ce = ceCandidates.find((el) => isVisible(el))
+    if (ce) return ce
+
+    // 2) Primary textarea by id
+    const byId = document.getElementById('prompt-textarea')
+    if (byId && byId.tagName === 'TEXTAREA' && isVisible(byId)) {
+      return byId as HTMLTextAreaElement
+    }
+
+    // 3) Any other visible, enabled textarea that is not the fallback one
+    const candidates = Array.from(document.querySelectorAll('form textarea:not([readonly]):not([disabled]):not([class*="fallbackTextarea"])')) as HTMLElement[]
+    const ta = candidates.find((el) => el.tagName === 'TEXTAREA' && isVisible(el))
+    if (ta) return ta as HTMLTextAreaElement
     return null
   }
 
@@ -29,81 +46,7 @@
     if (inputEl) {
       chrome.runtime.sendMessage({ type: 'TEXTAREA_READY' })
     }
-  }
-
-  function ensureFloatingButton() {
-    if (!inputEl) return
-    if (floatingBtn && floatingBtn.isConnected) return
-    floatingBtn = document.createElement('button')
-    floatingBtn.setAttribute('type', 'button')
-    floatingBtn.title = 'Open LangQueue'
-    floatingBtn.style.position = 'absolute'
-    floatingBtn.style.right = '10px'
-    floatingBtn.style.bottom = '10px'
-    floatingBtn.style.zIndex = '2147483647'
-    floatingBtn.style.width = '28px'
-    floatingBtn.style.height = '28px'
-    floatingBtn.style.borderRadius = '9999px'
-    floatingBtn.style.border = '1px solid rgba(0,0,0,0.1)'
-    floatingBtn.style.background = '#fff'
-    floatingBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)'
-    floatingBtn.style.display = 'flex'
-    floatingBtn.style.alignItems = 'center'
-    floatingBtn.style.justifyContent = 'center'
-    floatingBtn.style.cursor = 'pointer'
-    floatingBtn.style.transition = 'background 0.15s ease'
-    floatingBtn.onmouseenter = () => (floatingBtn!.style.background = '#f5f5f5')
-    floatingBtn.onmouseleave = () => (floatingBtn!.style.background = '#fff')
-    floatingBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M12 3v2M5.22 5.22l1.42 1.42M3 12h2m1.78 6.78-1.42 1.42M12 19v2m6.78-1.78-1.42-1.42M19 12h2m-4.22-5.36 1.42-1.42"/><path d="M8 12a4 4 0 1 0 8 0"/></svg>'
-
-    // Positioning within the nearest positioned ancestor of inputEl
-    const container = inputEl.closest('div') || inputEl.parentElement || document.body
-    if (container && container !== document.body) {
-      container.style.position = container.style.position || 'relative'
-      container.appendChild(floatingBtn)
-    } else {
-      document.body.appendChild(floatingBtn)
-      floatingBtn.style.position = 'fixed'
-    }
-
-    floatingBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' })
-    })
-  }
-
-  function showConfirmation(message: string) {
-    if (!inputEl) return
-    const container = inputEl.closest('div') || inputEl.parentElement || document.body
-    if (container && container !== document.body) {
-      container.style.position = container.style.position || 'relative'
-    }
-    const el = document.createElement('div')
-    el.textContent = message
-    el.style.position = container === document.body ? 'fixed' : 'absolute'
-    el.style.right = '10px'
-    el.style.bottom = container === document.body ? '56px' : '44px'
-    el.style.zIndex = '2147483647'
-    el.style.padding = '6px 10px'
-    el.style.borderRadius = '9999px'
-    el.style.fontSize = '12px'
-    el.style.color = '#065f46'
-    el.style.background = '#d1fae5'
-    el.style.border = '1px solid rgba(5,150,105,0.2)'
-    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'
-    el.style.opacity = '0'
-    el.style.transform = 'translateY(6px)'
-    el.style.transition = 'opacity 150ms ease, transform 150ms ease'
-    ;(container || document.body).appendChild(el)
-    requestAnimationFrame(() => {
-      el.style.opacity = '1'
-      el.style.transform = 'translateY(0)'
-    })
-    setTimeout(() => {
-      el.style.opacity = '0'
-      el.style.transform = 'translateY(6px)'
-      setTimeout(() => el.remove(), 180)
-    }, 1200)
-  }
+  }  
 
   function setTextareaValue(el: HTMLTextAreaElement, value: string) {
     const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
@@ -113,37 +56,52 @@
     el.focus()
   }
 
+  function dispatchFrameworkInput(el: HTMLElement, data: string) {
+    try {
+      // Use modern InputEvent when available so frameworks receive rich context
+      const ie = new InputEvent('input', { bubbles: true, data, inputType: 'insertText' } as unknown as InputEventInit)
+      el.dispatchEvent(ie)
+    } catch {
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+
   function setContentEditableValue(el: HTMLElement, value: string) {
     el.focus()
     const selection = window.getSelection()
-    if (selection) {
-      const range = document.createRange()
-      range.selectNodeContents(el)
-      selection.removeAllRanges()
-      selection.addRange(range)
-    }
-    document.execCommand('insertText', false, value)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.deleteContents()
+    const textNode = document.createTextNode(value)
+    range.insertNode(textNode)
+    // place caret after inserted text
+    range.setStartAfter(textNode)
+    range.setEndAfter(textNode)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    dispatchFrameworkInput(el, value)
   }
 
   function appendToContentEditable(el: HTMLElement, value: string) {
     el.focus()
     const selection = window.getSelection()
-    if (selection) {
-      const range = document.createRange()
-      range.selectNodeContents(el)
-      range.collapse(false) // move caret to end
-      selection.removeAllRanges()
-      selection.addRange(range)
-    }
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false) // move caret to end
     const needsNewline = (el.textContent || '').length > 0
     const textToInsert = `${needsNewline ? '\n' : ''}${value}`
-    document.execCommand('insertText', false, textToInsert)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
+    const textNode = document.createTextNode(textToInsert)
+    range.insertNode(textNode)
+    // move caret after inserted text
+    range.setStartAfter(textNode)
+    range.setEndAfter(textNode)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    dispatchFrameworkInput(el, textToInsert)
   }
 
   async function injectPrompt(content: string) {
-    if (!inputEl) {
+    if (!inputEl || !(inputEl as HTMLElement).isConnected || (inputEl as HTMLElement).tagName !== 'TEXTAREA' || !isVisible(inputEl as HTMLElement)) {
       inputEl = findInput()
     }
     if (!inputEl) {
@@ -166,7 +124,6 @@
           setContentEditableValue(inputEl, content)
         }
       }
-      showConfirmation('Inserted')
       return { ok: true as const }
     } catch {
       return { ok: false as const, reason: 'UNKNOWN' as const }
@@ -199,7 +156,6 @@
     if (el && el !== inputEl) {
       inputEl = el
       dispatchReady()
-      ensureFloatingButton()
     }
   }
 

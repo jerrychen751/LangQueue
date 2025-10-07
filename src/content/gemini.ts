@@ -16,7 +16,6 @@
   // Gemini uses a contenteditable div as the input in most cases
   const SELECTOR = 'div[contenteditable="true"][role="textbox"], textarea'
   let inputEl: HTMLTextAreaElement | HTMLElement | null = null
-  let floatingBtn: HTMLButtonElement | null = null
 
   function findInput(): HTMLTextAreaElement | HTMLElement | null {
     const el = document.querySelector(SELECTOR) as HTMLElement | null
@@ -32,44 +31,7 @@
     }
   }
 
-  function ensureFloatingButton() {
-    if (!inputEl) return
-    if (floatingBtn && floatingBtn.isConnected) return
-    floatingBtn = document.createElement('button')
-    floatingBtn.setAttribute('type', 'button')
-    floatingBtn.title = 'Open LangQueue'
-    floatingBtn.style.position = 'absolute'
-    floatingBtn.style.right = '10px'
-    floatingBtn.style.bottom = '10px'
-    floatingBtn.style.zIndex = '2147483647'
-    floatingBtn.style.width = '28px'
-    floatingBtn.style.height = '28px'
-    floatingBtn.style.borderRadius = '9999px'
-    floatingBtn.style.border = '1px solid rgba(0,0,0,0.1)'
-    floatingBtn.style.background = '#fff'
-    floatingBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)'
-    floatingBtn.style.display = 'flex'
-    floatingBtn.style.alignItems = 'center'
-    floatingBtn.style.justifyContent = 'center'
-    floatingBtn.style.cursor = 'pointer'
-    floatingBtn.style.transition = 'background 0.15s ease'
-    floatingBtn.onmouseenter = () => (floatingBtn!.style.background = '#f5f5f5')
-    floatingBtn.onmouseleave = () => (floatingBtn!.style.background = '#fff')
-    floatingBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="M12 3v2M5.22 5.22l1.42 1.42M3 12h2m1.78 6.78-1.42 1.42M12 19v2m6.78-1.78-1.42-1.42M19 12h2m-4.22-5.36 1.42-1.42"/><path d="M8 12a4 4 0 1 0 8 0"/></svg>'
-
-    const container = inputEl.closest('div') || inputEl.parentElement || document.body
-    if (container && container !== document.body) {
-      container.style.position = container.style.position || 'relative'
-      container.appendChild(floatingBtn)
-    } else {
-      document.body.appendChild(floatingBtn)
-      floatingBtn.style.position = 'fixed'
-    }
-
-    floatingBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' })
-    })
-  }
+  // Removed floating action button per product direction
 
   function showConfirmation(message: string) {
     if (!inputEl) return
@@ -199,7 +161,6 @@
     if (el && el !== inputEl) {
       inputEl = el
       dispatchReady()
-      ensureFloatingButton()
     }
   }
 
