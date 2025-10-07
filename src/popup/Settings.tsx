@@ -27,7 +27,7 @@ export default function Settings({ onBack }: SettingsProps) {
       const defaults = {
         openLibrary: isMac ? 'Command+Shift+P' : 'Ctrl+Shift+P',
         enhancePrompt: isMac ? 'Command+Shift+E' : 'Ctrl+Shift+E',
-        createPrompt: isMac ? 'Command+Shift+C' : 'Ctrl+Shift+C',
+        createPrompt: isMac ? 'Command+Shift+L' : 'Ctrl+Shift+L',
       }
       const merged: AppSettings = {
         ...existing,

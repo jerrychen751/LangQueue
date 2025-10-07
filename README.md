@@ -6,7 +6,7 @@ A Chrome extension for creating, organizing, and quickly inserting reusable prom
 
 - **Prompt library**: Create, edit, favorite, tag, search, and sort (recent, most used, alphabetical).
 - **One‑click insert**: Injects the selected prompt into ChatGPT or Gemini; falls back to copying to clipboard if direct insertion is unavailable.
-- **Keyboard shortcuts**: Open library (Cmd/Ctrl+Shift+P), Enhance prompt (Cmd/Ctrl+Shift+E), Create prompt (Cmd/Ctrl+Shift+C). Manage shortcuts at `chrome://extensions/shortcuts`.
+- **Keyboard shortcuts**: Open library (Cmd/Ctrl+Shift+P), Enhance prompt (Cmd/Ctrl+Shift+E), Create prompt (Cmd/Ctrl+Shift+L). Manage shortcuts at `chrome://extensions/shortcuts`.
 - **Import/Export**: Backup and restore your prompts as JSON with duplicate handling options.
 - **Privacy**: All data is stored locally in Chrome storage. No external servers.
 
@@ -33,7 +33,7 @@ Then in Chrome:
 ### Usage
 
 - Open ChatGPT or Gemini, then open LangQueue from the toolbar or press Cmd/Ctrl+Shift+P.
-- Create prompts via New Prompt or Cmd/Ctrl+Shift+C.
+- Create prompts via New Prompt or Cmd/Ctrl+Shift+L.
 - Click Insert on a prompt to place it into the current input. If insertion is not available on the page, the prompt is copied to your clipboard so you can paste.
 - Manage prompts with search, favorites, and sorting. Export/Import from Settings.
 
