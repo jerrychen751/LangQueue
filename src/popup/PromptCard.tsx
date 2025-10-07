@@ -40,18 +40,18 @@ export function PromptCard({ prompt, onEdit, onDelete, onInsert, onToggleFavorit
       title={canInsert ? 'Click to insert' : 'Open ChatGPT tab to enable insert'}
     >
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-gray-900 dark:text-gray-100 break-words max-w-full" title={prompt.title}>
             {prompt.title || 'Untitled'}
           </div>
-          <div className="relative mt-1">
+          <div className="relative mt-1 overflow-hidden">
             <div
-              className="text-[11px] leading-5 text-gray-600 dark:text-gray-300 whitespace-pre-wrap overflow-hidden"
+              className="text-[11px] leading-5 text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words overflow-hidden"
               style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as unknown as undefined }}
             >
               {prompt.content}
             </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-white to-transparent dark:from-gray-800" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-white to-transparent dark:from-gray-900" />
           </div>
         </div>
         <button
