@@ -17,6 +17,7 @@
     | { type: 'INJECT_PROMPT_RESULT'; payload: { ok: boolean; reason?: string } }
     | { type: 'INJECT_PROMPT_ERROR'; payload: { reason: string } }
     | { type: 'COMPAT_STATUS'; payload: { ready: boolean } }
+    | { type: 'CLICK_SEND' }
 
   const scriptMark = '__langqueue_gemini_content__'
   if ((window as unknown as Record<string, unknown>)[scriptMark]) return
@@ -93,18 +94,29 @@
     el.focus()
   }
 
+  function dispatchFrameworkInput(el: HTMLElement, data: string) {
+    try {
+      const ie = new InputEvent('input', { bubbles: true, data, inputType: 'insertText' } as unknown as InputEventInit)
+      el.dispatchEvent(ie)
+    } catch {
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+
   function setContentEditableValue(el: HTMLElement, value: string) {
     el.focus()
-    // Select all existing content then insert text to trigger frameworks' listeners
     const selection = window.getSelection()
-    if (selection) {
-      const range = document.createRange()
-      range.selectNodeContents(el)
-      selection.removeAllRanges()
-      selection.addRange(range)
-    }
-    document.execCommand('insertText', false, value)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.deleteContents()
+    const textNode = document.createTextNode(value)
+    range.insertNode(textNode)
+    // place caret after inserted text
+    range.setStartAfter(textNode)
+    range.setEndAfter(textNode)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    dispatchFrameworkInput(el, value)
   }
 
   function appendToContentEditable(el: HTMLElement, value: string) {
@@ -119,8 +131,15 @@
     }
     const needsNewline = (el.textContent || '').length > 0
     const textToInsert = `${needsNewline ? '\n' : ''}${value}`
-    document.execCommand('insertText', false, textToInsert)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
+    const textNode = document.createTextNode(textToInsert)
+    const range = selection ? selection.getRangeAt(0) : document.createRange()
+    range.insertNode(textNode)
+    // move caret after inserted text
+    range.setStartAfter(textNode)
+    range.setEndAfter(textNode)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    dispatchFrameworkInput(el, textToInsert)
   }
 
   function getInputText(el: HTMLTextAreaElement | HTMLElement | null): string {
@@ -398,6 +417,17 @@
         return sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: r.reason } })
       })
       return true
+    }
+    if (message.type === 'CLICK_SEND') {
+      const clicked = clickSendButton()
+      if (!clicked && inputEl && isVisible(inputEl as HTMLElement)) {
+        // Fallback: dispatch Enter on the input element
+        const el = inputEl as HTMLElement
+        const down = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true } as unknown as KeyboardEventInit)
+        const up = new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true } as unknown as KeyboardEventInit)
+        el.dispatchEvent(down)
+        el.dispatchEvent(up)
+      }
     }
     if (message.type === 'COMPAT_CHECK') {
       const ready = Boolean(findInput())
