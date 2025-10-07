@@ -74,6 +74,7 @@ export interface AppSettings {
   theme?: ThemePreference
   shortcuts?: AppShortcutsConfig
   insertionMode?: 'overwrite' | 'append'
+  chainDefaults?: ChainDefaults
 }
 
 export interface PromptExportFile {
@@ -84,5 +85,12 @@ export interface PromptExportFile {
 
 export type ImportMode = 'merge' | 'replace'
 export type DuplicateStrategy = 'skip' | 'replace' | 'duplicate'
+
+
+export interface ChainDefaults {
+  autoSend?: boolean
+  awaitResponse?: boolean
+  defaultDelayMs?: number
+}
 
 

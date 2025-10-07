@@ -16,6 +16,33 @@ export type CompatStatusMessage = { type: 'COMPAT_STATUS'; payload: { ready: boo
 export type InjectPromptResultMessage = { type: 'INJECT_PROMPT_RESULT'; payload: { ok: boolean; reason?: string } }
 export type InjectPromptErrorMessage = { type: 'INJECT_PROMPT_ERROR'; payload: { reason: 'TEXTAREA_NOT_FOUND' | 'UNKNOWN' } }
 
+// Prompt chaining types
+export type ChainStep = {
+  content: string
+  autoSend?: boolean
+  awaitResponse?: boolean
+  delayMs?: number
+}
+
+export type RunChainMessage = {
+  type: 'RUN_CHAIN'
+  payload: { steps: ChainStep[]; insertionModeOverride?: 'overwrite' | 'append' }
+}
+
+export type ChainProgressMessage = {
+  type: 'CHAIN_PROGRESS'
+  payload: {
+    stepIndex: number
+    totalSteps: number
+    status: 'starting' | 'sending' | 'awaiting_response' | 'delayed' | 'completed' | 'cancelled' | 'error'
+    error?: string
+  }
+}
+
+export type CancelChainMessage = {
+  type: 'CANCEL_CHAIN'
+}
+
 export type KnownMessage =
   | InjectPromptMessage
   | TextareaReadyMessage
@@ -24,5 +51,8 @@ export type KnownMessage =
   | CompatStatusMessage
   | InjectPromptResultMessage
   | InjectPromptErrorMessage
+  | RunChainMessage
+  | ChainProgressMessage
+  | CancelChainMessage
 
 

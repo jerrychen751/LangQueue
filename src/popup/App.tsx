@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Settings as SettingsIcon, ArrowLeft } from 'lucide-react'
+import { Plus, Settings as SettingsIcon, ArrowLeft, Play } from 'lucide-react'
 import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
 import type { Prompt } from '../types'
 import { getAllPrompts, updatePrompt, deletePrompt, getUsageStats, logUsage } from '../utils/storage'
-import { sendPromptToTab, detectActivePlatform } from '../utils/messaging'
+import { sendPromptToTab, detectActivePlatform, runChainOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
 import { checkTabCompatibility } from '../utils/messaging'
 import FilterBar, { type SortOption } from '../components/FilterBar'
 import Settings from './Settings'
+import ChainBuilder from '../components/ChainBuilder'
+import type { ChainStep } from '../types/messages'
 
 export default function App() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -25,6 +27,7 @@ export default function App() {
   
   const [stats, setStats] = useState<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }>({ totalPrompts: 0, totalUses: 0, mostUsedPrompt: null })
   const [view, setView] = useState<'main' | 'settings'>('main')
+  const [chainOpen, setChainOpen] = useState(false)
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -44,6 +47,22 @@ export default function App() {
 
   useEffect(() => {
     const handler: Parameters<typeof chrome.runtime.onMessage.addListener>[0] = (message) => {
+      if (typeof message === 'object' && message && (message as { type?: string }).type === 'CHAIN_PROGRESS') {
+          const { stepIndex, totalSteps, status, error } = (message as { payload?: { stepIndex?: number; totalSteps?: number; status?: string; error?: string } }).payload || {}
+          if (!status || typeof stepIndex !== 'number' || typeof totalSteps !== 'number') return
+          if (status === 'sending') {
+            showToast({ message: `Step ${stepIndex + 1}/${totalSteps} sent` })
+          }
+          if (status === 'completed' && stepIndex === totalSteps - 1) {
+            showToast({ variant: 'success', message: 'Chain completed!' })
+          }
+          if (status === 'error') {
+            showToast({ variant: 'error', message: `Chain error: ${error ?? 'Unknown error'}` })
+          }
+          if (status === 'cancelled') {
+            showToast({ variant: 'info', message: 'Chain cancelled' })
+          }
+      }
       if (typeof message === 'object' && message) {
         const type = (message as { type?: string }).type
         if (type === 'OPEN_NEW_PROMPT') {
@@ -65,7 +84,7 @@ export default function App() {
     }
     chrome.runtime.onMessage.addListener(handler)
     return () => chrome.runtime.onMessage.removeListener(handler)
-  }, [])
+  }, [showToast])
 
   // When navigating back from settings to main, ensure latest prompts are shown
   useEffect(() => {
@@ -266,13 +285,21 @@ export default function App() {
           <span>Total prompts: <span className="font-medium">{stats.totalPrompts}</span></span>
           <span>Total uses: <span className="font-medium">{stats.totalUses}</span></span>
         </div>
-        <button
-          onClick={handleCreate}
-          className="w-full inline-flex items-center justify-center gap-2 text-sm px-3 py-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15"
-        >
-          <Plus size={16} />
-          New Prompt
-        </button>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <button
+            onClick={() => setChainOpen(true)}
+            className="inline-flex items-center justify-center gap-2 text-sm px-3 py-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15"
+          >
+            <Play size={16} /> Chain Mode
+          </button>
+          <button
+            onClick={handleCreate}
+            className="inline-flex items-center justify-center gap-2 text-sm px-3 py-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15"
+          >
+            <Plus size={16} /> New Prompt
+          </button>
+        </div>
+        <button className="hidden" />
       </footer>
 
       <PromptModal
@@ -293,6 +320,23 @@ export default function App() {
           // Then ensure canonical ordering and stats from storage
           await handleRefresh()
           setModalOpen(false)
+        }}
+      />
+
+      <ChainBuilder
+        open={chainOpen}
+        availablePrompts={prompts}
+        onClose={() => setChainOpen(false)}
+        onRunChain={async (steps: ChainStep[], insertionMode) => {
+          try {
+            await runChainOnTab(steps, insertionMode)
+            showToast({ variant: 'success', message: 'Chain started' })
+            setChainOpen(false)
+            window.close()
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to start chain'
+            showToast({ variant: 'error', message })
+          }
         }}
       />
     </div>

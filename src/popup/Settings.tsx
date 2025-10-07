@@ -168,7 +168,47 @@ export default function Settings({ onBack }: SettingsProps) {
           </div>
         </section>
 
-        {null}
+        <section className="space-y-2">
+          <div className="font-medium">Chain execution defaults</div>
+          <label className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-md bg-white/5 border border-white/10 backdrop-blur-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 accent-amber-500"
+              checked={(settings.chainDefaults?.autoSend ?? true)}
+              onChange={(e) => setSettings((prev) => ({
+                ...prev,
+                chainDefaults: { ...prev.chainDefaults, autoSend: e.target.checked },
+              }))}
+            />
+            Auto-send each prompt in chain
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-md bg-white/5 border border-white/10 backdrop-blur-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 accent-amber-500"
+              checked={(settings.chainDefaults?.awaitResponse ?? true)}
+              onChange={(e) => setSettings((prev) => ({
+                ...prev,
+                chainDefaults: { ...prev.chainDefaults, awaitResponse: e.target.checked },
+              }))}
+            />
+            Wait for response before next prompt
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-md bg-white/5 border border-white/10 backdrop-blur-sm">
+            <span>Delay between prompts (ms)</span>
+            <input
+              type="number"
+              min={0}
+              max={30000}
+              value={(settings.chainDefaults?.defaultDelayMs ?? 1000)}
+              onChange={(e) => setSettings((prev) => ({
+                ...prev,
+                chainDefaults: { ...prev.chainDefaults, defaultDelayMs: Math.min(30000, Math.max(0, Number(e.target.value || 0))) },
+              }))}
+              className="w-28 px-2 py-1 text-xs border rounded bg-white dark:bg-gray-900 dark:border-gray-700"
+            />
+          </label>
+        </section>
 
         <section className="space-y-2">
           <div className="font-medium">Insertion behavior</div>
