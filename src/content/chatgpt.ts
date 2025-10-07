@@ -165,7 +165,25 @@
     return isVisible(btn)
   }
 
-  // Removed Enter-key fallback in chaining flow to avoid inserting newlines
+  function dispatchEnterOn(el: HTMLElement) {
+    el.focus()
+    const down = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      bubbles: true
+    } as unknown as KeyboardEventInit)
+    const up = new KeyboardEvent('keyup', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      bubbles: true
+    } as unknown as KeyboardEventInit)
+    el.dispatchEvent(down)
+    el.dispatchEvent(up)
+  }
 
   function clickSendButton(): boolean {
     // Keep input reference fresh for visibility and empty checks
@@ -180,6 +198,9 @@
     }
 
     const selectors = [
+      '#composer-submit-button',
+      'button#composer-submit-button',
+      'button.composer-submit-btn',
       'button[data-testid="send-button"]',
       'button[aria-label="Send message"]',
       'button[aria-label*="Send" i]',
@@ -349,11 +370,17 @@
       if (shouldAutoSend) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
         try {
-          // Allow UI to enable send after injection and retry briefly
+          // Allow UI to enable send after injection and retry a bit longer
           let sent = false
-          for (let attempt = 0; attempt < 20; attempt++) {
+          for (let attempt = 0; attempt < 40; attempt++) {
             if (clickSendButton()) { sent = true; break }
-            await new Promise((r) => setTimeout(r, 75))
+            await new Promise((r) => setTimeout(r, 100))
+          }
+          // ChatGPT usually submits on Enter if button click fails
+          if (!sent && targetInput && isVisible(targetInput as HTMLElement)) {
+            dispatchEnterOn(targetInput as HTMLElement)
+            await new Promise((r) => setTimeout(r, 150))
+            if (isGeneratingNow()) sent = true
           }
           if (!sent) {
             chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })
@@ -366,7 +393,9 @@
 
         if (shouldAwait) {
           chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'awaiting_response' } })
-          await awaitResponseComplete({ timeoutMs: 120000, pollMs: 200 })
+        await awaitResponseComplete({ timeoutMs: 120000, pollMs: 200 })
+        // Small guard delay to let UI re-enable controls for next step
+        await new Promise((r) => setTimeout(r, 150))
           if (currentChainAborted) {
             chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'cancelled' } })
             return false

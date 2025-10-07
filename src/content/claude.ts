@@ -140,6 +140,32 @@
     el.dispatchEvent(up)
   }
 
+  function dispatchComboOn(el: HTMLElement, combo: 'meta+enter' | 'ctrl+enter') {
+    el.focus()
+    const meta = combo === 'meta+enter'
+    const ctrl = combo === 'ctrl+enter'
+    const down = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      bubbles: true,
+      metaKey: meta,
+      ctrlKey: ctrl,
+    } as unknown as KeyboardEventInit)
+    const up = new KeyboardEvent('keyup', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      bubbles: true,
+      metaKey: meta,
+      ctrlKey: ctrl,
+    } as unknown as KeyboardEventInit)
+    el.dispatchEvent(down)
+    el.dispatchEvent(up)
+  }
+
   function clickSendButton(): boolean {
     if (!inputEl || !(inputEl as HTMLElement).isConnected || !isVisible(inputEl as HTMLElement)) {
       inputEl = findInput()
@@ -353,10 +379,23 @@
       if (shouldAutoSend) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
         try {
-          // Allow UI to enable the send button after content injection
-          await new Promise((r) => setTimeout(r, 50))
-          const clicked = clickSendButton()
-          if (!clicked) {
+          // Retry clicking send for a short window while the button enables
+          let sent = false
+          for (let attempt = 0; attempt < 40; attempt++) {
+            if (clickSendButton()) { sent = true; break }
+            await new Promise((r) => setTimeout(r, 100))
+          }
+          // Claude often uses Meta/Ctrl+Enter as a reliable fallback
+          if (!sent && targetInput && isVisible(targetInput as HTMLElement)) {
+            dispatchComboOn(targetInput as HTMLElement, 'meta+enter')
+            await new Promise((r) => setTimeout(r, 150))
+            if (!isGeneratingNow()) {
+              dispatchComboOn(targetInput as HTMLElement, 'ctrl+enter')
+              await new Promise((r) => setTimeout(r, 150))
+            }
+            if (isGeneratingNow()) sent = true
+          }
+          if (!sent) {
             chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })
             return false
           }
@@ -368,6 +407,8 @@
         if (shouldAwait) {
           chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'awaiting_response' } })
           await awaitResponseComplete({ timeoutMs: 120000, pollMs: 200 })
+          // Small guard delay to let UI re-enable controls for next step
+          await new Promise((r) => setTimeout(r, 150))
           if (currentChainAborted) {
             chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'cancelled' } })
             return false
