@@ -17,6 +17,9 @@ async function bootstrap() {
       </ToastProvider>
     </React.StrictMode>
   )
+  // Hide the HTML preloader once React mounts
+  const el = document.getElementById('preloader')
+  if (el) el.classList.add('hidden')
 }
 
 bootstrap()

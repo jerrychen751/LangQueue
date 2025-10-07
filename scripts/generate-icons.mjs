@@ -11,72 +11,46 @@ function ensureDirSync(dir) {
 
 function drawIcon(img, size) {
   const ctx = img.getContext('2d')
-  // flat background
-  const backgroundColor = '#0f172a'
-  ctx.fillStyle = backgroundColor
-  ctx.fillRect(0, 0, size, size)
-
-  // geometry for crisp, straight-edged L
-  const padding = Math.max(1, Math.floor(size * 0.12))
-  const contentLeft = padding
-  const contentTop = padding
-  const contentSize = size - padding * 2
-
-  const glyphColor = '#e5e7eb'
-  const lThickness = Math.max(2, Math.floor(size * 0.12))
-  const horizontalLength = Math.max(lThickness * 2, Math.floor((size - padding * 2) * 0.6))
-
-  // L vertical bar
-  ctx.fillStyle = glyphColor
-  ctx.fillRect(contentLeft, contentTop, lThickness, contentSize)
-
-  // L bottom bar (shorter than height to make L less square)
-  ctx.fillRect(contentLeft, contentTop + contentSize - lThickness, horizontalLength, lThickness)
-
-  // Q in the top-right quadrant, sitting on top of the L
-  const qBoxLeft = contentLeft + lThickness
-  const qBoxTop = contentTop
-  const qBoxSize = contentSize - lThickness
-  if (qBoxSize > 0) {
-    // Outer ring
-    const cx = qBoxLeft + qBoxSize / 2
-    const cy = qBoxTop + qBoxSize / 2
-    const outerR = qBoxSize / 2
-    const ringThickness = Math.max(1, Math.floor(qBoxSize * 0.18))
-    const innerR = Math.max(1, outerR - ringThickness)
-
-    // Draw outer filled circle (Q body)
-    ctx.fillStyle = glyphColor
-    ctx.beginPath()
-    ctx.arc(cx, cy, outerR, 0, Math.PI * 2, false)
-    ctx.fill()
-
-    // Punch inner hole to create the ring
-    ctx.fillStyle = backgroundColor
-    ctx.beginPath()
-    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, false)
-    ctx.fill()
-
-    // Q tail: diagonal wedge at bottom-right to read clearly as a Q (not O)
-    const theta = Math.PI / 4 // 45° (bottom-right)
-    const delta = Math.PI / 12 // wedge half-angle (~15°)
-    const tailLength = Math.max(1, Math.floor(qBoxSize * 0.28))
-
-    const base1x = cx + Math.cos(theta - delta) * outerR
-    const base1y = cy + Math.sin(theta - delta) * outerR
-    const base2x = cx + Math.cos(theta + delta) * outerR
-    const base2y = cy + Math.sin(theta + delta) * outerR
-    const tipx = cx + Math.cos(theta) * (outerR + tailLength)
-    const tipy = cy + Math.sin(theta) * (outerR + tailLength)
-
-    ctx.fillStyle = glyphColor
-    ctx.beginPath()
-    ctx.moveTo(base1x, base1y)
-    ctx.lineTo(base2x, base2y)
-    ctx.lineTo(tipx, tipy)
-    ctx.closePath()
-    ctx.fill()
+  // vertical gradient background to match action icon
+  const top = '#0f172a'
+  const bottom = '#1f2937'
+  // PureImage lacks gradients; approximate with bands
+  const bands = size
+  for (let y = 0; y < size; y++) {
+    const t = y / Math.max(1, size - 1)
+    const lerp = (a, b) => Math.round(a + (b - a) * t)
+    const topRgb = [0x0f, 0x17, 0x2a]
+    const botRgb = [0x1f, 0x29, 0x37]
+    const r = lerp(topRgb[0], botRgb[0])
+    const g = lerp(topRgb[1], botRgb[1])
+    const b = lerp(topRgb[2], botRgb[2])
+    ctx.fillStyle = `rgb(${r},${g},${b})`
+    ctx.fillRect(0, y, size, 1)
   }
+
+  // subtle border
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+  const border = Math.max(1, Math.floor(size * 0.05))
+  for (let i = 0; i < border; i++) {
+    ctx.strokeRect(i + 0.5, i + 0.5, size - 1 - i * 2, size - 1 - i * 2)
+  }
+
+  // Rounded-stroke L approximation with filled rects (PureImage lacks stroke caps)
+  const strokeWidth = Math.max(2, Math.floor(size * 0.14))
+  const glyphHeight = Math.floor(size * 0.50)
+  const horizontalLength = Math.floor(size * 0.40)
+  const bboxWidth = horizontalLength + strokeWidth
+  const bboxHeight = glyphHeight + strokeWidth
+  const originX = Math.floor((size - bboxWidth) / 2 + strokeWidth / 2)
+  // Shift up slightly for optical centering
+  const originY = Math.floor((size - bboxHeight) / 2 + strokeWidth / 2 - size * 0.04)
+  const color = '#e5e7eb'
+
+  // vertical bar
+  ctx.fillStyle = color
+  ctx.fillRect(originX, originY, strokeWidth, glyphHeight + Math.floor(strokeWidth / 2))
+  // bottom bar
+  ctx.fillRect(originX, originY + glyphHeight, horizontalLength + Math.floor(strokeWidth / 2), strokeWidth)
 }
 
 async function main() {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Sparkles, Plus, Settings as SettingsIcon, ArrowLeft } from 'lucide-react'
+import { Plus, Settings as SettingsIcon, ArrowLeft } from 'lucide-react'
+import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
 import type { Prompt } from '../types'
@@ -29,8 +30,14 @@ export default function App() {
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      await handleRefresh()
-      setLoading(false)
+      try {
+        await handleRefresh()
+      } catch (err) {
+        // Non-fatal: show a minimal inline error, but unblock UI
+        console.error('Failed to load prompts/stats', err)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -156,7 +163,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-popup min-w-popup max-w-popup h-[600px] bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col">
+    <div className="w-popup min-w-popup max-w-popup h-[600px] bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col relative">
       <header className="border-b bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900">
         <div className="flex items-center gap-2 p-3">
           {view === 'settings' ? (
@@ -164,7 +171,7 @@ export default function App() {
               <ArrowLeft size={16} />
             </button>
           ) : null}
-          <Sparkles size={18} className="text-sky-400" />
+          <Logo size={18} ariaLabel="LangQueue" className="shrink-0" />
           <div className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-purple-400 to-pink-400">LangQueue</div>
           <div className="ml-auto flex items-center gap-2 text-xs" title={checking ? 'Detecting compatibility…' : compatible ? `Ready on ${platform === 'gemini' ? 'Gemini' : 'ChatGPT'}` : 'Not detected on current tab'}>
             <span
@@ -243,6 +250,16 @@ export default function App() {
         )}
       </main>
       )}
+
+      {/* Initial full-screen loading overlay */}
+      {loading ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 z-50">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-7 w-7 rounded-full border-2 border-gray-300 dark:border-gray-700 border-t-sky-400 animate-spin" aria-label="Loading" />
+            <div className="text-xs font-medium bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-purple-400 to-pink-400">Loading…</div>
+          </div>
+        </div>
+      ) : null}
 
       <footer className="border-t p-3">
         <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-4">

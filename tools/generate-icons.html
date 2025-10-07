@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LangQueue Icon Generator</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background:#0b1220; color:#e5e7eb; padding:24px; }
+      .wrap { max-width: 720px; margin: 0 auto; }
+      .grid { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:16px; margin-top:16px; }
+      .card { background:#0f172a; border:1px solid #1f2937; border-radius:12px; padding:12px; text-align:center; }
+      canvas { display:block; margin:8px auto; image-rendering: pixelated; }
+      button, a.btn { background:#111827; color:#e5e7eb; border:1px solid #374151; padding:6px 10px; border-radius:8px; cursor:pointer; text-decoration:none; display:inline-block; }
+      button:hover, a.btn:hover { background:#0b1220; }
+      .bar { display:flex; gap:8px; align-items:center; margin-top:16px; }
+      code { background:#111827; padding:2px 6px; border-radius:6px; border:1px solid #1f2937; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2>LangQueue Icon Generator</h2>
+      <p>Generates the exact same “L on dark gradient” as the extension action icon for sizes 16, 32, 48, and 128.</p>
+      <div id="grid" class="grid"></div>
+      <div class="bar">
+        <button id="downloadAll">Download all PNGs</button>
+        <span>Then replace files in <code>extension/public/images/</code>: <code>icon16.png</code>, <code>icon32.png</code>, <code>icon48.png</code>, <code>icon128.png</code></span>
+      </div>
+    </div>
+
+    <script>
+      function drawLIcon(ctx, size) {
+        const gradient = ctx.createLinearGradient(0, 0, 0, size)
+        gradient.addColorStop(0, '#0f172a')
+        gradient.addColorStop(1, '#1f2937')
+        ctx.fillStyle = gradient
+        ctx.fillRect(0, 0, size, size)
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+        ctx.lineWidth = Math.max(1, Math.floor(size * 0.05))
+        ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth)
+
+        const strokeWidth = Math.max(2, Math.floor(size * 0.14))
+        const glyphHeight = Math.floor(size * 0.50)
+        const horizontalLength = Math.floor(size * 0.40)
+        const bboxWidth = horizontalLength + strokeWidth
+        const bboxHeight = glyphHeight + strokeWidth
+        const originX = Math.floor((size - bboxWidth) / 2 + strokeWidth / 2)
+        // Shift up slightly for optical centering
+        const originY = Math.floor((size - bboxHeight) / 2 + strokeWidth / 2 - size * 0.04)
+
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        ctx.lineWidth = strokeWidth
+        ctx.strokeStyle = '#e5e7eb'
+        ctx.shadowColor = 'rgba(0,0,0,0.18)'
+        ctx.shadowBlur = Math.max(0, Math.floor(size * 0.06))
+
+        ctx.beginPath()
+        ctx.moveTo(originX, originY)
+        ctx.lineTo(originX, originY + glyphHeight)
+        ctx.lineTo(originX + horizontalLength, originY + glyphHeight)
+        ctx.stroke()
+      }
+
+      function createCard(size) {
+        const wrap = document.createElement('div')
+        wrap.className = 'card'
+        const label = document.createElement('div')
+        label.textContent = size + 'x' + size
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+        drawLIcon(ctx, size)
+        const a = document.createElement('a')
+        a.className = 'btn'
+        a.textContent = 'Download PNG'
+        a.href = canvas.toDataURL('image/png')
+        a.download = 'icon' + size + '.png'
+        wrap.appendChild(label)
+        wrap.appendChild(canvas)
+        wrap.appendChild(a)
+        return { wrap, canvas }
+      }
+
+      const sizes = [16, 32, 48, 128]
+      const grid = document.getElementById('grid')
+      const cards = sizes.map((s) => createCard(s))
+      cards.forEach((c) => grid.appendChild(c.wrap))
+
+      document.getElementById('downloadAll').addEventListener('click', () => {
+        cards.forEach((c, i) => {
+          const a = document.createElement('a')
+          a.href = c.canvas.toDataURL('image/png')
+          a.download = 'icon' + sizes[i] + '.png'
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+        })
+      })
+    </script>
+  </body>
+  </html>
+
+
