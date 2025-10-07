@@ -11,47 +11,72 @@ function ensureDirSync(dir) {
 
 function drawIcon(img, size) {
   const ctx = img.getContext('2d')
-  // background gradient (approximate with two rects since pureimage lacks gradients)
-  ctx.fillStyle = '#0f172a' // start
-  ctx.fillRect(0, 0, size, Math.floor(size * 0.55))
-  ctx.fillStyle = '#1f2937' // end
-  ctx.fillRect(0, Math.floor(size * 0.55), size, size - Math.floor(size * 0.55))
+  // flat background
+  const backgroundColor = '#0f172a'
+  ctx.fillStyle = backgroundColor
+  ctx.fillRect(0, 0, size, size)
 
-  // subtle border
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)'
-  const lineW = Math.max(1, Math.floor(size * 0.05))
-  ctx.lineWidth = lineW
-  ctx.strokeRect(lineW / 2, lineW / 2, size - lineW, size - lineW)
+  // geometry for crisp, straight-edged L
+  const padding = Math.max(1, Math.floor(size * 0.12))
+  const contentLeft = padding
+  const contentTop = padding
+  const contentSize = size - padding * 2
 
-  // draw L with round joins
-  const strokeWidth = Math.max(2, Math.floor(size * 0.16))
-  const glyphHeight = Math.floor(size * 0.50)
-  const horizontalLength = Math.floor(size * 0.40)
-  const bboxWidth = horizontalLength + strokeWidth
-  const bboxHeight = glyphHeight + strokeWidth
-  const originX = Math.floor((size - bboxWidth) / 2 + strokeWidth / 2)
-  const originY = Math.floor((size - bboxHeight) / 2 + strokeWidth / 2)
+  const glyphColor = '#e5e7eb'
+  const lThickness = Math.max(2, Math.floor(size * 0.12))
+  const horizontalLength = Math.max(lThickness * 2, Math.floor((size - padding * 2) * 0.6))
 
-  ctx.strokeStyle = '#e5e7eb'
-  ctx.lineWidth = strokeWidth
-  ctx.lineJoin = 'round'
-  ctx.lineCap = 'round'
+  // L vertical bar
+  ctx.fillStyle = glyphColor
+  ctx.fillRect(contentLeft, contentTop, lThickness, contentSize)
 
-  // shadow (simple fake by drawing behind)
-  ctx.beginPath()
-  ctx.moveTo(originX + 1, originY + 1)
-  ctx.lineTo(originX + 1, originY + glyphHeight + 1)
-  ctx.lineTo(originX + horizontalLength + 1, originY + glyphHeight + 1)
-  ctx.strokeStyle = 'rgba(0,0,0,0.2)'
-  ctx.stroke()
+  // L bottom bar (shorter than height to make L less square)
+  ctx.fillRect(contentLeft, contentTop + contentSize - lThickness, horizontalLength, lThickness)
 
-  // foreground L
-  ctx.beginPath()
-  ctx.moveTo(originX, originY)
-  ctx.lineTo(originX, originY + glyphHeight)
-  ctx.lineTo(originX + horizontalLength, originY + glyphHeight)
-  ctx.strokeStyle = '#e5e7eb'
-  ctx.stroke()
+  // Q in the top-right quadrant, sitting on top of the L
+  const qBoxLeft = contentLeft + lThickness
+  const qBoxTop = contentTop
+  const qBoxSize = contentSize - lThickness
+  if (qBoxSize > 0) {
+    // Outer ring
+    const cx = qBoxLeft + qBoxSize / 2
+    const cy = qBoxTop + qBoxSize / 2
+    const outerR = qBoxSize / 2
+    const ringThickness = Math.max(1, Math.floor(qBoxSize * 0.18))
+    const innerR = Math.max(1, outerR - ringThickness)
+
+    // Draw outer filled circle (Q body)
+    ctx.fillStyle = glyphColor
+    ctx.beginPath()
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2, false)
+    ctx.fill()
+
+    // Punch inner hole to create the ring
+    ctx.fillStyle = backgroundColor
+    ctx.beginPath()
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, false)
+    ctx.fill()
+
+    // Q tail: diagonal wedge at bottom-right to read clearly as a Q (not O)
+    const theta = Math.PI / 4 // 45° (bottom-right)
+    const delta = Math.PI / 12 // wedge half-angle (~15°)
+    const tailLength = Math.max(1, Math.floor(qBoxSize * 0.28))
+
+    const base1x = cx + Math.cos(theta - delta) * outerR
+    const base1y = cy + Math.sin(theta - delta) * outerR
+    const base2x = cx + Math.cos(theta + delta) * outerR
+    const base2y = cy + Math.sin(theta + delta) * outerR
+    const tipx = cx + Math.cos(theta) * (outerR + tailLength)
+    const tipy = cy + Math.sin(theta) * (outerR + tailLength)
+
+    ctx.fillStyle = glyphColor
+    ctx.beginPath()
+    ctx.moveTo(base1x, base1y)
+    ctx.lineTo(base2x, base2y)
+    ctx.lineTo(tipx, tipy)
+    ctx.closePath()
+    ctx.fill()
+  }
 }
 
 async function main() {
@@ -60,9 +85,7 @@ async function main() {
     const img = PImage.make(s, s)
     drawIcon(img, s)
     const outPath = path.join(outDir, `icon${s}.png`)
-    const stream = fs.createWriteStream(outPath)
-    await PImage.encodePNGToStream(img, stream)
-    await new Promise((res) => stream.on('finish', res))
+    await PImage.encodePNGToStream(img, fs.createWriteStream(outPath))
     // eslint-disable-next-line no-console
     console.log(`wrote ${outPath}`)
   }
