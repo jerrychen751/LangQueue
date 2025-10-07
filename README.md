@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+## LangQueue
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A Chrome extension for creating, organizing, and quickly inserting reusable prompts into ChatGPT and Google Gemini. Keep a personal prompt library, search and favorite items, and insert into the active chat with one click or a keyboard shortcut.
 
-Currently, two official plugins are available:
+### Highlights
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Prompt library**: Create, edit, favorite, tag, search, and sort (recent, most used, alphabetical).
+- **One‑click insert**: Injects the selected prompt into ChatGPT or Gemini; falls back to copying to clipboard if direct insertion is unavailable.
+- **Keyboard shortcuts**: Open library (Cmd/Ctrl+Shift+P), Enhance prompt (Cmd/Ctrl+Shift+E), Create prompt (Cmd/Ctrl+Shift+C). Manage shortcuts at `chrome://extensions/shortcuts`.
+- **Import/Export**: Backup and restore your prompts as JSON with duplicate handling options.
+- **Privacy**: All data is stored locally in Chrome storage. No external servers.
 
-## React Compiler
+### Supported sites
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- ChatGPT (`chat.openai.com`, `chatgpt.com`)
+- Google Gemini (`gemini.google.com`)
 
-## Expanding the ESLint configuration
+### Install from source
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Prerequisites: Node.js 18+ and npm.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd extension
+npm install
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Then in Chrome:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+1. Open `chrome://extensions` and enable Developer mode.
+2. Click Load unpacked and select `extension/dist`.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Usage
+
+- Open ChatGPT or Gemini, then open LangQueue from the toolbar or press Cmd/Ctrl+Shift+P.
+- Create prompts via New Prompt or Cmd/Ctrl+Shift+C.
+- Click Insert on a prompt to place it into the current input. If insertion is not available on the page, the prompt is copied to your clipboard so you can paste.
+- Manage prompts with search, favorites, and sorting. Export/Import from Settings.
+
+### Development
+
+```bash
+cd extension
+npm install
+npm run dev   # start Vite in development
+npm run lint  # run ESLint
 ```
+
+Load `extension/dist` as an unpacked extension while developing.
+
+### Tech
+
+- React 18, TypeScript, Vite, `@crxjs/vite-plugin`
+- Tailwind CSS, lucide-react
+- Chrome Extension Manifest V3, content scripts, Chrome storage APIs
