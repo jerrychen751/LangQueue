@@ -152,6 +152,8 @@
       'button[aria-label="Send message"]',
       'button[aria-label="Send"]',
       'button[aria-label*="Send" i]',
+      'button[data-testid="send-button"]',
+      'button[data-testid*="send" i]',
       'button[type="submit"]',
       'form button[type="submit"]',
       'form [type="submit"]'
@@ -180,6 +182,16 @@
         } catch {
           void 0
         }
+      }
+      // Fallback: use HTMLFormElement.requestSubmit when available
+      try {
+        const htmlForm = form as HTMLFormElement
+        if (typeof htmlForm.requestSubmit === 'function') {
+          htmlForm.requestSubmit()
+          return true
+        }
+      } catch {
+        // ignore
       }
     }
 
@@ -339,6 +351,8 @@
       if (shouldAutoSend) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
         try {
+          // Allow UI to enable the send button after content injection
+          await new Promise((r) => setTimeout(r, 50))
           const clicked = clickSendButton()
           if (!clicked) {
             chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })

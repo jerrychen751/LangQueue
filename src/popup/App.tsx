@@ -192,13 +192,13 @@ export default function App() {
           ) : null}
           <Logo size={18} ariaLabel="LangQueue" className="shrink-0" />
           <div className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-purple-400 to-pink-400">LangQueue</div>
-          <div className="ml-auto flex items-center gap-2 text-xs" title={checking ? 'Detecting compatibility…' : compatible ? `Ready on ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` : 'Not detected on current tab'}>
+          <div className="ml-auto flex items-center gap-2 text-xs" title={checking ? 'Detecting compatibility…' : compatible ? `Ready on ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : platform === 'chatgpt' ? 'ChatGPT' : 'this page'}` : 'Not detected on current tab'}>
             <span
               className={`inline-block w-2 h-2 rounded-full ${checking ? 'bg-gray-300 dark:bg-gray-700 animate-pulse' : compatible ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
               aria-hidden
             />
             <span className={compatible ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'}>
-              {checking ? 'Detecting…' : compatible ? (platform === 'gemini' ? 'Gemini detected' : platform === 'claude' ? 'Claude detected' : 'ChatGPT detected') : 'Open ChatGPT, Gemini, or Claude to enable Insert'}
+              {checking ? 'Detecting…' : compatible ? (platform === 'gemini' ? 'Gemini detected' : platform === 'claude' ? 'Claude detected' : platform === 'chatgpt' ? 'ChatGPT detected' : 'Detected') : 'Open ChatGPT, Gemini, or Claude to enable Insert'}
             </span>
             {view === 'main' ? (
               <button className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setView('settings')} aria-label="Settings">
