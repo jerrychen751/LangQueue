@@ -3,8 +3,8 @@ import { Plus, Settings as SettingsIcon, ArrowLeft, Play } from 'lucide-react'
 import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
-import type { Prompt } from '../types'
-import { getAllPrompts, updatePrompt, deletePrompt, getUsageStats, logUsage } from '../utils/storage'
+import type { Prompt, SavedChain } from '../types'
+import { getAllPrompts, updatePrompt, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain } from '../utils/storage'
 import { sendPromptToTab, detectActivePlatform, runChainOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
 import { checkTabCompatibility } from '../utils/messaging'
@@ -28,6 +28,7 @@ export default function App() {
   const [stats, setStats] = useState<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }>({ totalPrompts: 0, totalUses: 0, mostUsedPrompt: null })
   const [view, setView] = useState<'main' | 'settings'>('main')
   const [chainOpen, setChainOpen] = useState(false)
+  const [chains, setChains] = useState<SavedChain[]>([])
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -93,6 +94,13 @@ export default function App() {
     }
   }, [view])
 
+  // Refresh chains when chain builder closes
+  useEffect(() => {
+    if (!chainOpen) {
+      handleRefresh()
+    }
+  }, [chainOpen])
+
   useEffect(() => {
     const check = async () => {
       setChecking(true)
@@ -148,9 +156,14 @@ export default function App() {
   }, [prompts, query, favoritesOnly, sort])
 
   async function handleRefresh() {
-    const items = await getAllPrompts('local')
+    const [items, savedChains, stats] = await Promise.all([
+      getAllPrompts('local'),
+      getAllChains('local'),
+      getUsageStats('local'),
+    ])
     setPrompts(items)
-    setStats(await getUsageStats('local'))
+    setChains(savedChains)
+    setStats(stats)
   }
 
   async function handleCreate() {
@@ -179,6 +192,18 @@ export default function App() {
     await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id }, 'local')
     await handleRefresh()
     window.close()
+  }
+
+  async function handleRunChainFromLibrary(chain: SavedChain) {
+    const steps = chain.steps.map((s) => ({ content: s.content, autoSend: true, awaitResponse: true, delayMs: 500 }))
+    try {
+      await runChainOnTab(steps, 'overwrite')
+      showToast({ variant: 'success', message: 'Chain started' })
+      window.close()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to start chain'
+      showToast({ variant: 'error', message })
+    }
   }
 
   return (
@@ -250,22 +275,84 @@ export default function App() {
         ) : !loading && visiblePrompts.length === 0 ? (
           <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-12">No results. Try clearing filters or adjusting your search.</div>
         ) : (
-          <div className="grid gap-3 grid-cols-1">
+          <>
+            <div className="grid gap-3 grid-cols-1">
             {visiblePrompts.map((p) => (
-              <PromptCard
-                key={p.id}
-                prompt={p}
-                onEdit={() => {
-                  setEditing(p)
-                  setModalOpen(true)
-                }}
-                onDelete={handleDelete}
+                <PromptCard
+                  key={p.id}
+                  prompt={p}
+                  onEdit={() => {
+                    setEditing(p)
+                    setModalOpen(true)
+                  }}
+                  onDelete={handleDelete}
                 onInsert={handleInsert}
-                onToggleFavorite={handleToggleFavorite}
-                canInsert={compatible}
-              />
-            ))}
-          </div>
+                onSend={async (prompt) => {
+                  // Insert then auto-send and await with default delay via a one-step chain for reliability
+                  const steps: ChainStep[] = [{ content: prompt.content, autoSend: true, awaitResponse: true, delayMs: 500 }]
+                  try {
+                    await runChainOnTab(steps, 'overwrite')
+                    showToast({ variant: 'success', message: 'Sent' })
+                    window.close()
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : 'Failed to send'
+                    showToast({ variant: 'error', message })
+                  }
+                }}
+                  onToggleFavorite={handleToggleFavorite}
+                  canInsert={compatible}
+                />
+              ))}
+            </div>
+
+            <div className="mt-4">
+              <div className="px-1 py-2 text-xs font-medium text-gray-600 dark:text-gray-300">Chains</div>
+              {chains.length === 0 ? (
+                <div className="text-xs text-gray-500 dark:text-gray-400 px-1">No saved chains.</div>
+              ) : (
+                <ul className="divide-y rounded-md border dark:border-gray-700">
+                  {chains.map((c) => (
+                    <li key={c.id} className="p-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{c.title}</div>
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400">{c.steps.length} step{c.steps.length === 1 ? '' : 's'}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                          onClick={() => handleRunChainFromLibrary(c)}
+                        >
+                          <Play size={14} /> Run
+                        </button>
+                        <button
+                          className="px-2 py-1.5 text-xs rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white hover:bg-white/15"
+                          onClick={async () => {
+                            const nextTitle = prompt('Rename chain', c.title)?.trim()
+                            if (!nextTitle) return
+                            const updated: SavedChain = { ...c, title: nextTitle, updatedAt: Date.now() }
+                            await saveChain(updated, 'local')
+                            await handleRefresh()
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="px-2 py-1.5 text-xs rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white hover:bg-white/15"
+                          onClick={async () => {
+                            if (!confirm('Delete this chain?')) return
+                            await deleteChain(c.id, 'local')
+                            await handleRefresh()
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
         )}
       </main>
       )}

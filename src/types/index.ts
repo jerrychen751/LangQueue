@@ -94,3 +94,19 @@ export interface ChainDefaults {
 }
 
 
+export interface SavedChain {
+  id: string
+  title: string
+  steps: { content: string }[]
+  createdAt: number
+  updatedAt: number
+  description?: string
+}
+
+export interface ChainExportFile {
+  version: number
+  exportedAt: number
+  chains: SavedChain[]
+}
+
+

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Play, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Trash2, X, Save } from 'lucide-react'
 import type { Prompt } from '../types'
 import type { ChainStep } from '../types/messages'
+import { saveChain } from '../utils/storage'
+import { useToast } from './useToast'
 
 type ChainBuilderProps = {
   open: boolean
@@ -14,8 +16,6 @@ type ChainItem = {
   id: string
   title: string
   content: string
-  autoSend: boolean
-  awaitResponse: boolean
   delayMs: number
 }
 
@@ -23,9 +23,11 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const lastActiveRef = useRef<HTMLElement | null>(null)
 
-  const [insertionMode, setInsertionMode] = useState<'overwrite' | 'append'>('overwrite')
   const [items, setItems] = useState<ChainItem[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [title, setTitle] = useState('')
+  const { showToast } = useToast()
 
   useEffect(() => {
     if (!open) return
@@ -71,9 +73,7 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
       id: `${p.id}_${Date.now()}`,
       title: p.title,
       content: p.content,
-      autoSend: true,
-      awaitResponse: true,
-      delayMs: 0,
+      delayMs: 500,
     }
     setItems((prev) => [...prev, item])
   }
@@ -104,11 +104,10 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     })
   }
 
-  function updateItem(index: number, changes: Partial<Pick<ChainItem, 'autoSend' | 'awaitResponse' | 'delayMs'>>) {
-    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...changes } : it)))
-  }
+  // No per-step editing; autosend/await and delay are fixed
 
   const canRun = items.length > 0 && !submitting
+  const canSave = items.length > 0 && title.trim().length > 0 && !saving
 
   const sortedPrompts = useMemo(() => {
     return [...availablePrompts].sort((a, b) => a.title.localeCompare(b.title))
@@ -119,15 +118,31 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     setSubmitting(true)
     const steps: ChainStep[] = items.map((it) => ({
       content: it.content,
-      autoSend: it.autoSend,
-      awaitResponse: it.awaitResponse,
-      delayMs: it.delayMs,
+      autoSend: true,
+      awaitResponse: true,
+      delayMs: 500,
     }))
     try {
-      onRunChain(steps, insertionMode)
+      onRunChain(steps, 'overwrite')
       handleClose()
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleSaveChain() {
+    if (!canSave) return
+    setSaving(true)
+    try {
+      const now = Date.now()
+      await saveChain({ id: '', title: title.trim(), steps: items.map((it) => ({ content: it.content })), createdAt: now, updatedAt: now }, 'local')
+      showToast({ variant: 'success', message: 'Chain saved to library' })
+      setTitle('')
+      handleClose()
+    } catch (err) {
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to save chain' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -220,36 +235,7 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
                               </div>
                             </div>
 
-                            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                              <label className="inline-flex items-center gap-2 px-2 py-1 rounded border bg-white dark:bg-gray-900 dark:border-gray-700">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 accent-amber-500"
-                                  checked={it.autoSend}
-                                  onChange={(e) => updateItem(idx, { autoSend: e.target.checked })}
-                                />
-                                Auto-send
-                              </label>
-                              <label className="inline-flex items-center gap-2 px-2 py-1 rounded border bg-white dark:bg-gray-900 dark:border-gray-700">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 accent-amber-500"
-                                  checked={it.awaitResponse}
-                                  onChange={(e) => updateItem(idx, { awaitResponse: e.target.checked })}
-                                />
-                                Await response
-                              </label>
-                              <label className="inline-flex items-center gap-2 px-2 py-1 rounded border bg-white dark:bg-gray-900 dark:border-gray-700">
-                                <span>Delay (ms)</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={it.delayMs}
-                                  onChange={(e) => updateItem(idx, { delayMs: Math.max(0, Number(e.target.value || 0)) })}
-                                  className="w-24 px-2 py-1 text-xs border rounded bg-white dark:bg-gray-900 dark:border-gray-700"
-                                />
-                              </label>
-                            </div>
+                            {/* Per-step controls removed; autosend/await and delay are fixed by design */}
                           </div>
                         </div>
                       </li>
@@ -260,29 +246,27 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-3 flex items-center justify-end">
             <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-700 dark:text-gray-300">Insertion mode</label>
-              <select
-                value={insertionMode}
-                onChange={(e) => setInsertionMode((e.target.value as 'overwrite' | 'append') ?? 'overwrite')}
-                className="px-2 py-1 text-xs border rounded bg-white dark:bg-gray-900 dark:border-gray-700"
-              >
-                <option value="overwrite">overwrite</option>
-                <option value="append">append</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white" onClick={handleClose} disabled={submitting}>
-                Cancel
-              </button>
+              <input
+                type="text"
+                value={title}
+                placeholder="Chain title"
+                onChange={(e) => setTitle(e.target.value)}
+                className="px-2 py-1 text-xs border rounded bg-white dark:bg-gray-900 dark:border-gray-700 w-40"
+              />
               <button
                 className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-xl bg-emerald-600 text-white shadow hover:bg-emerald-700 disabled:opacity-60"
-                onClick={handleRun}
-                disabled={!canRun}
+                onClick={async () => {
+                  await handleSaveChain()
+                  handleRun()
+                }}
+                disabled={!canSave || !canRun}
               >
-                <Play size={16} />
-                Run Chain
+                <Save size={16} /> Run and Save
+              </button>
+              <button className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white" onClick={handleClose} disabled={submitting}>
+                Cancel
               </button>
             </div>
           </div>

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Download, Upload, Trash2, Keyboard } from 'lucide-react'
-import type { AppSettings, PromptExportFile, ImportMode, DuplicateStrategy } from '../types'
-import { clearAllData, exportPrompts, getAllPrompts, getSettings, importPrompts, saveSettings } from '../utils/storage'
+import { ArrowLeft, Keyboard } from 'lucide-react'
+import type { AppSettings } from '../types'
+import { getSettings, saveSettings } from '../utils/storage'
 import { useToast } from '../components/useToast'
+
 
 type SettingsProps = {
   onBack: () => void
@@ -10,12 +11,9 @@ type SettingsProps = {
 
 export default function Settings({ onBack }: SettingsProps) {
   const [settings, setSettings] = useState<AppSettings>({})
-  const [stats, setStats] = useState<{ totalPrompts: number; storageKb: number }>({ totalPrompts: 0, storageKb: 0 })
   const [status, setStatus] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const [importMode, setImportMode] = useState<ImportMode>('merge')
-  const [dupStrategy, setDupStrategy] = useState<DuplicateStrategy>('skip')
-  const { showToast } = useToast()
+  // Toasts not used now that storage controls are removed
+  useToast()
   const autosaveTimerRef = useRef<number | null>(null)
   const didHydrateRef = useRef(false)
 
@@ -39,9 +37,6 @@ export default function Settings({ onBack }: SettingsProps) {
         },
       }
       setSettings(merged)
-      const prompts = await getAllPrompts('local')
-      const storageKb = Math.round((JSON.stringify(prompts).length / 1024) * 10) / 10
-      setStats({ totalPrompts: prompts.length, storageKb })
     }
     load()
   }, [])
@@ -67,39 +62,7 @@ export default function Settings({ onBack }: SettingsProps) {
     }
   }, [settings])
 
-  async function handleExport() {
-    setStatus(null)
-    const data = await exportPrompts('local')
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `langqueue_prompts_${new Date().toISOString()}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    setStatus('Exported prompts to file.')
-  }
-
-  async function handleImportFile(file: File) {
-    setStatus(null)
-    try {
-      const text = await file.text()
-      const json = JSON.parse(text) as PromptExportFile
-      const res = await importPrompts(json, { mode: importMode, duplicateStrategy: dupStrategy }, 'local')
-      setStatus(`Imported: ${res.imported}, Replaced: ${res.replaced}, Duplicated: ${res.duplicated}, Skipped: ${res.skipped}`)
-      const prompts = await getAllPrompts('local')
-      const storageKb = Math.round((JSON.stringify(prompts).length / 1024) * 10) / 10
-      setStats({ totalPrompts: prompts.length, storageKb })
-      chrome.runtime.sendMessage({ type: 'PROMPTS_IMPORTED' })
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Import failed: invalid JSON or format.'
-      setStatus(message)
-    }
-  }
-
-  function openImport() {
-    fileInputRef.current?.click()
-  }
+  // Removed storage import/export helpers and UI
 
   // Shortcuts are read-only in the UI; changes are not allowed via form
 
@@ -234,65 +197,7 @@ export default function Settings({ onBack }: SettingsProps) {
           </label>
         </section>
 
-        <section className="space-y-2">
-          <div className="font-medium">Storage</div>
-          <div className="text-gray-600 dark:text-gray-300">{stats.totalPrompts} prompts, ~{stats.storageKb} KB</div>
-          <div className="flex items-center gap-2">
-            <button className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15" onClick={handleExport}>
-              <Download size={14} /> Export JSON
-            </button>
-            <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) handleImportFile(f)
-              e.currentTarget.value = ''
-            }} />
-            <button className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15" onClick={openImport}>
-              <Upload size={14} /> Import JSON
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="inline-flex items-center gap-2">
-              <span className="text-gray-600 dark:text-gray-300">Import mode</span>
-              <select value={importMode} onChange={(e) => setImportMode(e.target.value as ImportMode)} className="border rounded px-2 py-1 bg-white dark:bg-gray-800 dark:border-gray-700">
-                <option value="merge">Merge</option>
-                <option value="replace">Replace</option>
-              </select>
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <span className="text-gray-600 dark:text-gray-300">Duplicates</span>
-              <select value={dupStrategy} onChange={(e) => setDupStrategy(e.target.value as DuplicateStrategy)} className="border rounded px-2 py-1 bg-white dark:bg-gray-800 dark:border-gray-700">
-                <option value="skip">Skip</option>
-                <option value="replace">Replace</option>
-                <option value="duplicate">Duplicate</option>
-              </select>
-            </label>
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <div className="font-medium text-rose-700">Danger zone</div>
-          <button
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-xl bg-rose-600/20 border border-rose-400/40 text-rose-200 backdrop-blur-md hover:bg-rose-600/25"
-            onClick={async () => {
-              if (!confirm('This will clear all prompts and usage data. Continue?')) return
-              try {
-                await clearAllData('local')
-                // Keep dark theme enforced
-                document.documentElement.classList.add('dark')
-                setStatus('All data cleared')
-                setStats({ totalPrompts: 0, storageKb: 0 })
-                showToast({ variant: 'success', message: 'All data cleared' })
-                // Notify popup to refresh and return to main view
-                chrome.runtime.sendMessage({ type: 'DB_CLEARED' })
-              } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : 'Failed to clear data'
-                setStatus(message)
-              }
-            }}
-          >
-            <Trash2 size={14} /> Clear all data
-          </button>
-        </section>
+        {/* Storage/import/export and danger zone sections removed per product direction */}
 
         <section>
           <button className="w-full inline-flex items-center justify-center gap-2 text-sm px-3 py-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15" onClick={saveAll}>

@@ -9,6 +9,7 @@ type PromptCardProps = {
   onEdit: (prompt: Prompt) => void
   onDelete: (prompt: Prompt) => void
   onInsert: (prompt: Prompt) => void
+  onSend?: (prompt: Prompt) => void
   onToggleFavorite: (prompt: Prompt) => void
   canInsert?: boolean
 }
@@ -27,7 +28,7 @@ function hashColorFromTag(tag: string): string {
   return palette[sum]
 }
 
-export function PromptCard({ prompt, onEdit, onDelete, onInsert, onToggleFavorite, canInsert = true }: PromptCardProps) {
+export function PromptCard({ prompt, onEdit, onDelete, onInsert, onSend, onToggleFavorite, canInsert = true }: PromptCardProps) {
   const { showToast } = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
 
@@ -55,11 +56,12 @@ export function PromptCard({ prompt, onEdit, onDelete, onInsert, onToggleFavorit
           </div>
         </div>
         <button
-          className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition ${prompt.isFavorite ? 'text-amber-500' : 'text-gray-500'}`}
-          onClick={() => onToggleFavorite(prompt)}
+          className={`p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition ${prompt.isFavorite ? 'text-amber-500' : 'text-gray-500'}`}
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(prompt) }}
           title={prompt.isFavorite ? 'Unfavorite' : 'Favorite'}
+          aria-label={prompt.isFavorite ? 'Unfavorite' : 'Favorite'}
         >
-          <Star size={16} className="inline" fill={prompt.isFavorite ? 'currentColor' : 'none'} />
+          <Star size={18} className="inline" fill={prompt.isFavorite ? 'currentColor' : 'none'} />
         </button>
       </div>
 
@@ -95,7 +97,8 @@ export function PromptCard({ prompt, onEdit, onDelete, onInsert, onToggleFavorit
             className={`px-2 py-1 rounded ${canInsert ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : 'opacity-50 cursor-not-allowed'}`}
             onClick={async () => {
               if (!canInsert) return
-              await onInsert(prompt)
+              if (onSend) await onSend(prompt)
+              else await onInsert(prompt)
             }}
             title={canInsert ? 'Insert' : 'Open ChatGPT tab to enable insert'}
             disabled={!canInsert}

@@ -1,4 +1,4 @@
-import type { DBSchema, DBSchemaV1, Prompt, UsageLog, PromptExportFile, ImportMode, DuplicateStrategy, AppSettings } from '../types'
+import type { DBSchema, DBSchemaV1, Prompt, UsageLog, PromptExportFile, ImportMode, DuplicateStrategy, AppSettings, SavedChain, ChainExportFile } from '../types'
 
 export type StorageArea = 'local' | 'sync'
 
@@ -287,6 +287,7 @@ export async function clearAllData(area: StorageArea = 'local'): Promise<void> {
   await setInStorage(DB_KEY, empty, area)
   await removeFromStorage(SETTINGS_KEY, area)
   await removeFromStorage(TOTAL_USES_KEY, area)
+  await removeFromStorage('langqueue_chains', area)
 }
 
 // Export / Import
@@ -359,6 +360,88 @@ export async function importPrompts(
   }
 
   await saveDB(db, area)
+  return { imported, skipped, replaced, duplicated }
+}
+
+
+// Chain storage (simple list separate from DB schema; stored under a key)
+const CHAINS_KEY = 'langqueue_chains'
+
+export async function getAllChains(area: StorageArea = 'local'): Promise<SavedChain[]> {
+  return (await getFromStorage<SavedChain[]>(CHAINS_KEY, area)) ?? []
+}
+
+export async function saveChain(chain: SavedChain, area: StorageArea = 'local'): Promise<void> {
+  const list = await getAllChains(area)
+  const idx = list.findIndex((c) => c.id === chain.id)
+  const normalized: SavedChain = {
+    ...chain,
+    id: chain.id || generateId('c'),
+    title: chain.title || 'Untitled chain',
+    steps: Array.isArray(chain.steps) ? chain.steps.map((s) => ({ content: s.content })) : [],
+    createdAt: chain.createdAt || now(),
+    updatedAt: now(),
+  }
+  if (idx >= 0) list[idx] = normalized
+  else list.unshift(normalized)
+  await setInStorage(CHAINS_KEY, list, area)
+}
+
+export async function deleteChain(id: string, area: StorageArea = 'local'): Promise<void> {
+  const list = await getAllChains(area)
+  const next = list.filter((c) => c.id !== id)
+  await setInStorage(CHAINS_KEY, next, area)
+}
+
+export async function exportChains(area: StorageArea = 'local'): Promise<ChainExportFile> {
+  const chains = await getAllChains(area)
+  return {
+    version: 1,
+    exportedAt: Date.now(),
+    chains,
+  }
+}
+
+export async function importChains(
+  data: unknown,
+  options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy },
+  area: StorageArea = 'local'
+): Promise<{ imported: number; skipped: number; replaced: number; duplicated: number }> {
+  if (!data || typeof data !== 'object') throw new Error('Invalid import data')
+  const file = data as Partial<ChainExportFile>
+  if (typeof file.version !== 'number' || !Array.isArray(file.chains)) throw new Error('Invalid chain export format')
+
+  let list = await getAllChains(area)
+  let imported = 0
+  let skipped = 0
+  let replaced = 0
+  let duplicated = 0
+
+  if (options.mode === 'replace') {
+    list = []
+  }
+
+  for (const raw of file.chains) {
+    if (!raw || typeof raw !== 'object') { skipped++; continue }
+    const c = raw as SavedChain
+    if (!c.id || !c.title || !Array.isArray(c.steps)) { skipped++; continue }
+    const idx = list.findIndex((x) => x.id === c.id)
+    if (idx >= 0) {
+      if (options.duplicateStrategy === 'skip') { skipped++; continue }
+      if (options.duplicateStrategy === 'replace') { list[idx] = c; replaced++; continue }
+      if (options.duplicateStrategy === 'duplicate') {
+        const copy = { ...c, id: `${c.id}_copy_${Date.now()}`, createdAt: Date.now(), updatedAt: Date.now() }
+        list.unshift(copy)
+        duplicated++
+        continue
+      }
+    } else {
+      list.unshift(c)
+      imported++
+    }
+  }
+
+  await setInStorage(CHAINS_KEY, list, area)
   return { imported, skipped, replaced, duplicated }
 }
 
