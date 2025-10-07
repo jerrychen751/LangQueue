@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ensure the popup background is dark in dark mode, even beyond content */
+html.dark body {
+  background-color: #111827; /* tailwind gray-900 */
+}
+body {
+  background-color: #ffffff;
+}

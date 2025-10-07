@@ -1,0 +1,74 @@
+{
+  "manifest_version": 3,
+  "name": "LangQueue",
+  "description": "Prompt library, enhancement, chaining, and automation for interacting with LLMs.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "LangQueue",
+    "default_popup": "popup.html"
+  },
+  
+  "background": {
+    "service_worker": "src/background/index.ts"
+  },
+  "commands": {
+    "open_popup": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      },
+      "description": "Open LangQueue popup"
+    },
+    "enhance_prompt": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Open new prompt builder"
+    },
+    "create_prompt": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+C",
+        "mac": "Command+Shift+C"
+      },
+      "description": "Create prompt"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": ["src/content/chatgpt.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": ["src/content/gemini.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://claude.ai/*"
+  ]
+}
+
+
