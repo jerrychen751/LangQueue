@@ -154,6 +154,8 @@
       'button[aria-label*="Send" i]',
       'button[data-testid="send-button"]',
       'button[data-testid*="send" i]',
+      'div[role="button"][aria-label*="Send" i]',
+      'div[role="button"][data-testid*="send" i]',
       'button[type="submit"]',
       'form button[type="submit"]',
       'form [type="submit"]'

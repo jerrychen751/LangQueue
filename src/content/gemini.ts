@@ -138,25 +138,7 @@
     return isVisible(btn)
   }
 
-  function dispatchEnterOn(el: HTMLElement) {
-    el.focus()
-    const down = new KeyboardEvent('keydown', {
-      key: 'Enter',
-      code: 'Enter',
-      keyCode: 13,
-      which: 13,
-      bubbles: true
-    } as unknown as KeyboardEventInit)
-    const up = new KeyboardEvent('keyup', {
-      key: 'Enter',
-      code: 'Enter',
-      keyCode: 13,
-      which: 13,
-      bubbles: true
-    } as unknown as KeyboardEventInit)
-    el.dispatchEvent(down)
-    el.dispatchEvent(up)
-  }
+  // Removed Enter-key fallback in chaining flow to avoid inserting newlines
 
   function clickSendButton(): boolean {
     if (!inputEl || !(inputEl as HTMLElement).isConnected || !isVisible(inputEl as HTMLElement)) {
@@ -170,6 +152,8 @@
       'button[aria-label="Send message"]',
       'button[aria-label*="Send" i]',
       'button.send-button',
+      'div[role="button"][aria-label*="Send" i]',
+      'div[role="button"][data-testid*="send" i]',
       'button[type="submit"]',
       'form button[type="submit"]',
       'form [type="submit"]'
@@ -199,11 +183,16 @@
           void 0
         }
       }
-    }
-
-    if (inputEl && isVisible(inputEl as HTMLElement)) {
-      dispatchEnterOn(inputEl as HTMLElement)
-      return true
+      // Fallback to requestSubmit when available
+      try {
+        const htmlForm = form as HTMLFormElement
+        if (typeof htmlForm.requestSubmit === 'function') {
+          htmlForm.requestSubmit()
+          return true
+        }
+      } catch {
+        // ignore
+      }
     }
 
     return false
@@ -360,8 +349,13 @@
       if (shouldAutoSend) {
         chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
         try {
-          const clicked = clickSendButton()
-          if (!clicked) {
+          // Allow UI to enable send after injection and retry briefly
+          let sent = false
+          for (let attempt = 0; attempt < 20; attempt++) {
+            if (clickSendButton()) { sent = true; break }
+            await new Promise((r) => setTimeout(r, 75))
+          }
+          if (!sent) {
             chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })
             return false
           }
