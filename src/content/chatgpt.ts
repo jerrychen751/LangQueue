@@ -35,21 +35,30 @@
   }
 
   function findInput(): HTMLTextAreaElement | HTMLElement | null {
-    // 1) Visible contenteditable (preferred on ChatGPT UI)
-    const ceCandidates = Array.from(document.querySelectorAll('div[contenteditable="true"][role="textbox"]')) as HTMLElement[]
-    const ce = ceCandidates.find((el) => isVisible(el))
-    if (ce) return ce
-
-    // 2) Primary textarea by id
-    const byId = document.getElementById('prompt-textarea')
-    if (byId && byId.tagName === 'TEXTAREA' && isVisible(byId)) {
-      return byId as HTMLTextAreaElement
+    // Prefer modern ChatGPT contenteditable input
+    const cePrioritySelectors = [
+      'div[contenteditable="true"][role="textbox"]',
+      'div[contenteditable="true"][data-testid*="prompt" i]',
+      'div[contenteditable="true"]'
+    ]
+    for (const sel of cePrioritySelectors) {
+      const el = Array.from(document.querySelectorAll(sel)) as HTMLElement[]
+      const found = el.find((n) => isVisible(n))
+      if (found) return found
     }
 
-    // 3) Any other visible, enabled textarea that is not the fallback one
-    const candidates = Array.from(document.querySelectorAll('form textarea:not([readonly]):not([disabled]):not([class*="fallbackTextarea"])')) as HTMLElement[]
-    const ta = candidates.find((el) => el.tagName === 'TEXTAREA' && isVisible(el))
-    if (ta) return ta as HTMLTextAreaElement
+    // Legacy textarea variants
+    const byId = document.getElementById('prompt-textarea')
+    if (byId && byId.tagName === 'TEXTAREA' && isVisible(byId)) return byId as HTMLTextAreaElement
+
+    const withinForm = Array.from(document.querySelectorAll('form textarea:not([readonly]):not([disabled]):not([class*="fallbackTextarea"])')) as HTMLElement[]
+    const ta1 = withinForm.find((el) => el.tagName === 'TEXTAREA' && isVisible(el))
+    if (ta1) return ta1 as HTMLTextAreaElement
+
+    const anyTextarea = Array.from(document.querySelectorAll('textarea')) as HTMLElement[]
+    const ta2 = anyTextarea.find((el) => isVisible(el))
+    if (ta2) return ta2 as HTMLTextAreaElement
+
     return null
   }
 

@@ -23,7 +23,7 @@ export default function App() {
   const [editing, setEditing] = useState<Prompt | undefined>(undefined)
   const [compatible, setCompatible] = useState(false)
   const [checking, setChecking] = useState(true)
-  const [platform, setPlatform] = useState<'chatgpt' | 'gemini' | 'other'>('other')
+  const [platform, setPlatform] = useState<'chatgpt' | 'gemini' | 'claude' | 'other'>('other')
   
   const [stats, setStats] = useState<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }>({ totalPrompts: 0, totalUses: 0, mostUsedPrompt: null })
   const [view, setView] = useState<'main' | 'settings'>('main')
@@ -99,7 +99,7 @@ export default function App() {
       const ok = await checkTabCompatibility()
       setCompatible(ok)
       const p = await detectActivePlatform()
-      setPlatform(p === 'chatgpt' || p === 'gemini' ? p : 'other')
+      setPlatform(p === 'chatgpt' || p === 'gemini' || p === 'claude' ? p : 'other')
       // Check for any pending action set by background shortcut
       const pending = await new Promise<string | undefined>((resolve) => {
         chrome.storage.local.get(['langqueue_pending_action'], (res) => resolve(res['langqueue_pending_action']))
@@ -171,7 +171,7 @@ export default function App() {
   async function handleInsert(p: Prompt) {
     try {
       await sendPromptToTab(p.content)
-      showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : 'ChatGPT'}` })
+      showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` })
     } catch {
       await navigator.clipboard.writeText(p.content)
       showToast({ variant: 'info', message: 'Copied to clipboard' })
@@ -192,13 +192,13 @@ export default function App() {
           ) : null}
           <Logo size={18} ariaLabel="LangQueue" className="shrink-0" />
           <div className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-purple-400 to-pink-400">LangQueue</div>
-          <div className="ml-auto flex items-center gap-2 text-xs" title={checking ? 'Detecting compatibility…' : compatible ? `Ready on ${platform === 'gemini' ? 'Gemini' : 'ChatGPT'}` : 'Not detected on current tab'}>
+          <div className="ml-auto flex items-center gap-2 text-xs" title={checking ? 'Detecting compatibility…' : compatible ? `Ready on ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` : 'Not detected on current tab'}>
             <span
               className={`inline-block w-2 h-2 rounded-full ${checking ? 'bg-gray-300 dark:bg-gray-700 animate-pulse' : compatible ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
               aria-hidden
             />
             <span className={compatible ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'}>
-              {checking ? 'Detecting…' : compatible ? (platform === 'gemini' ? 'Gemini detected' : 'ChatGPT detected') : 'Open ChatGPT or Gemini to enable Insert'}
+              {checking ? 'Detecting…' : compatible ? (platform === 'gemini' ? 'Gemini detected' : platform === 'claude' ? 'Claude detected' : 'ChatGPT detected') : 'Open ChatGPT, Gemini, or Claude to enable Insert'}
             </span>
             {view === 'main' ? (
               <button className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setView('settings')} aria-label="Settings">

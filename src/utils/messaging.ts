@@ -19,7 +19,7 @@ export async function checkTabCompatibility(): Promise<boolean> {
   const tab = await getActiveTab()
   if (!tab?.id || !tab.url) return false
   const platform = detectPlatformFromUrl(tab.url)
-  if (!(platform === 'chatgpt' || platform === 'gemini')) return false
+  if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) return false
   try {
     const response = (await chrome.tabs.sendMessage(tab.id, { type: 'COMPAT_CHECK' } as CompatCheckMessage)) as
       | CompatStatusMessage
@@ -34,7 +34,7 @@ export async function sendPromptToTab(promptContent: string): Promise<void> {
   const tab = await getActiveTab()
   if (!tab?.id || !tab.url) throw new Error('No active tab')
   const platform = detectPlatformFromUrl(tab.url)
-  if (!(platform === 'chatgpt' || platform === 'gemini')) throw new Error('Not on a compatible AI chat page')
+  if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) throw new Error('Not on a compatible AI chat page')
   try {
     const res = (await chrome.tabs.sendMessage(tab.id, { type: 'INJECT_PROMPT', payload: { content: promptContent } } as InjectPromptMessage)) as
       | InjectPromptResultMessage
@@ -66,7 +66,7 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
   const tab = await getActiveTab()
   if (!tab?.id || !tab.url) throw new Error('No active tab')
   const platform = detectPlatformFromUrl(tab.url)
-  if (!(platform === 'chatgpt' || platform === 'gemini')) throw new Error('Not on a compatible AI chat page')
+  if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) throw new Error('Not on a compatible AI chat page')
 
   // Best-effort readiness check; proceed even if false, as content scripts may attach shortly after
   try {
