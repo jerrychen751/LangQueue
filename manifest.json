@@ -60,7 +60,7 @@
       "matches": [
         "https://claude.ai/*"
       ],
-      "js": ["src/content/index.ts"],
+      "js": ["src/content/claude.ts"],
       "run_at": "document_idle"
     }
   ],
