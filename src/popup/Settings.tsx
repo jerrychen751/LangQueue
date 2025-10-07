@@ -87,6 +87,10 @@ export default function Settings({ onBack }: SettingsProps) {
       const json = JSON.parse(text) as PromptExportFile
       const res = await importPrompts(json, { mode: importMode, duplicateStrategy: dupStrategy }, 'local')
       setStatus(`Imported: ${res.imported}, Replaced: ${res.replaced}, Duplicated: ${res.duplicated}, Skipped: ${res.skipped}`)
+      const prompts = await getAllPrompts('local')
+      const storageKb = Math.round((JSON.stringify(prompts).length / 1024) * 10) / 10
+      setStats({ totalPrompts: prompts.length, storageKb })
+      chrome.runtime.sendMessage({ type: 'PROMPTS_IMPORTED' })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Import failed: invalid JSON or format.'
       setStatus(message)

@@ -50,11 +50,22 @@ export default function App() {
           setView('main')
           handleRefresh()
         }
+        if (type === 'PROMPTS_IMPORTED') {
+          setView('main')
+          handleRefresh()
+        }
       }
     }
     chrome.runtime.onMessage.addListener(handler)
     return () => chrome.runtime.onMessage.removeListener(handler)
   }, [])
+
+  // When navigating back from settings to main, ensure latest prompts are shown
+  useEffect(() => {
+    if (view === 'main') {
+      handleRefresh()
+    }
+  }, [view])
 
   useEffect(() => {
     const check = async () => {
