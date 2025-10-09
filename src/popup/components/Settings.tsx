@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Keyboard } from 'lucide-react'
-import type { AppSettings } from '../types'
-import { getSettings, saveSettings } from '../utils/storage'
-import { useToast } from '../components/useToast'
+import type { AppSettings } from '../../types'
+import { getSettings, saveSettings } from '../../utils/storage'
+import { useToast } from '../../components/useToast'
 
 
 type SettingsProps = {

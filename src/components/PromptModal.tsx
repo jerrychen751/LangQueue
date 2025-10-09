@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import type { Prompt } from '../types'
 import { savePrompt, updatePrompt, type StorageArea } from '../utils/storage'
@@ -50,62 +50,13 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
     setTimeout(() => titleRef.current?.focus(), 0)
   }, [open, initialPrompt])
 
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-      // Global save shortcut: Cmd/Ctrl + Shift + Enter
-      if ((e.key === 'Enter' || e.key === 'NumpadEnter') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        e.stopPropagation()
-        // Trigger save regardless of focused field
-        if (!saving) {
-          // Call asynchronously to avoid re-entrancy in key handler
-          Promise.resolve().then(() => handleSave())
-        }
-      }
-      if (e.key === 'Tab' && dialogRef.current) {
-        // Simple focus trap
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-        if (focusable.length === 0) return
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, onClose])
-
-  function close() {
+  const close = useCallback(() => {
     onClose()
     // Restore focus
     setTimeout(() => lastActiveRef.current?.focus(), 0)
-  }
+  }, [onClose])
 
-  function addTagFromInput() {
-    const t = tagInput.trim()
-    if (!t) return
-    if (!tags.includes(t)) setTags((prev) => [...prev, t])
-    setTagInput('')
-  }
-
-  function removeTag(tag: string) {
-    setTags((prev) => prev.filter((t) => t !== tag))
-  }
-
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     // Read latest values from DOM refs to avoid stale state when saving via hotkeys
     const t = (titleRef.current?.value ?? title).trim()
     const c = (contentRef.current?.value ?? content).trim()
@@ -173,6 +124,55 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
     } finally {
       setSaving(false)
     }
+  }, [category, close, content, description, initialPrompt, isEditing, isFavorite, onSaved, storageArea, showToast, tags, title])
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        close()
+      }
+      // Global save shortcut: Cmd/Ctrl + Shift + Enter
+      if ((e.key === 'Enter' || e.key === 'NumpadEnter') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        e.stopPropagation()
+        // Trigger save regardless of focused field
+        if (!saving) {
+          // Call asynchronously to avoid re-entrancy in key handler
+          Promise.resolve().then(() => handleSave())
+        }
+      }
+      if (e.key === 'Tab' && dialogRef.current) {
+        // Simple focus trap
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [open, close, saving, handleSave])
+
+  function addTagFromInput() {
+    const t = tagInput.trim()
+    if (!t) return
+    if (!tags.includes(t)) setTags((prev) => [...prev, t])
+    setTagInput('')
+  }
+
+  function removeTag(tag: string) {
+    setTags((prev) => prev.filter((t) => t !== tag))
   }
 
   if (!open) return null

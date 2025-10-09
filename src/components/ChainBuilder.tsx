@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { ArrowDown, ArrowUp, Trash2, X, Save } from 'lucide-react'
 import type { Prompt } from '../types'
 import type { ChainStep } from '../types/messages'
@@ -36,6 +36,11 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     setSubmitting(false)
   }, [open])
 
+  const handleClose = useCallback(() => {
+    onClose()
+    setTimeout(() => lastActiveRef.current?.focus(), 0)
+  }, [onClose])
+
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -61,12 +66,7 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [open])
-
-  function handleClose() {
-    onClose()
-    setTimeout(() => lastActiveRef.current?.focus(), 0)
-  }
+  }, [open, handleClose])
 
   function addPromptToChain(p: Prompt) {
     const item: ChainItem = {

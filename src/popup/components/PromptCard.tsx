@@ -1,7 +1,7 @@
 import { Star, Pencil, Trash2, Send, Tag as TagIcon } from 'lucide-react'
-import type { Prompt } from '../types'
-import { useToast } from '../components/useToast'
-import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import type { Prompt } from '../../types'
+import { useToast } from '../../components/useToast'
+import DeleteConfirmModal from '../../components/DeleteConfirmModal'
 import { useState } from 'react'
 
 type PromptCardProps = {
