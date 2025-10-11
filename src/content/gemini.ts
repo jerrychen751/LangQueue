@@ -294,15 +294,47 @@
         chrome.storage.local.get(['langqueue_settings'], (res) => resolve(res['langqueue_settings'] || {}))
       })
       const mode = settings.insertionMode || 'overwrite'
+      const contentWithNL = content.endsWith('\n') ? content : `${content}\n`
       if (inputEl instanceof HTMLTextAreaElement) {
-        const base = mode === 'append' && inputEl.value ? `${inputEl.value}\n${content}` : content
+        const existing = inputEl.value || ''
+        const base = mode === 'append'
+          ? (existing ? `${existing}${existing.endsWith('\n') ? '' : '\n'}${contentWithNL}` : contentWithNL)
+          : contentWithNL
         setTextareaValue(inputEl, base)
+        const ensureCaretEnd = () => {
+          try {
+            const len = (inputEl as HTMLTextAreaElement).value.length
+            ;(inputEl as HTMLTextAreaElement).setSelectionRange(len, len)
+          } catch {
+            /* noop */
+          }
+        }
+        ensureCaretEnd()
+        requestAnimationFrame(ensureCaretEnd)
+        setTimeout(ensureCaretEnd, 0)
       } else {
         if (mode === 'append') {
-          appendToContentEditable(inputEl, content)
+          appendToContentEditable(inputEl, contentWithNL)
         } else {
-          setContentEditableValue(inputEl, content)
+          setContentEditableValue(inputEl, contentWithNL)
         }
+        const ensureCaretEndCE = () => {
+          try {
+            const el = inputEl as HTMLElement
+            el.focus()
+            const selection = window.getSelection()
+            const range = document.createRange()
+            range.selectNodeContents(el)
+            range.collapse(false)
+            selection?.removeAllRanges()
+            selection?.addRange(range)
+          } catch {
+            /* noop */
+          }
+        }
+        ensureCaretEndCE()
+        requestAnimationFrame(ensureCaretEndCE)
+        setTimeout(ensureCaretEndCE, 0)
       }
       showConfirmation('Inserted')
       return { ok: true as const }

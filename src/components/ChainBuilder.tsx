@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Trash2, X, Save } from 'lucide-react'
 import type { Prompt } from '../types'
 import type { ChainStep } from '../types/messages'
@@ -28,6 +28,11 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const { showToast } = useToast()
+
+  const handleClose = useCallback(() => {
+    onClose()
+    setTimeout(() => lastActiveRef.current?.focus(), 0)
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
@@ -61,12 +66,9 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [open])
+  }, [open, handleClose])
 
-  function handleClose() {
-    onClose()
-    setTimeout(() => lastActiveRef.current?.focus(), 0)
-  }
+  
 
   function addPromptToChain(p: Prompt) {
     const item: ChainItem = {
