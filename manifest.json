@@ -25,12 +25,12 @@
       },
       "description": "Open LangQueue popup"
     },
-    "enhance_prompt": {
+    "focus_search": {
       "suggested_key": {
-        "default": "Ctrl+Shift+E",
-        "mac": "Command+Shift+E"
+        "default": "Ctrl+Shift+O",
+        "mac": "Command+Shift+O"
       },
-      "description": "Open new prompt builder"
+      "description": "Open library with search focused"
     },
     "create_prompt": {
       "suggested_key": {

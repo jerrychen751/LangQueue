@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Search, Star, X } from 'lucide-react'
 
 export type SortOption = 'recent' | 'alpha' | 'mostUsed'
@@ -7,14 +7,19 @@ type FilterBarProps = {
   initialQuery?: string
   initialFavoritesOnly?: boolean
   initialSort?: SortOption
+  // When true, focus and select the search input on mount
+  autoFocus?: boolean
+  // Increment this to re-focus and select the input on demand
+  focusSignal?: number
   onChange: (s: { query: string; favoritesOnly: boolean; sort: SortOption }) => void
 }
 
-export default function FilterBar({ initialQuery = '', initialFavoritesOnly = false, initialSort = 'recent', onChange }: FilterBarProps) {
+export default function FilterBar({ initialQuery = '', initialFavoritesOnly = false, initialSort = 'recent', autoFocus = false, focusSignal, onChange }: FilterBarProps) {
   const [query, setQuery] = useState(initialQuery)
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery)
   const [favoritesOnly, setFavoritesOnly] = useState(initialFavoritesOnly)
   const [sort, setSort] = useState<SortOption>(initialSort)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 300)
@@ -24,6 +29,31 @@ export default function FilterBar({ initialQuery = '', initialFavoritesOnly = fa
   useEffect(() => {
     onChange({ query: debouncedQuery, favoritesOnly, sort })
   }, [debouncedQuery, favoritesOnly, sort, onChange])
+
+  // Focus handling: on mount if autoFocus, and whenever focusSignal changes
+  useEffect(() => {
+    if (!autoFocus) return
+    const el = inputRef.current
+    if (el) {
+      // Use a rAF to ensure element is in DOM and painted
+      requestAnimationFrame(() => {
+        el.focus()
+        el.select()
+      })
+    }
+  }, [autoFocus])
+
+  useEffect(() => {
+    if (typeof focusSignal === 'number') {
+      const el = inputRef.current
+      if (el) {
+        requestAnimationFrame(() => {
+          el.focus()
+          el.select()
+        })
+      }
+    }
+  }, [focusSignal])
 
   function clearAll() {
     setQuery('')
@@ -38,6 +68,7 @@ export default function FilterBar({ initialQuery = '', initialFavoritesOnly = fa
       <div className="relative">
         <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="w-full pl-7 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500"

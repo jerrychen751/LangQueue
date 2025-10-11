@@ -24,14 +24,14 @@ export default function Settings({ onBack }: SettingsProps) {
       const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
       const defaults = {
         openLibrary: isMac ? 'Command+Shift+P' : 'Ctrl+Shift+P',
-        enhancePrompt: isMac ? 'Command+Shift+E' : 'Ctrl+Shift+E',
+        focusSearch: isMac ? 'Command+Shift+O' : 'Ctrl+Shift+O',
         createPrompt: isMac ? 'Command+Shift+L' : 'Ctrl+Shift+L',
       }
       const merged: AppSettings = {
         ...existing,
         shortcuts: {
           openLibrary: existing.shortcuts?.openLibrary ?? defaults.openLibrary,
-          enhancePrompt: existing.shortcuts?.enhancePrompt ?? defaults.enhancePrompt,
+          focusSearch: existing.shortcuts?.focusSearch ?? defaults.focusSearch,
           // Backward compatibility: prefer new key, fallback to legacy savePrompt key, then default
           createPrompt: existing.shortcuts?.createPrompt ?? existing.shortcuts?.savePrompt ?? defaults.createPrompt,
         },
@@ -117,9 +117,9 @@ export default function Settings({ onBack }: SettingsProps) {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-36 text-gray-600 dark:text-gray-300">Enhance prompt</span>
+              <span className="w-36 text-gray-600 dark:text-gray-300">Focus search</span>
               <span className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-white/5 border border-white/10 backdrop-blur-sm">
-                {formatShortcut(settings.shortcuts?.enhancePrompt ?? '')}
+                {formatShortcut(settings.shortcuts?.focusSearch ?? '')}
               </span>
             </div>
             <div className="flex items-center gap-2">

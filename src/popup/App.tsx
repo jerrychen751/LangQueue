@@ -30,6 +30,7 @@ export default function App() {
   const [chainOpen, setChainOpen] = useState(false)
   const [chains, setChains] = useState<SavedChain[]>([])
   const { showToast } = useToast()
+  const [focusSearchSignal, setFocusSearchSignal] = useState(0)
 
   useEffect(() => {
     const load = async () => {
@@ -69,6 +70,9 @@ export default function App() {
         if (type === 'OPEN_NEW_PROMPT') {
           setEditing(undefined)
           setModalOpen(true)
+        }
+        if (type === 'FOCUS_SEARCH') {
+          setFocusSearchSignal((n) => n + 1)
         }
         if (type === 'TEXTAREA_READY') {
           setCompatible(true)
@@ -115,6 +119,10 @@ export default function App() {
       if (pending === 'OPEN_NEW_PROMPT') {
         setEditing(undefined)
         setModalOpen(true)
+        chrome.storage.local.remove(['langqueue_pending_action'])
+      }
+      if (pending === 'FOCUS_SEARCH') {
+        setFocusSearchSignal((n) => n + 1)
         chrome.storage.local.remove(['langqueue_pending_action'])
       }
       setChecking(false)
@@ -238,6 +246,8 @@ export default function App() {
               initialQuery={query}
               initialFavoritesOnly={favoritesOnly}
               initialSort={sort}
+              autoFocus={false}
+              focusSignal={focusSearchSignal}
               onChange={(s) => {
                 setQuery(s.query)
                 setFavoritesOnly(s.favoritesOnly)

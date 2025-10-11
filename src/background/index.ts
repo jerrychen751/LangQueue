@@ -103,7 +103,7 @@ chrome.commands.onCommand.addListener(async (command) => {
       }
       return
     }
-    if (command === 'enhance_prompt' || command === 'save_prompt' || command === 'create_prompt') {
+    if (command === 'create_prompt') {
       try {
         await new Promise<void>((resolve) => {
           chrome.storage.local.set({ langqueue_pending_action: 'OPEN_NEW_PROMPT' }, () => resolve())
@@ -116,6 +116,21 @@ chrome.commands.onCommand.addListener(async (command) => {
       setTimeout(() => {
         chrome.runtime.sendMessage({ type: 'OPEN_NEW_PROMPT' })
       }, 600)
+      return
+    }
+    if (command === 'focus_search') {
+      try {
+        await new Promise<void>((resolve) => {
+          chrome.storage.local.set({ langqueue_pending_action: 'FOCUS_SEARCH' }, () => resolve())
+        })
+        await (chrome.action.openPopup?.() as Promise<void> | undefined)
+      } catch {
+        // swallow
+      }
+      // Give the popup a moment to mount, then request focusing the search field
+      setTimeout(() => {
+        chrome.runtime.sendMessage({ type: 'FOCUS_SEARCH' })
+      }, 400)
       return
     }
     // No other commands

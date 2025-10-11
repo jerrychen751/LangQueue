@@ -64,7 +64,7 @@ export type ThemePreference = 'light' | 'dark'
 
 export interface AppShortcutsConfig {
   openLibrary?: string
-  enhancePrompt?: string
+  focusSearch?: string
   createPrompt?: string
   // Legacy key for backward compatibility with older saved settings
   savePrompt?: string
