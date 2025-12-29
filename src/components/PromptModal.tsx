@@ -22,15 +22,12 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const lastActiveRef = useRef<HTMLElement | null>(null)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  const savingRef = useRef(false)
+  const handleSaveRef = useRef<() => Promise<void>>(async () => {})
   const { showToast } = useToast()
 
   const [title, setTitle] = useState(initialPrompt?.title ?? '')
   const [content, setContent] = useState(initialPrompt?.content ?? '')
-  const [description, setDescription] = useState(initialPrompt?.description ?? '')
-  const [tagInput, setTagInput] = useState('')
-  const [tags, setTags] = useState<string[]>(initialPrompt?.tags ?? [])
-  const [category, setCategory] = useState(initialPrompt?.category ?? '')
-  const [isFavorite, setIsFavorite] = useState<boolean>(initialPrompt?.isFavorite ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,69 +37,19 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
     // Reset fields when opening for a different prompt
     setTitle(initialPrompt?.title ?? '')
     setContent(initialPrompt?.content ?? '')
-    setDescription(initialPrompt?.description ?? '')
-    setTags(initialPrompt?.tags ?? [])
-    setCategory(initialPrompt?.category ?? '')
-    setIsFavorite(initialPrompt?.isFavorite ?? false)
-    setTagInput('')
     setError(null)
     // Focus the title
     setTimeout(() => titleRef.current?.focus(), 0)
   }, [open, initialPrompt])
 
   useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-      // Global save shortcut: Cmd/Ctrl + Shift + Enter
-      if ((e.key === 'Enter' || e.key === 'NumpadEnter') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        e.stopPropagation()
-        // Trigger save regardless of focused field
-        if (!saving) {
-          // Call asynchronously to avoid re-entrancy in key handler
-          Promise.resolve().then(() => handleSave())
-        }
-      }
-      if (e.key === 'Tab' && dialogRef.current) {
-        // Simple focus trap
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-        if (focusable.length === 0) return
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, onClose])
+    savingRef.current = saving
+  }, [saving])
 
   function close() {
     onClose()
     // Restore focus
     setTimeout(() => lastActiveRef.current?.focus(), 0)
-  }
-
-  function addTagFromInput() {
-    const t = tagInput.trim()
-    if (!t) return
-    if (!tags.includes(t)) setTags((prev) => [...prev, t])
-    setTagInput('')
-  }
-
-  function removeTag(tag: string) {
-    setTags((prev) => prev.filter((t) => t !== tag))
   }
 
   async function handleSave() {
@@ -131,19 +78,11 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
         await updatePrompt(initialPrompt.id, {
           title: t,
           content: c,
-          description: description.trim(),
-          tags,
-          category: category.trim(),
-          isFavorite,
         }, storageArea)
         const saved: Prompt = {
           ...initialPrompt,
           title: t,
           content: c,
-          description: description.trim(),
-          tags,
-          category: category.trim(),
-          isFavorite,
           updatedAt: Date.now(),
         }
         onSaved?.(saved)
@@ -154,10 +93,6 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
           id: generateClientId(),
           title: t,
           content: c,
-          description: description.trim(),
-          category: category.trim(),
-          tags,
-          isFavorite,
           usageCount: 0,
           createdAt: now,
           updatedAt: now,
@@ -174,6 +109,46 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
       setSaving(false)
     }
   }
+
+  handleSaveRef.current = handleSave
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+      // Global save shortcut: Cmd/Ctrl + Shift + Enter
+      if ((e.key === 'Enter' || e.key === 'NumpadEnter') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        e.stopPropagation()
+        // Trigger save regardless of focused field
+        if (!savingRef.current) {
+          // Call asynchronously to avoid re-entrancy in key handler
+          Promise.resolve().then(() => handleSaveRef.current())
+        }
+      }
+      if (e.key === 'Tab' && dialogRef.current) {
+        // Simple focus trap
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [open, onClose])
 
   if (!open) return null
 
@@ -232,65 +207,6 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
             />
           </div>
 
-          <div>
-            <label className="block text-xs text-gray-700 mb-1 dark:text-gray-300">Description (optional)</label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
-              placeholder="Short description for this prompt"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-700 mb-1 dark:text-gray-300">Tags</label>
-            <div className="flex flex-wrap gap-1 mb-1">
-              {tags.map((t) => (
-                <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 border dark:border-gray-700">
-                  {t}
-                  <button className="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => removeTag(t)} aria-label={`Remove ${t}`}>
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onBlur={addTagFromInput}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault()
-                  addTagFromInput()
-                }
-              }}
-              className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
-              placeholder="Type a tag and press Enter"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-700 mb-1 dark:text-gray-300">Category</label>
-              <input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
-                placeholder="e.g., Research, Coding, Content"
-              />
-            </div>
-            <div className="flex items-end">
-              <label className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-md bg-white/5 border border-white/10 backdrop-blur-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 accent-amber-500"
-                  checked={isFavorite}
-                  onChange={(e) => setIsFavorite(e.target.checked)}
-                />
-                Favorite
-              </label>
-            </div>
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 p-3 border-t">
@@ -313,5 +229,3 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
     </div>
   )
 }
-
-

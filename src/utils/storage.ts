@@ -1,4 +1,5 @@
-import type { DBSchema, DBSchemaV1, Prompt, UsageLog, PromptExportFile, ImportMode, DuplicateStrategy, AppSettings, SavedChain, ChainExportFile } from '../types'
+import type { DBSchema, Prompt, UsageLog, PromptExportFile, ImportMode, DuplicateStrategy, AppSettings, SavedChain, ChainExportFile } from '../types'
+import { CURRENT_SCHEMA_VERSION } from '../types'
 
 export type StorageArea = 'local' | 'sync'
 
@@ -57,13 +58,48 @@ function now(): number {
   return Date.now()
 }
 
-function createEmptyDB(): DBSchemaV1 {
+function getDefaultPrompts(timestamp: number): Prompt[] {
+  const templates = [
+    {
+      title: 'summarize-in-bullets',
+      content: 'Summarize the above in 5 concise bullets. Highlight key decisions and next steps.',
+    },
+    {
+      title: 'rewrite-for-clarity',
+      content: 'Rewrite the above for clarity and brevity. Keep the original meaning.',
+    },
+    {
+      title: 'extract-action-items',
+      content: 'Extract the action items from the above. Return a concise checklist.',
+    },
+    {
+      title: 'explain-simply',
+      content: 'Explain the above in simple terms for a beginner. Use a short example.',
+    },
+    {
+      title: 'draft-a-reply',
+      content: 'Draft a concise, professional reply to the above. Provide 2 variations.',
+    },
+  ]
+  return templates.map((item, index) => ({
+    id: generateId('p'),
+    title: item.title,
+    content: item.content,
+    usageCount: 0,
+    createdAt: timestamp - index,
+    updatedAt: timestamp - index,
+  }))
+}
+
+function createEmptyDB(): DBSchema {
   const ts = now()
+  const defaults = getDefaultPrompts(ts)
+  const promptsById = Object.fromEntries(defaults.map((prompt) => [prompt.id, prompt]))
+  const promptOrder = defaults.map((prompt) => prompt.id)
   return {
-    meta: { schemaVersion: 1, createdAt: ts, updatedAt: ts },
-    promptsById: {},
-    promptOrder: [],
-    foldersById: {},
+    meta: { schemaVersion: CURRENT_SCHEMA_VERSION, createdAt: ts, updatedAt: ts },
+    promptsById,
+    promptOrder,
     usageLogs: [],
   }
 }
@@ -86,17 +122,10 @@ async function saveDB(db: DBSchema, area: StorageArea = 'local'): Promise<void> 
 
 // Migrations
 export async function migrateDB(db: unknown): Promise<DBSchema> {
-  // Current schema is v1. In the future, apply stepwise migrations here.
-  if (!db || typeof db !== 'object' || !('meta' in db)) {
-    return createEmptyDB()
-  }
+  if (!db || typeof db !== 'object' || !('meta' in db)) return createEmptyDB()
   const meta = (db as { meta?: { schemaVersion?: number } }).meta
-  switch (meta?.schemaVersion) {
-    case 1:
-      return db as DBSchemaV1
-    default:
-      return createEmptyDB()
-  }
+  if (meta?.schemaVersion !== CURRENT_SCHEMA_VERSION) return createEmptyDB()
+  return db as DBSchema
 }
 
 // ID helpers
@@ -105,16 +134,28 @@ function generateId(prefix: string): string {
   return `${prefix}_${Date.now()}_${rand}`
 }
 
+function normalizeTitle(title: string): string {
+  return title.trim()
+}
+
+function assertUniqueTitle(db: DBSchema, title: string, ignoreId?: string): string {
+  const normalized = normalizeTitle(title)
+  if (!normalized) throw new Error('Title is required.')
+  const exists = Object.values(db.promptsById).some((p) => p.title === normalized && p.id !== ignoreId)
+  if (exists) throw new Error('A shortcut with that name already exists.')
+  return normalized
+}
+
 // Prompt operations
 export async function savePrompt(prompt: Prompt, area: StorageArea = 'local'): Promise<void> {
   const db = await getDB(area)
   const existing = db.promptsById[prompt.id]
+  const normalizedTitle = assertUniqueTitle(db, prompt.title, prompt.id)
   const ts = now()
   const normalized: Prompt = {
     ...prompt,
     id: prompt.id || generateId('p'),
-    tags: prompt.tags ?? [],
-    isFavorite: prompt.isFavorite ?? false,
+    title: normalizedTitle,
     usageCount: prompt.usageCount ?? 0,
     createdAt: existing?.createdAt ?? prompt.createdAt ?? ts,
     updatedAt: ts,
@@ -151,8 +192,9 @@ export async function updatePrompt(
   const db = await getDB(area)
   const existing = db.promptsById[id]
   if (!existing) throw new Error(`Prompt not found: ${id}`)
+  const normalizedTitle = assertUniqueTitle(db, updates.title ?? existing.title, id)
   const ts = now()
-  db.promptsById[id] = { ...existing, ...updates, id, updatedAt: ts }
+  db.promptsById[id] = { ...existing, ...updates, id, title: normalizedTitle, updatedAt: ts }
   await saveDB(db, area)
 }
 
@@ -165,29 +207,18 @@ export async function searchPrompts(query: string, area: StorageArea = 'local'):
     let score = 0
     const title = (p.title || '').toLowerCase()
     const content = (p.content || '').toLowerCase()
-    const description = (p.description || '').toLowerCase()
-    const category = (p.category || '').toLowerCase()
-    const tags = (p.tags || []).map((t) => t.toLowerCase())
 
     if (title === q) score += 120
     else if (title.startsWith(q)) score += 100
     else if (title.includes(q)) score += 80
 
     if (content.includes(q)) score += 50
-    if (description.includes(q)) score += 35
-    if (category.includes(q)) score += 15
-    if (tags.some((t) => t === q)) score += 40
-    else if (tags.some((t) => t.includes(q))) score += 25
-
-    if (p.isFavorite) score += 10
     if (p.lastUsedAt) score += 5
     return score
   }
 
   const candidates = Object.values(db.promptsById).filter((p) => {
-    const hay = [p.title, p.description ?? '', p.content, p.category ?? '', ...(p.tags ?? [])]
-      .join('\n')
-      .toLowerCase()
+    const hay = [p.title, p.content].join('\n').toLowerCase()
     return hay.includes(q)
   })
 
@@ -444,5 +475,3 @@ export async function importChains(
   await setInStorage(CHAINS_KEY, list, area)
   return { imported, skipped, replaced, duplicated }
 }
-
-

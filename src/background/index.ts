@@ -1,5 +1,25 @@
 /// <reference lib="webworker" />
 
+import { getSettings, searchPrompts, logUsage, updatePrompt, deletePrompt, savePrompt } from '../utils/storage'
+import type { Platform, PromptSummary } from '../types'
+
+const PLATFORM_VALUES = [
+  'chatgpt',
+  'claude',
+  'gemini',
+  'perplexity',
+  'bing',
+  'poe',
+  'huggingchat',
+  'other',
+] as const
+
+function normalizePlatform(value: unknown): Platform {
+  return typeof value === 'string' && PLATFORM_VALUES.includes(value as Platform)
+    ? (value as Platform)
+    : 'other'
+}
+
 function makeLImage(size: number): ImageData | null {
   // Generate a simple white "L" on a dark background for the action icon.
   // Use OffscreenCanvas since we're in a service worker context.
@@ -50,6 +70,10 @@ function makeLImage(size: number): ImageData | null {
   return ctx.getImageData(0, 0, size, size)
 }
 
+function generatePromptId(): string {
+  return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`
+}
+
 function setLActionIcon(): void {
   const sizes = [16, 32, 48, 128] as const
   const imageData: Record<string, ImageData> = {}
@@ -79,6 +103,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'PING') {
     sendResponse({ ok: true })
+    return
   }
   if (message?.type === 'OPEN_POPUP') {
     // Avoid unhandled promise rejection if no active browser window
@@ -90,53 +115,118 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     } catch {
       // swallow
     }
+    return
   }
-})
-
-chrome.commands.onCommand.addListener(async (command) => {
-  try {
-    if (command === 'open_popup') {
-      try {
-        await (chrome.action.openPopup?.() as Promise<void> | undefined)
-      } catch {
-        // swallow
-      }
+  if (message?.type === 'GET_SETTINGS') {
+    getSettings('local')
+      .then((settings) => sendResponse({ type: 'SETTINGS_RESULT', payload: { settings } }))
+      .catch(() => sendResponse({ type: 'SETTINGS_RESULT', payload: { settings: {} } }))
+    return true
+  }
+  if (message?.type === 'PROMPT_SEARCH') {
+    const query = typeof message?.payload?.query === 'string' ? message.payload.query : ''
+    const limit = typeof message?.payload?.limit === 'number' ? message.payload.limit : null
+    searchPrompts(query, 'local')
+      .then((results) => {
+        const trimmed = typeof limit === 'number' ? results.slice(0, Math.max(0, limit)) : results
+        const prompts: PromptSummary[] = trimmed.map((p) => ({
+          id: p.id,
+          title: p.title,
+          content: p.content,
+        }))
+        sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { prompts } })
+      })
+      .catch(() => sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { prompts: [] } }))
+    return true
+  }
+  if (message?.type === 'PROMPT_UPDATE') {
+    const id = message?.payload?.id
+    const title = message?.payload?.title
+    const content = message?.payload?.content
+    if (typeof id !== 'string' || typeof title !== 'string' || typeof content !== 'string') {
+      sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: false, error: 'INVALID_PAYLOAD' } })
       return
     }
-    if (command === 'create_prompt') {
+    updatePrompt(id, { title, content }, 'local')
+      .then(() => sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: true } }))
+      .catch((err) => {
+        sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: false, error: err?.message || 'UPDATE_FAILED' } })
+      })
+    return true
+  }
+  if (message?.type === 'PROMPT_DELETE') {
+    const id = message?.payload?.id
+    if (typeof id !== 'string') {
+      sendResponse({ type: 'PROMPT_DELETE_RESULT', payload: { ok: false, error: 'INVALID_PAYLOAD' } })
+      return
+    }
+    deletePrompt(id, 'local')
+      .then(() => sendResponse({ type: 'PROMPT_DELETE_RESULT', payload: { ok: true } }))
+      .catch((err) => {
+        sendResponse({ type: 'PROMPT_DELETE_RESULT', payload: { ok: false, error: err?.message || 'DELETE_FAILED' } })
+      })
+    return true
+  }
+  if (message?.type === 'PROMPT_CREATE') {
+    const title = message?.payload?.title
+    const content = message?.payload?.content
+    if (typeof title !== 'string' || typeof content !== 'string') {
+      sendResponse({ type: 'PROMPT_CREATE_RESULT', payload: { ok: false, error: 'INVALID_PAYLOAD' } })
+      return
+    }
+    const now = Date.now()
+    const id = generatePromptId()
+    savePrompt(
+      {
+        id,
+        title,
+        content,
+        usageCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      },
+      'local'
+    )
+      .then(() => sendResponse({ type: 'PROMPT_CREATE_RESULT', payload: { ok: true, id } }))
+      .catch((err) => {
+        sendResponse({ type: 'PROMPT_CREATE_RESULT', payload: { ok: false, error: err?.message || 'CREATE_FAILED' } })
+      })
+    return true
+  }
+  if (message?.type === 'LOG_USAGE') {
+    const promptId = message?.payload?.promptId
+    const platform = normalizePlatform(message?.payload?.platform)
+    if (typeof promptId === 'string') {
+      void logUsage({ timestamp: Date.now(), platform, promptId }, 'local').finally(() => {
+        sendResponse({ ok: true })
+      })
+      return true
+    }
+    sendResponse({ ok: false })
+    return
+  }
+  if (message?.type === 'OPEN_PROMPT_EDITOR') {
+    const promptId = message?.payload?.promptId
+    if (!promptId || typeof promptId !== 'string') {
+      sendResponse({ ok: false })
+      return
+    }
+    void new Promise<void>((resolve) => {
+      chrome.storage.local.set({ langqueue_pending_action: { type: 'OPEN_EDIT_PROMPT', promptId } }, () => resolve())
+    }).finally(() => {
       try {
-        await new Promise<void>((resolve) => {
-          chrome.storage.local.set({ langqueue_pending_action: 'OPEN_NEW_PROMPT' }, () => resolve())
-        })
-        await (chrome.action.openPopup?.() as Promise<void> | undefined)
+        const maybePromise = chrome.action.openPopup?.()
+        if (maybePromise && typeof (maybePromise as Promise<void>).then === 'function') {
+          ;(maybePromise as Promise<void>).catch(() => {})
+        }
       } catch {
         // swallow
       }
-      // Give the popup a moment to mount, then request opening the builder
       setTimeout(() => {
-        chrome.runtime.sendMessage({ type: 'OPEN_NEW_PROMPT' })
+        chrome.runtime.sendMessage({ type: 'OPEN_EDIT_PROMPT', payload: { promptId } })
       }, 600)
-      return
-    }
-    if (command === 'focus_search') {
-      try {
-        await new Promise<void>((resolve) => {
-          chrome.storage.local.set({ langqueue_pending_action: 'FOCUS_SEARCH' }, () => resolve())
-        })
-        await (chrome.action.openPopup?.() as Promise<void> | undefined)
-      } catch {
-        // swallow
-      }
-      // Give the popup a moment to mount, then request focusing the search field
-      setTimeout(() => {
-        chrome.runtime.sendMessage({ type: 'FOCUS_SEARCH' })
-      }, 400)
-      return
-    }
-    // No other commands
-  } catch {
-    // swallow
+      sendResponse({ ok: true })
+    })
+    return true
   }
 })
-
-

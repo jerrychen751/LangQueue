@@ -186,9 +186,6 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
                     {sortedPrompts.map((p) => (
                       <li key={p.id} className="px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" onClick={() => addPromptToChain(p)}>
                         <div className="font-medium text-gray-900 dark:text-gray-100">{p.title}</div>
-                        {p.description ? (
-                          <div className="text-[11px] text-gray-500 line-clamp-1">{p.description}</div>
-                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -277,5 +274,4 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     </div>
   )
 }
-
 

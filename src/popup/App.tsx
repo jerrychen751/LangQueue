@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Settings as SettingsIcon, ArrowLeft, Play } from 'lucide-react'
 import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
 import type { Prompt, SavedChain } from '../types'
-import { getAllPrompts, updatePrompt, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain } from '../utils/storage'
+import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain, getPrompt } from '../utils/storage'
 import { sendPromptToTab, detectActivePlatform, runChainOnTab, clickSendOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
 import { checkTabCompatibility } from '../utils/messaging'
@@ -16,7 +16,6 @@ import type { ChainStep } from '../types/messages'
 export default function App() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [query, setQuery] = useState('')
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [sort, setSort] = useState<SortOption>('recent')
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -47,6 +46,13 @@ export default function App() {
     load()
   }, [])
 
+  const openPromptById = useCallback(async (promptId: string) => {
+    const prompt = await getPrompt(promptId, 'local')
+    if (!prompt) return
+    setEditing(prompt)
+    setModalOpen(true)
+  }, [])
+
   useEffect(() => {
     const handler: Parameters<typeof chrome.runtime.onMessage.addListener>[0] = (message) => {
       if (typeof message === 'object' && message && (message as { type?: string }).type === 'CHAIN_PROGRESS') {
@@ -71,6 +77,12 @@ export default function App() {
           setEditing(undefined)
           setModalOpen(true)
         }
+        if (type === 'OPEN_EDIT_PROMPT') {
+          const promptId = (message as { payload?: { promptId?: string } }).payload?.promptId
+          if (promptId) {
+            void openPromptById(promptId)
+          }
+        }
         if (type === 'FOCUS_SEARCH') {
           setFocusSearchSignal((n) => n + 1)
         }
@@ -89,7 +101,7 @@ export default function App() {
     }
     chrome.runtime.onMessage.addListener(handler)
     return () => chrome.runtime.onMessage.removeListener(handler)
-  }, [showToast])
+  }, [showToast, openPromptById])
 
   // When navigating back from settings to main, ensure latest prompts are shown
   useEffect(() => {
@@ -113,35 +125,39 @@ export default function App() {
       const p = await detectActivePlatform()
       setPlatform(p === 'chatgpt' || p === 'gemini' || p === 'claude' ? p : 'other')
       // Check for any pending action set by background shortcut
-      const pending = await new Promise<string | undefined>((resolve) => {
+      const pending = await new Promise<unknown>((resolve) => {
         chrome.storage.local.get(['langqueue_pending_action'], (res) => resolve(res['langqueue_pending_action']))
       })
-      if (pending === 'OPEN_NEW_PROMPT') {
+      if (pending === 'OPEN_NEW_PROMPT' || (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'OPEN_NEW_PROMPT')) {
         setEditing(undefined)
         setModalOpen(true)
         chrome.storage.local.remove(['langqueue_pending_action'])
       }
-      if (pending === 'FOCUS_SEARCH') {
+      if (pending === 'FOCUS_SEARCH' || (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'FOCUS_SEARCH')) {
         setFocusSearchSignal((n) => n + 1)
+        chrome.storage.local.remove(['langqueue_pending_action'])
+      }
+      if (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'OPEN_EDIT_PROMPT') {
+        const promptId = (pending as { promptId?: string }).promptId
+        if (promptId) {
+          await openPromptById(promptId)
+        }
         chrome.storage.local.remove(['langqueue_pending_action'])
       }
       setChecking(false)
     }
     check()
-  }, [])
+  }, [openPromptById])
 
   const visiblePrompts = useMemo(() => {
     const q = query.trim().toLowerCase()
     let list = [...prompts]
     if (q) {
       list = list.filter((p) => {
-        const hay = [p.title, p.description ?? '', p.content, p.category ?? '', ...(p.tags ?? [])]
-          .join('\n')
-          .toLowerCase()
+        const hay = [p.title, p.content].join('\n').toLowerCase()
         return hay.includes(q)
       })
     }
-    if (favoritesOnly) list = list.filter((p) => p.isFavorite)
     switch (sort) {
       case 'alpha':
         list.sort((a, b) => a.title.localeCompare(b.title))
@@ -161,7 +177,7 @@ export default function App() {
         break
     }
     return list
-  }, [prompts, query, favoritesOnly, sort])
+  }, [prompts, query, sort])
 
   async function handleRefresh() {
     const [items, savedChains, stats] = await Promise.all([
@@ -177,11 +193,6 @@ export default function App() {
   async function handleCreate() {
     setEditing(undefined)
     setModalOpen(true)
-  }
-
-  async function handleToggleFavorite(p: Prompt) {
-    await updatePrompt(p.id, { isFavorite: !p.isFavorite }, 'local')
-    await handleRefresh()
   }
 
   async function handleDelete(p: Prompt) {
@@ -244,13 +255,11 @@ export default function App() {
           {view === 'main' ? (
             <FilterBar
               initialQuery={query}
-              initialFavoritesOnly={favoritesOnly}
               initialSort={sort}
               autoFocus={false}
               focusSignal={focusSearchSignal}
               onChange={(s) => {
                 setQuery(s.query)
-                setFavoritesOnly(s.favoritesOnly)
                 setSort(s.sort)
               }}
             />
@@ -297,10 +306,10 @@ export default function App() {
                   }}
                   onDelete={handleDelete}
                 onInsert={handleInsert}
-                onSend={async (prompt) => {
-                  try {
-                    await sendPromptToTab(prompt.content) // mirror card click injection
-                    await clickSendOnTab()
+                  onSend={async (prompt) => {
+                    try {
+                      await sendPromptToTab(prompt.content) // mirror card click injection
+                      await clickSendOnTab()
                     showToast({ variant: 'success', message: 'Sent' })
                     window.close()
                   } catch (err: unknown) {
@@ -308,7 +317,6 @@ export default function App() {
                     showToast({ variant: 'error', message })
                   }
                 }}
-                  onToggleFavorite={handleToggleFavorite}
                   canInsert={compatible}
                 />
               ))}
@@ -438,5 +446,3 @@ export default function App() {
     </div>
   )
 }
-
-

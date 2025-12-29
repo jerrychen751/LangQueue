@@ -8,31 +8,14 @@ export type Platform =
   | 'huggingchat'
   | 'other'
 
-export interface Folder {
-  id: string
-  name: string
-  parentId?: string | null
-  color?: string | null
-  createdAt: number
-  updatedAt: number
-}
-
 export interface Prompt {
   id: string
   title: string
   content: string
-  description?: string
-  category?: string
-  tags: string[]
-  isFavorite: boolean
   usageCount: number
-  folderId?: string | null
-  rating?: number | null
   createdAt: number
   updatedAt: number
   lastUsedAt?: number
-  modelHints?: string[]
-  version?: number
 }
 
 export interface UsageLog {
@@ -41,23 +24,20 @@ export interface UsageLog {
   promptId: string
 }
 
-export interface DBSchemaMetaV1 {
-  schemaVersion: 1
+export interface DBSchemaMeta {
+  schemaVersion: 2
   createdAt: number
   updatedAt: number
 }
 
-export interface DBSchemaV1 {
-  meta: DBSchemaMetaV1
+export interface DBSchema {
+  meta: DBSchemaMeta
   promptsById: Record<string, Prompt>
   promptOrder: string[]
-  foldersById: Record<string, Folder>
   usageLogs: UsageLog[]
 }
 
-export type DBSchema = DBSchemaV1
-
-export const CURRENT_SCHEMA_VERSION = 1 as const
+export const CURRENT_SCHEMA_VERSION = 2 as const
 
 // App settings and import/export types
 export type ThemePreference = 'light' | 'dark'
@@ -66,8 +46,6 @@ export interface AppShortcutsConfig {
   openLibrary?: string
   focusSearch?: string
   createPrompt?: string
-  // Legacy key for backward compatibility with older saved settings
-  savePrompt?: string
 }
 
 export interface AppSettings {
@@ -75,6 +53,7 @@ export interface AppSettings {
   shortcuts?: AppShortcutsConfig
   insertionMode?: 'overwrite' | 'append'
   chainDefaults?: ChainDefaults
+  tweaks?: PageTweaks
 }
 
 export interface PromptExportFile {
@@ -93,6 +72,16 @@ export interface ChainDefaults {
   defaultDelayMs?: number
 }
 
+export interface PageTweaks {
+  preventAutoScrollOnSubmit?: boolean
+}
+
+export interface PromptSummary {
+  id: string
+  title: string
+  content: string
+}
+
 
 export interface SavedChain {
   id: string
@@ -108,5 +97,3 @@ export interface ChainExportFile {
   exportedAt: number
   chains: SavedChain[]
 }
-
-

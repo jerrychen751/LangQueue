@@ -32,8 +32,7 @@ export default function Settings({ onBack }: SettingsProps) {
         shortcuts: {
           openLibrary: existing.shortcuts?.openLibrary ?? defaults.openLibrary,
           focusSearch: existing.shortcuts?.focusSearch ?? defaults.focusSearch,
-          // Backward compatibility: prefer new key, fallback to legacy savePrompt key, then default
-          createPrompt: existing.shortcuts?.createPrompt ?? existing.shortcuts?.savePrompt ?? defaults.createPrompt,
+          createPrompt: existing.shortcuts?.createPrompt ?? defaults.createPrompt,
         },
       }
       setSettings(merged)
@@ -197,6 +196,22 @@ export default function Settings({ onBack }: SettingsProps) {
           </label>
         </section>
 
+        <section className="space-y-2">
+          <div className="font-medium">Page tweaks</div>
+          <label className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-md bg-white/5 border border-white/10 backdrop-blur-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 accent-amber-500"
+              checked={Boolean(settings.tweaks?.preventAutoScrollOnSubmit)}
+              onChange={(e) => setSettings((prev) => ({
+                ...prev,
+                tweaks: { ...prev.tweaks, preventAutoScrollOnSubmit: e.target.checked },
+              }))}
+            />
+            Prevent auto-scroll on submit
+          </label>
+        </section>
+
         {/* Storage/import/export and danger zone sections removed per product direction */}
 
         <section>
@@ -208,5 +223,3 @@ export default function Settings({ onBack }: SettingsProps) {
     </div>
   )
 }
-
-

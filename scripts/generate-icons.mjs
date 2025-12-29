@@ -60,15 +60,12 @@ async function main() {
     drawIcon(img, s)
     const outPath = path.join(outDir, `icon${s}.png`)
     await PImage.encodePNGToStream(img, fs.createWriteStream(outPath))
-    // eslint-disable-next-line no-console
     console.log(`wrote ${outPath}`)
   }
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err)
   process.exit(1)
 })
-
 

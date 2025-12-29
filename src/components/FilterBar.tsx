@@ -1,23 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { Search, Star, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 export type SortOption = 'recent' | 'alpha' | 'mostUsed'
 
 type FilterBarProps = {
   initialQuery?: string
-  initialFavoritesOnly?: boolean
   initialSort?: SortOption
   // When true, focus and select the search input on mount
   autoFocus?: boolean
   // Increment this to re-focus and select the input on demand
   focusSignal?: number
-  onChange: (s: { query: string; favoritesOnly: boolean; sort: SortOption }) => void
+  onChange: (s: { query: string; sort: SortOption }) => void
 }
 
-export default function FilterBar({ initialQuery = '', initialFavoritesOnly = false, initialSort = 'recent', autoFocus = false, focusSignal, onChange }: FilterBarProps) {
+export default function FilterBar({ initialQuery = '', initialSort = 'recent', autoFocus = false, focusSignal, onChange }: FilterBarProps) {
   const [query, setQuery] = useState(initialQuery)
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery)
-  const [favoritesOnly, setFavoritesOnly] = useState(initialFavoritesOnly)
   const [sort, setSort] = useState<SortOption>(initialSort)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -27,8 +25,8 @@ export default function FilterBar({ initialQuery = '', initialFavoritesOnly = fa
   }, [query])
 
   useEffect(() => {
-    onChange({ query: debouncedQuery, favoritesOnly, sort })
-  }, [debouncedQuery, favoritesOnly, sort, onChange])
+    onChange({ query: debouncedQuery, sort })
+  }, [debouncedQuery, sort, onChange])
 
   // Focus handling: on mount if autoFocus, and whenever focusSignal changes
   useEffect(() => {
@@ -57,10 +55,9 @@ export default function FilterBar({ initialQuery = '', initialFavoritesOnly = fa
 
   function clearAll() {
     setQuery('')
-    setFavoritesOnly(false)
     setSort('recent')
     // Immediately notify listeners without waiting for debounce
-    onChange({ query: '', favoritesOnly: false, sort: 'recent' })
+    onChange({ query: '', sort: 'recent' })
   }
 
   return (
@@ -76,16 +73,6 @@ export default function FilterBar({ initialQuery = '', initialFavoritesOnly = fa
         />
       </div>
       <div className="flex items-center gap-2 text-xs">
-        <label className="inline-flex items-center gap-2 px-2 py-1 border rounded-md cursor-pointer bg-white/5 dark:bg-white/5 backdrop-blur-sm hover:bg-white/10 dark:hover:bg-white/10 border-white/10 dark:border-white/10">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 accent-sky-600 dark:accent-sky-400"
-            checked={favoritesOnly}
-            onChange={(e) => setFavoritesOnly(e.target.checked)}
-          />
-          <Star size={12} className={favoritesOnly ? 'text-amber-500' : 'text-gray-400'} />
-          Favorites only
-        </label>
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortOption)}
@@ -103,5 +90,4 @@ export default function FilterBar({ initialQuery = '', initialFavoritesOnly = fa
     </div>
   )
 }
-
 

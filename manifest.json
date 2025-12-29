@@ -17,50 +17,19 @@
   "background": {
     "service_worker": "src/background/index.ts"
   },
-  "commands": {
-    "open_popup": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+P",
-        "mac": "Command+Shift+P"
-      },
-      "description": "Open LangQueue popup"
-    },
-    "focus_search": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+O",
-        "mac": "Command+Shift+O"
-      },
-      "description": "Open library with search focused"
-    },
-    "create_prompt": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+L",
-        "mac": "Command+Shift+L"
-      },
-      "description": "Create prompt"
-    }
-  },
   "content_scripts": [
     {
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.openai.com/*"
+        "https://*.chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://*.chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://*.gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://*.claude.ai/*"
       ],
-      "js": ["src/content/chatgpt.ts"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://gemini.google.com/*"
-      ],
-      "js": ["src/content/gemini.ts"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://claude.ai/*"
-      ],
-      "js": ["src/content/claude.ts"],
+      "js": ["src/content/index.ts"],
       "run_at": "document_idle"
     }
   ],
@@ -71,9 +40,13 @@
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
+    "https://*.chatgpt.com/*",
     "https://chat.openai.com/*",
+    "https://*.chat.openai.com/*",
     "https://gemini.google.com/*",
-    "https://claude.ai/*"
+    "https://*.gemini.google.com/*",
+    "https://claude.ai/*",
+    "https://*.claude.ai/*"
   ],
   "icons": {
     "16": "images/icon16.png",
@@ -82,5 +55,3 @@
     "128": "images/icon128.png"
   }
 }
-
-
