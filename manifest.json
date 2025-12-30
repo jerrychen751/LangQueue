@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LangQueue",
   "description": "Prompt library, enhancement, chaining, and automation for interacting with LLMs.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "action": {
     "default_title": "LangQueue",
     "default_popup": "popup.html",
