@@ -1,8 +1,16 @@
-export type OverlayItem = {
-  id: string
-  title: string
-  content: string
-}
+export type OverlayItem =
+  | {
+      kind: 'prompt'
+      id: string
+      title: string
+      content: string
+    }
+  | {
+      kind: 'chain'
+      id: string
+      title: string
+      steps: { content: string }[]
+    }
 
 type OverlayCallbacks = {
   onSelect: (item: OverlayItem) => void
@@ -38,13 +46,34 @@ const STYLES = `
     color: #9ca3af;
     border-bottom: 1px solid #1f2937;
   }
+  .lq-create {
+    margin: 6px 6px 0;
+    width: calc(100% - 12px);
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+    background: #111827;
+    color: #e5e7eb;
+    font-size: 12px;
+    padding: 8px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lq-create:hover {
+    background: #0f172a;
+  }
+  .lq-create svg {
+    width: 14px;
+    height: 14px;
+  }
   .lq-list {
     list-style: none;
     margin: 0;
     padding: 6px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -53,7 +82,7 @@ const STYLES = `
     grid-template-columns: 1fr auto;
     gap: 8px;
     align-items: center;
-    padding: 8px 10px;
+    padding: 6px 10px;
     border-radius: 8px;
     cursor: pointer;
   }
@@ -61,16 +90,10 @@ const STYLES = `
     background: #1f2937;
   }
   .lq-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #f9fafb;
-    margin-bottom: 2px;
-  }
-  .lq-snippet {
-    font-size: 12px;
-    color: #9ca3af;
-    max-height: 2.4em;
-    overflow: hidden;
+    line-height: 1.4;
   }
   .lq-edit {
     position: relative;
@@ -78,8 +101,8 @@ const STYLES = `
     border: 1px solid #1f2937;
     color: #cbd5f5;
     font-size: 12px;
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border-radius: 6px;
     cursor: pointer;
@@ -120,19 +143,9 @@ const STYLES = `
     padding: 10px 12px;
     font-size: 12px;
     color: #9ca3af;
-    cursor: pointer;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-  }
-  .lq-empty:hover {
-    background: #111827;
-    color: #e5e7eb;
-  }
-  .lq-empty svg {
-    width: 14px;
-    height: 14px;
   }
 `
 
@@ -147,9 +160,22 @@ export function createOverlay(callbacks: OverlayCallbacks) {
   container.style.display = 'none'
   const header = document.createElement('div')
   header.className = 'lq-header'
+  const createButton = document.createElement('button')
+  createButton.className = 'lq-create'
+  createButton.type = 'button'
+  createButton.setAttribute('aria-label', 'Create new shortcut')
+  createButton.dataset.action = 'create'
+  createButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/>
+    </svg>
+    <span>Create new shortcut</span>
+  `
+  createButton.addEventListener('click', () => callbacks.onCreate())
   const list = document.createElement('ul')
   list.className = 'lq-list'
   container.appendChild(header)
+  container.appendChild(createButton)
   container.appendChild(list)
   shadow.appendChild(style)
   shadow.appendChild(container)
@@ -179,17 +205,9 @@ export function createOverlay(callbacks: OverlayCallbacks) {
   function render() {
     list.innerHTML = ''
     if (state.items.length === 0) {
-      const empty = document.createElement('button')
+      const empty = document.createElement('li')
       empty.className = 'lq-empty'
-      empty.type = 'button'
-      empty.dataset.action = 'create'
-      empty.innerHTML = `
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/>
-        </svg>
-        <span>Create a shortcut</span>
-      `
-      empty.addEventListener('click', () => callbacks.onCreate())
+      empty.textContent = 'No shortcuts found.'
       list.appendChild(empty)
       applyScrollLimit()
       return
@@ -202,29 +220,7 @@ export function createOverlay(callbacks: OverlayCallbacks) {
       const title = document.createElement('div')
       title.className = 'lq-title'
       title.textContent = item.title || 'Untitled'
-      const snippet = document.createElement('div')
-      snippet.className = 'lq-snippet'
-      snippet.textContent = (item.content || '').trim()
       textWrap.appendChild(title)
-      textWrap.appendChild(snippet)
-      const edit = document.createElement('button')
-      edit.className = 'lq-edit'
-      edit.setAttribute('aria-label', 'Edit')
-      edit.dataset.action = 'edit'
-      edit.innerHTML = `
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="currentColor" d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l8.06-8.06.92.92L5.92 19.58zM20.71 6.04a1.003 1.003 0 0 0 0-1.42l-1.34-1.34a1.003 1.003 0 0 0-1.42 0l-1.02 1.02 2.75 2.75 1.03-1.01z"/>
-        </svg>
-        <span class="lq-tooltip">Edit</span>
-      `
-      edit.addEventListener('click', (event) => {
-        event.stopPropagation()
-        state.selectedIndex = index
-        callbacks.onEdit(item)
-      })
-      edit.addEventListener('mousedown', (event) => {
-        event.stopPropagation()
-      })
       function selectItem() {
         state.selectedIndex = index
         callbacks.onSelect(item)
@@ -239,7 +235,27 @@ export function createOverlay(callbacks: OverlayCallbacks) {
         selectItem()
       })
       li.appendChild(textWrap)
-      li.appendChild(edit)
+      if (item.kind === 'prompt') {
+        const edit = document.createElement('button')
+        edit.className = 'lq-edit'
+        edit.setAttribute('aria-label', 'Edit')
+        edit.dataset.action = 'edit'
+        edit.innerHTML = `
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l8.06-8.06.92.92L5.92 19.58zM20.71 6.04a1.003 1.003 0 0 0 0-1.42l-1.34-1.34a1.003 1.003 0 0 0-1.42 0l-1.02 1.02 2.75 2.75 1.03-1.01z"/>
+          </svg>
+          <span class="lq-tooltip">Edit</span>
+        `
+        edit.addEventListener('click', (event) => {
+          event.stopPropagation()
+          state.selectedIndex = index
+          callbacks.onEdit(item)
+        })
+        edit.addEventListener('mousedown', (event) => {
+          event.stopPropagation()
+        })
+        li.appendChild(edit)
+      }
       list.appendChild(li)
     })
     applyScrollLimit()

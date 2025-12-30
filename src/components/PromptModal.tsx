@@ -55,7 +55,8 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
   async function handleSave() {
     // Read latest values from DOM refs to avoid stale state when saving via hotkeys
     const t = (titleRef.current?.value ?? title).trim()
-    const c = (contentRef.current?.value ?? content).trim()
+    const rawContent = contentRef.current?.value ?? content
+    const trimmedContent = rawContent.trim()
     if (!t) {
       setError('Title is required.')
       titleRef.current?.focus()
@@ -66,7 +67,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
       titleRef.current?.focus()
       return
     }
-    if (!c) {
+    if (!trimmedContent) {
       setError('Content is required.')
       contentRef.current?.focus()
       return
@@ -77,12 +78,12 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
       if (isEditing && initialPrompt) {
         await updatePrompt(initialPrompt.id, {
           title: t,
-          content: c,
+          content: rawContent,
         }, storageArea)
         const saved: Prompt = {
           ...initialPrompt,
           title: t,
-          content: c,
+          content: rawContent,
           updatedAt: Date.now(),
         }
         onSaved?.(saved)
@@ -92,7 +93,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
         const newPrompt: Prompt = {
           id: generateClientId(),
           title: t,
-          content: c,
+          content: rawContent,
           usageCount: 0,
           createdAt: now,
           updatedAt: now,

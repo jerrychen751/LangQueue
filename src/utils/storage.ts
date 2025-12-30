@@ -228,6 +228,34 @@ export async function searchPrompts(query: string, area: StorageArea = 'local'):
     .map(({ p }) => p)
 }
 
+export async function searchChains(query: string, area: StorageArea = 'local'): Promise<SavedChain[]> {
+  const q = query.trim().toLowerCase()
+  const chains = await getAllChains(area)
+  if (!q) return chains
+
+  function scoreChain(chain: SavedChain): number {
+    let score = 0
+    const title = (chain.title || '').toLowerCase()
+    if (title === q) score += 120
+    else if (title.startsWith(q)) score += 100
+    else if (title.includes(q)) score += 80
+
+    const stepText = chain.steps.map((s) => s.content || '').join('\n').toLowerCase()
+    if (stepText.includes(q)) score += 50
+    return score
+  }
+
+  const candidates = chains.filter((chain) => {
+    const hay = [chain.title, ...chain.steps.map((s) => s.content)].join('\n').toLowerCase()
+    return hay.includes(q)
+  })
+
+  return candidates
+    .map((chain) => ({ chain, s: scoreChain(chain) }))
+    .sort((a, b) => b.s - a.s)
+    .map(({ chain }) => chain)
+}
+
 export async function logUsage(log: UsageLog, area: StorageArea = 'local'): Promise<void> {
   const db = await getDB(area)
   db.usageLogs.push({ ...log })

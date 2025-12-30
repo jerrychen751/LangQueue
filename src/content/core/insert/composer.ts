@@ -1,9 +1,23 @@
 import type { InputElement } from '../types'
 import type { SlashContext } from '../detect/slash'
 
-function dispatchFrameworkInput(el: HTMLElement, data: string) {
+function inferInputType(data: string): InputEventInit['inputType'] {
+  if (/[\r\n\t]/.test(data) || / {2,}/.test(data)) return 'insertFromPaste'
+  return 'insertText'
+}
+
+function dispatchFrameworkBeforeInput(el: HTMLElement, data: string, inputType: InputEventInit['inputType']) {
   try {
-    const ie = new InputEvent('input', { bubbles: true, data, inputType: 'insertText' } as InputEventInit)
+    const evt = new InputEvent('beforeinput', { bubbles: true, cancelable: true, data, inputType } as InputEventInit)
+    el.dispatchEvent(evt)
+  } catch {
+    void 0
+  }
+}
+
+function dispatchFrameworkInput(el: HTMLElement, data: string, inputType: InputEventInit['inputType']) {
+  try {
+    const ie = new InputEvent('input', { bubbles: true, data, inputType } as InputEventInit)
     el.dispatchEvent(ie)
   } catch {
     el.dispatchEvent(new Event('input', { bubbles: true }))
@@ -19,17 +33,19 @@ function setTextareaValue(el: HTMLTextAreaElement, value: string) {
 
 function setContentEditableValue(el: HTMLElement, value: string) {
   el.focus()
+  const inputType = inferInputType(value)
+  dispatchFrameworkBeforeInput(el, value, inputType)
   const selection = window.getSelection()
   const range = document.createRange()
   range.selectNodeContents(el)
   range.deleteContents()
-  const textNode = document.createTextNode(value)
-  range.insertNode(textNode)
-  range.setStartAfter(textNode)
-  range.setEndAfter(textNode)
+  range.insertNode(buildLineBreakFragment(value))
+  const after = document.createRange()
+  after.selectNodeContents(el)
+  after.collapse(false)
   selection?.removeAllRanges()
-  selection?.addRange(range)
-  dispatchFrameworkInput(el, value)
+  selection?.addRange(after)
+  dispatchFrameworkInput(el, value, inputType)
 }
 
 function appendToContentEditable(el: HTMLElement, value: string) {
@@ -40,13 +56,25 @@ function appendToContentEditable(el: HTMLElement, value: string) {
   range.collapse(false)
   const needsNewline = (el.textContent || '').length > 0
   const textToInsert = `${needsNewline ? '\n' : ''}${value}`
-  const textNode = document.createTextNode(textToInsert)
-  range.insertNode(textNode)
-  range.setStartAfter(textNode)
-  range.setEndAfter(textNode)
+  const inputType = inferInputType(textToInsert)
+  dispatchFrameworkBeforeInput(el, textToInsert, inputType)
+  range.insertNode(buildLineBreakFragment(textToInsert))
+  const after = document.createRange()
+  after.selectNodeContents(el)
+  after.collapse(false)
   selection?.removeAllRanges()
-  selection?.addRange(range)
-  dispatchFrameworkInput(el, textToInsert)
+  selection?.addRange(after)
+  dispatchFrameworkInput(el, textToInsert, inputType)
+}
+
+function buildLineBreakFragment(value: string): DocumentFragment {
+  const fragment = document.createDocumentFragment()
+  const lines = value.split(/\r\n|\r|\n/)
+  lines.forEach((line, index) => {
+    if (line) fragment.appendChild(document.createTextNode(line))
+    if (index < lines.length - 1) fragment.appendChild(document.createElement('br'))
+  })
+  return fragment
 }
 
 export function getInputText(el: InputElement | null): string {
@@ -92,4 +120,3 @@ export function replaceSlashContext(context: SlashContext, replacement: string) 
   const next = `${before}${replacement}${context.textAfter}`
   setContentEditableValue(context.input, next)
 }
-

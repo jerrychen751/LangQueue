@@ -8,7 +8,7 @@ import { createOverlay } from './overlay/overlay'
 import { createQueue } from './queue/queue'
 import { createChainExecutor } from './queue/chain_executor'
 import { applyTweaks } from './page_tweaks/tweaks'
-import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, updatePrompt } from './messaging'
+import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './messaging'
 
 function mapPlatform(id: Adapter['id']): Platform {
   return id === 'chatgpt' || id === 'claude' || id === 'gemini' ? id : 'other'
@@ -32,13 +32,21 @@ export function initController(adapter: Adapter) {
     onSelect: (item) => {
       const input = activeInput || adapter.findInput()
       if (!input) return
-      setInputText(input, item.content)
+      if (item.kind === 'prompt') {
+        setInputText(input, item.content)
+        overlay.hide()
+        void logUsage(item.id, mapPlatform(adapter.id))
+        return
+      }
       overlay.hide()
-      void logUsage(item.id, mapPlatform(adapter.id))
+      if (chainExecutor.isRunning()) return
+      void chainExecutor.run(item.steps, settings, 'overwrite')
     },
     onEdit: (item) => {
       overlay.hide()
-      editor.open({ id: item.id, title: item.title, content: item.content })
+      if (item.kind === 'prompt') {
+        editor.open({ id: item.id, title: item.title, content: item.content })
+      }
     },
     onCreate: () => {
       overlay.hide()
@@ -87,10 +95,27 @@ export function initController(adapter: Adapter) {
     }
     const query = context.query || ''
     const token = ++pendingSearchToken
-    const prompts = await searchPrompts(query)
+    const [prompts, chains] = await Promise.all([
+      searchPrompts(query),
+      searchChains(query),
+    ])
     if (token !== pendingSearchToken) return
+    const items = [
+      ...prompts.map((prompt) => ({
+        kind: 'prompt' as const,
+        id: prompt.id,
+        title: prompt.title,
+        content: prompt.content,
+      })),
+      ...chains.map((chain) => ({
+        kind: 'chain' as const,
+        id: chain.id,
+        title: chain.title,
+        steps: chain.steps,
+      })),
+    ]
     const label = query ? `//${query}` : ''
-    overlay.show(overlayPositionFromRect(context.rect), prompts, label)
+    overlay.show(overlayPositionFromRect(context.rect), items, label)
   }
 
   function getEventInput(event: Event): InputElement | null {

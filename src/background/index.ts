@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
-import { getSettings, searchPrompts, logUsage, updatePrompt, deletePrompt, savePrompt } from '../utils/storage'
-import type { Platform, PromptSummary } from '../types'
+import { getSettings, searchPrompts, searchChains, logUsage, updatePrompt, deletePrompt, savePrompt } from '../utils/storage'
+import type { Platform, PromptSummary, ChainSummary } from '../types'
 
 const PLATFORM_VALUES = [
   'chatgpt',
@@ -137,6 +137,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { prompts } })
       })
       .catch(() => sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { prompts: [] } }))
+    return true
+  }
+  if (message?.type === 'CHAIN_SEARCH') {
+    const query = typeof message?.payload?.query === 'string' ? message.payload.query : ''
+    const limit = typeof message?.payload?.limit === 'number' ? message.payload.limit : null
+    searchChains(query, 'local')
+      .then((results) => {
+        const trimmed = typeof limit === 'number' ? results.slice(0, Math.max(0, limit)) : results
+        const chains: ChainSummary[] = trimmed.map((c) => ({
+          id: c.id,
+          title: c.title,
+          steps: c.steps,
+        }))
+        sendResponse({ type: 'CHAIN_SEARCH_RESULT', payload: { chains } })
+      })
+      .catch(() => sendResponse({ type: 'CHAIN_SEARCH_RESULT', payload: { chains: [] } }))
     return true
   }
   if (message?.type === 'PROMPT_UPDATE') {

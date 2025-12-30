@@ -1,9 +1,11 @@
-import type { AppSettings, Platform, PromptSummary } from '../../types'
+import type { AppSettings, Platform, PromptSummary, ChainSummary } from '../../types'
 import type {
   GetSettingsMessage,
   SettingsResultMessage,
   PromptSearchMessage,
   PromptSearchResultMessage,
+  ChainSearchMessage,
+  ChainSearchResultMessage,
   LogUsageMessage,
   OpenPromptEditorMessage,
   PromptUpdateMessage,
@@ -34,6 +36,22 @@ export async function searchPrompts(query: string, limit?: number): Promise<Prom
       payload,
     } as PromptSearchMessage)) as PromptSearchResultMessage | undefined
     return response?.type === 'PROMPT_SEARCH_RESULT' ? response.payload.prompts : []
+  } catch {
+    return []
+  }
+}
+
+export async function searchChains(query: string, limit?: number): Promise<ChainSummary[]> {
+  try {
+    const payload: { query: string; limit?: number } = { query }
+    if (typeof limit === 'number') {
+      payload.limit = limit
+    }
+    const response = (await chrome.runtime.sendMessage({
+      type: 'CHAIN_SEARCH',
+      payload,
+    } as ChainSearchMessage)) as ChainSearchResultMessage | undefined
+    return response?.type === 'CHAIN_SEARCH_RESULT' ? response.payload.chains : []
   } catch {
     return []
   }

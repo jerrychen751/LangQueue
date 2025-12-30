@@ -82,6 +82,12 @@ export interface PromptSummary {
   content: string
 }
 
+export interface ChainSummary {
+  id: string
+  title: string
+  steps: { content: string }[]
+}
+
 
 export interface SavedChain {
   id: string

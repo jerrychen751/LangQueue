@@ -1,30 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Trash2, X, Save } from 'lucide-react'
-import type { Prompt } from '../types'
-import type { ChainStep } from '../types/messages'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ArrowDown, ArrowUp, Trash2, X, Save, Plus } from 'lucide-react'
 import { saveChain } from '../utils/storage'
 import { useToast } from './useToast'
 
 type ChainBuilderProps = {
   open: boolean
-  availablePrompts: Prompt[]
   onClose: () => void
-  onRunChain: (steps: ChainStep[], insertionMode: 'overwrite' | 'append') => void
 }
 
 type ChainItem = {
   id: string
-  title: string
   content: string
-  delayMs: number
 }
 
-export default function ChainBuilder({ open, availablePrompts, onClose, onRunChain }: ChainBuilderProps) {
+const DEFAULT_STEP_COUNT = 2
+
+function createEmptyItem(): ChainItem {
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    content: '',
+  }
+}
+
+function createDefaultItems(): ChainItem[] {
+  return Array.from({ length: DEFAULT_STEP_COUNT }, () => createEmptyItem())
+}
+
+export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const lastActiveRef = useRef<HTMLElement | null>(null)
 
-  const [items, setItems] = useState<ChainItem[]>([])
-  const [submitting, setSubmitting] = useState(false)
+  const [items, setItems] = useState<ChainItem[]>(() => createDefaultItems())
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const { showToast } = useToast()
@@ -38,7 +45,11 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     if (!open) return
     lastActiveRef.current = (document.activeElement as HTMLElement) ?? null
     // reset transient states when opened
-    setSubmitting(false)
+    setSaving(false)
+    setTitle('')
+    const defaults = createDefaultItems()
+    setItems(defaults)
+    setEditingId(null)
   }, [open])
 
   useEffect(() => {
@@ -68,16 +79,14 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     return () => window.removeEventListener('keydown', onKey, true)
   }, [open, handleClose])
 
-  
+  function addStep() {
+    const next = createEmptyItem()
+    setItems((prev) => [...prev, next])
+    setEditingId(next.id)
+  }
 
-  function addPromptToChain(p: Prompt) {
-    const item: ChainItem = {
-      id: `${p.id}_${Date.now()}`,
-      title: p.title,
-      content: p.content,
-      delayMs: 500,
-    }
-    setItems((prev) => [...prev, item])
+  function updateItem(id: string, content: string) {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, content } : item)))
   }
 
   function removeItem(index: number) {
@@ -106,38 +115,15 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
     })
   }
 
-  // No per-step editing; autosend/await and delay are fixed
-
-  const canRun = items.length > 0 && !submitting
-  const canSave = items.length > 0 && title.trim().length > 0 && !saving
-
-  const sortedPrompts = useMemo(() => {
-    return [...availablePrompts].sort((a, b) => a.title.localeCompare(b.title))
-  }, [availablePrompts])
-
-  function handleRun() {
-    if (!canRun) return
-    setSubmitting(true)
-    const steps: ChainStep[] = items.map((it) => ({
-      content: it.content,
-      autoSend: true,
-      awaitResponse: true,
-      delayMs: 500,
-    }))
-    try {
-      onRunChain(steps, 'overwrite')
-      handleClose()
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const allFilled = items.length > 0 && items.every((it) => it.content.trim().length > 0)
+  const canSave = allFilled && title.trim().length > 0 && !saving
 
   async function handleSaveChain() {
     if (!canSave) return
     setSaving(true)
     try {
       const now = Date.now()
-      await saveChain({ id: '', title: title.trim(), steps: items.map((it) => ({ content: it.content })), createdAt: now, updatedAt: now }, 'local')
+      await saveChain({ id: '', title: title.trim(), steps: items.map((it) => ({ content: it.content.trim() })), createdAt: now, updatedAt: now }, 'local')
       showToast({ variant: 'success', message: 'Chain saved to library' })
       setTitle('')
       handleClose()
@@ -174,104 +160,107 @@ export default function ChainBuilder({ open, availablePrompts, onClose, onRunCha
           </button>
         </div>
 
-        <div className="p-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="border rounded-md overflow-hidden">
-              <div className="px-3 py-2 text-xs font-medium border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-200">Available prompts</div>
-              <div className="max-h-[360px] overflow-auto">
-                {sortedPrompts.length === 0 ? (
-                  <div className="p-3 text-xs text-gray-500">No prompts yet.</div>
-                ) : (
-                  <ul className="divide-y">
-                    {sortedPrompts.map((p) => (
-                      <li key={p.id} className="px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" onClick={() => addPromptToChain(p)}>
-                        <div className="font-medium text-gray-900 dark:text-gray-100">{p.title}</div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            <div className="border rounded-md overflow-hidden">
-              <div className="px-3 py-2 text-xs font-medium border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-200">Chain sequence</div>
-              <div className="max-h-[360px] overflow-auto">
-                {items.length === 0 ? (
-                  <div className="p-3 text-xs text-gray-500">Click prompts on the left to add steps.</div>
-                ) : (
-                  <ol className="divide-y">
-                    {items.map((it, idx) => (
+        <div className="p-3 space-y-3">
+          <div className="border rounded-md overflow-hidden">
+            <div className="px-3 py-2 text-xs font-medium border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-200">Chain sequence</div>
+            <div className="max-h-[360px] overflow-auto">
+              {items.length === 0 ? (
+                <div className="p-3 text-xs text-gray-500">Add a step to start building a chain.</div>
+              ) : (
+                <ol className="divide-y">
+                  {items.map((it, idx) => {
+                    const isEditing = it.content.trim().length === 0 || editingId === it.id
+                    return (
                       <li key={it.id} className="px-3 py-2">
                         <div className="flex items-start gap-2">
-                          <div className="w-6 shrink-0 text-xs text-gray-500 pt-0.5">{idx + 1}.</div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="font-medium text-gray-900 dark:text-gray-100">{it.title}</div>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
-                                  onClick={() => moveUp(idx)}
-                                  disabled={idx === 0}
-                                  aria-label="Move up"
-                                >
-                                  <ArrowUp size={14} />
-                                </button>
-                                <button
-                                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
-                                  onClick={() => moveDown(idx)}
-                                  disabled={idx === items.length - 1}
-                                  aria-label="Move down"
-                                >
-                                  <ArrowDown size={14} />
-                                </button>
-                                <button
-                                  className="p-1 rounded hover:bg-rose-50 text-rose-700 dark:hover:bg-rose-900/30 dark:text-rose-300"
-                                  onClick={() => removeItem(idx)}
-                                  aria-label="Remove"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Per-step controls removed; autosend/await and delay are fixed by design */}
+                          <div className="w-6 shrink-0 text-xs text-gray-500 pt-1">{idx + 1}.</div>
+                          <div className="flex-1 min-w-0">
+                            {isEditing ? (
+                              <textarea
+                                value={it.content}
+                                placeholder={`Step ${idx + 1} prompt`}
+                                onChange={(e) => updateItem(it.id, e.target.value)}
+                                onFocus={() => setEditingId(it.id)}
+                                onBlur={() => {
+                                  if (editingId === it.id) setEditingId(null)
+                                }}
+                                className="w-full min-h-[64px] resize-none rounded-md border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="w-full text-left"
+                                onClick={() => setEditingId(it.id)}
+                                title={it.content}
+                              >
+                                <div className="text-sm text-gray-900 dark:text-gray-100 truncate">{it.content}</div>
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 pt-1">
+                            <button
+                              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                              onClick={() => moveUp(idx)}
+                              disabled={idx === 0}
+                              aria-label="Move up"
+                            >
+                              <ArrowUp size={14} />
+                            </button>
+                            <button
+                              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                              onClick={() => moveDown(idx)}
+                              disabled={idx === items.length - 1}
+                              aria-label="Move down"
+                            >
+                              <ArrowDown size={14} />
+                            </button>
+                            <button
+                              className="p-1 rounded hover:bg-rose-50 text-rose-700 dark:hover:bg-rose-900/30 dark:text-rose-300"
+                              onClick={() => removeItem(idx)}
+                              aria-label="Remove"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </div>
                       </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
+                    )
+                  })}
+                </ol>
+              )}
+            </div>
+            <div className="border-t px-3 py-2 bg-gray-50 dark:bg-gray-800">
+              <button
+                className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white"
+                onClick={addStep}
+                type="button"
+              >
+                <Plus size={14} /> Add step
+              </button>
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-end">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={title}
-                placeholder="Chain title"
-                onChange={(e) => setTitle(e.target.value)}
-                className="px-2 py-1 text-xs border rounded bg-white dark:bg-gray-900 dark:border-gray-700 w-40"
-              />
-              <button
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-xl bg-emerald-600 text-white shadow hover:bg-emerald-700 disabled:opacity-60"
-                onClick={async () => {
-                  await handleSaveChain()
-                  handleRun()
-                }}
-                disabled={!canSave || !canRun}
-              >
-                <Save size={16} /> Run and Save
-              </button>
-              <button className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white" onClick={handleClose} disabled={submitting}>
-                Cancel
-              </button>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <input
+              type="text"
+              value={title}
+              placeholder="Chain title"
+              onChange={(e) => setTitle(e.target.value)}
+              className="flex-1 px-2 py-1 text-xs border rounded bg-white dark:bg-gray-900 dark:border-gray-700"
+            />
+            <button
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-xl bg-emerald-600 text-white shadow hover:bg-emerald-700 disabled:opacity-60"
+              onClick={handleSaveChain}
+              disabled={!canSave}
+            >
+              <Save size={16} /> Save prompt chain
+            </button>
+            <button className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white" onClick={handleClose} disabled={saving}>
+              Cancel
+            </button>
           </div>
         </div>
       </div>
     </div>
   )
 }
-

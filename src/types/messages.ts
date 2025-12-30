@@ -1,4 +1,4 @@
-import type { AppSettings, Platform, PromptSummary } from './index'
+import type { AppSettings, Platform, PromptSummary, ChainSummary } from './index'
 
 export type InjectPromptMessage = {
   type: 'INJECT_PROMPT'
@@ -24,6 +24,9 @@ export type SettingsResultMessage = { type: 'SETTINGS_RESULT'; payload: { settin
 
 export type PromptSearchMessage = { type: 'PROMPT_SEARCH'; payload: { query: string; limit?: number } }
 export type PromptSearchResultMessage = { type: 'PROMPT_SEARCH_RESULT'; payload: { prompts: PromptSummary[] } }
+
+export type ChainSearchMessage = { type: 'CHAIN_SEARCH'; payload: { query: string; limit?: number } }
+export type ChainSearchResultMessage = { type: 'CHAIN_SEARCH_RESULT'; payload: { chains: ChainSummary[] } }
 
 export type LogUsageMessage = { type: 'LOG_USAGE'; payload: { promptId: string; platform: Platform } }
 
@@ -79,6 +82,8 @@ export type KnownMessage =
   | SettingsResultMessage
   | PromptSearchMessage
   | PromptSearchResultMessage
+  | ChainSearchMessage
+  | ChainSearchResultMessage
   | LogUsageMessage
   | OpenPromptEditorMessage
   | PromptUpdateMessage

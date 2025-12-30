@@ -292,13 +292,14 @@ export function createEditor(callbacks: EditorCallbacks) {
   async function handleSave() {
     if (busy) return
     const titleVal = nameInput.value.trim()
-    const contentVal = instructionsArea.value.trim()
+    const rawContent = instructionsArea.value
+    const trimmedContent = rawContent.trim()
     if (!titleVal) {
       setError('Shortcut name is required.')
       nameInput.focus()
       return
     }
-    if (!contentVal) {
+    if (!trimmedContent) {
       setError('Instructions are required.')
       instructionsArea.focus()
       return
@@ -306,7 +307,7 @@ export function createEditor(callbacks: EditorCallbacks) {
     resetError()
     setBusy(true)
     try {
-      const ok = await callbacks.onSave({ id: currentId, title: titleVal, content: contentVal })
+      const ok = await callbacks.onSave({ id: currentId, title: titleVal, content: rawContent })
       if (ok) {
         close()
       } else {
