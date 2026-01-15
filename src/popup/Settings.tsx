@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import type { AppSettings } from '../types'
-import { getSettings, saveSettings } from '../utils/storage'
+import { getSettings, saveSettings, exportLibrary, importLibrary } from '../utils/storage'
 import { useToast } from '../components/useToast'
+import { downloadJson } from '../utils/download'
 
 type SettingsProps = {
   onBack: () => void
@@ -11,10 +12,13 @@ type SettingsProps = {
 export default function Settings({ onBack }: SettingsProps) {
   const [settings, setSettings] = useState<AppSettings>({})
   const [status, setStatus] = useState<string | null>(null)
-  // Toasts not used now that storage controls are removed
-  useToast()
+  const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [importSummary, setImportSummary] = useState<string | null>(null)
+  const { showToast } = useToast()
   const autosaveTimerRef = useRef<number | null>(null)
   const didHydrateRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -65,12 +69,73 @@ export default function Settings({ onBack }: SettingsProps) {
     setStatus('Saved')
   }
 
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const data = await exportLibrary('local')
+      const filename = `langqueue-backup-${new Date().toISOString().slice(0, 10)}.json`
+      await downloadJson(filename, data)
+      showToast({ variant: 'success', message: 'Exported to Downloads' })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      showToast({ variant: 'error', message })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleImportFile(file: File) {
+    setImporting(true)
+    setImportSummary(null)
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      const results = await importLibrary(parsed, 'local')
+      const promptStats = results.prompts
+      const chainStats = results.chains
+      const summaryParts: string[] = []
+      if (promptStats) {
+        summaryParts.push(
+          `prompts imported ${promptStats.imported}, replaced ${promptStats.replaced}, skipped ${promptStats.skipped}`
+        )
+      }
+      if (chainStats) {
+        summaryParts.push(
+          `chains imported ${chainStats.imported}, replaced ${chainStats.replaced}, skipped ${chainStats.skipped}`
+        )
+      }
+      const summary = summaryParts.join(' • ') || 'No items imported'
+      setImportSummary(summary)
+      showToast({ variant: 'success', message: 'Import completed' })
+      chrome.runtime.sendMessage({ type: 'PROMPTS_IMPORTED' }).catch(() => {
+        // best-effort notification
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Import failed'
+      showToast({ variant: 'error', message })
+      setImportSummary(null)
+    } finally {
+      setImporting(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   const statusTone = status?.toLowerCase().includes('fail')
     ? 'text-rose-200 border-rose-400/30 bg-rose-500/15'
     : 'text-emerald-200 border-emerald-400/30 bg-emerald-500/15'
 
   return (
     <div className="w-popup min-w-popup max-w-popup h-[600px] bg-slate-950 text-slate-100 flex flex-col bg-[radial-gradient(120%_120%_at_50%_0%,rgba(56,189,248,0.12),transparent_60%)]">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void handleImportFile(file)
+        }}
+      />
       <header className="border-b border-white/10 px-3 pt-3 pb-2">
         <div className="flex items-center gap-2">
           <button className="p-2 rounded-full hover:bg-white/10 transition" onClick={onBack} aria-label="Back">
@@ -207,6 +272,41 @@ export default function Settings({ onBack }: SettingsProps) {
                 <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
               </span>
             </label>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5">
+          <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Import / Export</div>
+          <div className="divide-y divide-white/10">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="font-medium">Export library</div>
+                <div className="text-xs text-slate-400">Prompts and chains saved to Downloads.</div>
+              </div>
+              <button
+                className="px-3 py-2 text-xs rounded-xl border border-white/10 bg-slate-900/60 hover:bg-slate-800/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={handleExport}
+                disabled={exporting}
+              >
+                {exporting ? 'Exporting…' : 'Export JSON'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="font-medium">Import from file</div>
+                <div className="text-xs text-slate-400">Merge and replace duplicates by ID.</div>
+              </div>
+              <button
+                className="px-3 py-2 text-xs rounded-xl border border-white/10 bg-slate-900/60 hover:bg-slate-800/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+              >
+                {importing ? 'Importing…' : 'Import JSON'}
+              </button>
+            </div>
+            {importSummary ? (
+              <div className="px-4 py-2 text-[11px] text-slate-300">{importSummary}</div>
+            ) : null}
           </div>
         </section>
       </main>

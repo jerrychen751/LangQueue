@@ -1,4 +1,15 @@
-import type { DBSchema, Prompt, UsageLog, PromptExportFile, ImportMode, DuplicateStrategy, AppSettings, SavedChain, ChainExportFile } from '../types'
+import type {
+  DBSchema,
+  Prompt,
+  UsageLog,
+  PromptExportFile,
+  ImportMode,
+  DuplicateStrategy,
+  AppSettings,
+  SavedChain,
+  ChainExportFile,
+  LibraryExportFile,
+} from '../types'
 import { CURRENT_SCHEMA_VERSION } from '../types'
 
 export type StorageArea = 'local' | 'sync'
@@ -422,7 +433,6 @@ export async function importPrompts(
   return { imported, skipped, replaced, duplicated }
 }
 
-
 // Chain storage (simple list separate from DB schema; stored under a key)
 const CHAINS_KEY = 'langqueue_chains'
 
@@ -502,4 +512,80 @@ export async function importChains(
 
   await setInStorage(CHAINS_KEY, list, area)
   return { imported, skipped, replaced, duplicated }
+}
+
+export async function exportLibrary(area: StorageArea = 'local'): Promise<LibraryExportFile> {
+  const [promptFile, chainFile] = await Promise.all([exportPrompts(area), exportChains(area)])
+  return {
+    version: 2,
+    exportedAt: Date.now(),
+    prompts: promptFile.prompts,
+    chains: chainFile.chains,
+  }
+}
+
+type ImportCounts = { imported: number; skipped: number; replaced: number; duplicated: number }
+
+function isLibraryExportFile(input: unknown): input is LibraryExportFile {
+  return (
+    !!input &&
+    typeof input === 'object' &&
+    typeof (input as { version?: number }).version === 'number' &&
+    Array.isArray((input as { prompts?: unknown[] }).prompts) &&
+    Array.isArray((input as { chains?: unknown[] }).chains)
+  )
+}
+
+function isPromptExportFile(input: unknown): input is PromptExportFile {
+  return (
+    !!input &&
+    typeof input === 'object' &&
+    typeof (input as { version?: number }).version === 'number' &&
+    Array.isArray((input as { prompts?: unknown[] }).prompts)
+  )
+}
+
+function isChainExportFile(input: unknown): input is ChainExportFile {
+  return (
+    !!input &&
+    typeof input === 'object' &&
+    typeof (input as { version?: number }).version === 'number' &&
+    Array.isArray((input as { chains?: unknown[] }).chains)
+  )
+}
+
+export async function importLibrary(
+  data: unknown,
+  area: StorageArea = 'local'
+): Promise<{ prompts?: ImportCounts; chains?: ImportCounts }> {
+  const parsed = typeof data === 'string' ? JSON.parse(data) : data
+  const importOptions = { mode: 'merge' as ImportMode, duplicateStrategy: 'replace' as DuplicateStrategy }
+
+  if (isLibraryExportFile(parsed)) {
+    const [promptResult, chainResult] = await Promise.all([
+      importPrompts(
+        { version: parsed.version, exportedAt: parsed.exportedAt, prompts: parsed.prompts },
+        importOptions,
+        area
+      ),
+      importChains(
+        { version: parsed.version, exportedAt: parsed.exportedAt, chains: parsed.chains },
+        importOptions,
+        area
+      ),
+    ])
+    return { prompts: promptResult, chains: chainResult }
+  }
+
+  if (isPromptExportFile(parsed)) {
+    const prompts = await importPrompts(parsed, importOptions, area)
+    return { prompts }
+  }
+
+  if (isChainExportFile(parsed)) {
+    const chains = await importChains(parsed, importOptions, area)
+    return { chains }
+  }
+
+  throw new Error('Unrecognized export format. Expected prompts, chains, or combined library export.')
 }

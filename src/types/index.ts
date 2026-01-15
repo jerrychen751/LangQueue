@@ -103,3 +103,10 @@ export interface ChainExportFile {
   exportedAt: number
   chains: SavedChain[]
 }
+
+export interface LibraryExportFile {
+  version: number
+  exportedAt: number
+  prompts: Prompt[]
+  chains: SavedChain[]
+}

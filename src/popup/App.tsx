@@ -4,7 +4,7 @@ import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
 import type { Prompt, SavedChain } from '../types'
-import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain, getPrompt } from '../utils/storage'
+import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain, getPrompt, exportLibrary } from '../utils/storage'
 import { sendPromptToTab, detectActivePlatform, clickSendOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
 import { checkTabCompatibility } from '../utils/messaging'
@@ -12,6 +12,7 @@ import FilterBar, { type SortOption } from '../components/FilterBar'
 import Settings from './Settings'
 import ChainBuilder from '../components/ChainBuilder'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import { downloadJson } from '../utils/download'
 
 export default function App() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -31,6 +32,7 @@ export default function App() {
   const [deleteChainTarget, setDeleteChainTarget] = useState<SavedChain | null>(null)
   const { showToast } = useToast()
   const [focusSearchSignal, setFocusSearchSignal] = useState(0)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -214,6 +216,22 @@ export default function App() {
     window.close()
   }
 
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const data = await exportLibrary('local')
+      const date = new Date()
+      const filename = `langqueue-backup-${date.toISOString().slice(0, 10)}.json`
+      await downloadJson(filename, data)
+      showToast({ variant: 'success', message: 'Exported to Downloads' })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      showToast({ variant: 'error', message })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="w-popup min-w-popup max-w-popup h-[600px] bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col relative">
       <header className="border-b bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900">
@@ -384,6 +402,13 @@ export default function App() {
             <Plus size={16} /> New Prompt
           </button>
         </div>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="w-full inline-flex items-center justify-center gap-2 text-xs px-3 py-2 rounded-xl border border-white/15 backdrop-blur-md text-white hover:bg-white/15 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {exporting ? 'Exporting…' : 'Export library to Downloads'}
+        </button>
         <button className="hidden" />
       </footer>
 

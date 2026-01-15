@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LangQueue",
   "description": "Prompt library, enhancement, chaining, and automation for interacting with LLMs.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "action": {
     "default_title": "LangQueue",
     "default_popup": "popup.html",
@@ -36,7 +36,8 @@
   "permissions": [
     "storage",
     "activeTab",
-    "tabs"
+    "tabs",
+    "downloads"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
