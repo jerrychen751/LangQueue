@@ -1,9 +1,13 @@
-<img width="1218" height="685" alt="Screenshot 2026-01-21 at 8 24 25 PM" src="https://github.com/user-attachments/assets/5d933464-5492-4398-b26c-6a8f3b8031d4" />
-<img width="744" height="591" alt="Screenshot 2026-01-21 at 8 25 39 PM" src="https://github.com/user-attachments/assets/b793b078-9a81-4a56-8804-08d4a9267e08" />
-
 ## LangQueue
 
 LangQueue is a personal prompt orchestration Chrome extension for ChatGPT, Claude, and Gemini. It keeps a local prompt library and surfaces fast, in‑page insertion tools so you can drop structured prompts and chains into an active chat without leaving the page.
+
+<table>
+  <tr>
+    <td><img width="600" height="337" alt="Screenshot 2026-01-21 at 8 24 25 PM" src="https://github.com/user-attachments/assets/5d933464-5492-4398-b26c-6a8f3b8031d4" /></td>
+    <td><img width="600" height="477" alt="Screenshot 2026-01-21 at 8 25 39 PM" src="https://github.com/user-attachments/assets/b793b078-9a81-4a56-8804-08d4a9267e08" /></td>
+  </tr>
+</table>
 
 ### Capabilities
 
