@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
-import type { Prompt } from '../types'
+import { X, Loader2, Paperclip, Trash2 } from 'lucide-react'
+import type { AttachmentRef, Prompt } from '../types'
 import { savePrompt, updatePrompt, type StorageArea } from '../utils/storage'
 import { useToast } from './useToast'
+import { saveAttachmentFile, validateAttachmentFile } from '../utils/attachments'
 
 type PromptModalProps = {
   open: boolean
@@ -22,6 +23,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const lastActiveRef = useRef<HTMLElement | null>(null)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const savingRef = useRef(false)
   const handleSaveRef = useRef<() => Promise<void>>(async () => {})
   const { showToast } = useToast()
@@ -30,6 +32,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
   const [content, setContent] = useState(initialPrompt?.content ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentRef[]>(initialPrompt?.attachments ?? [])
 
   useEffect(() => {
     if (!open) return
@@ -37,6 +40,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
     // Reset fields when opening for a different prompt
     setTitle(initialPrompt?.title ?? '')
     setContent(initialPrompt?.content ?? '')
+    setAttachments(initialPrompt?.attachments ?? [])
     setError(null)
     // Focus the title
     setTimeout(() => titleRef.current?.focus(), 0)
@@ -50,6 +54,31 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
     onClose()
     // Restore focus
     setTimeout(() => lastActiveRef.current?.focus(), 0)
+  }
+
+  async function handleFilesPicked(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setSaving(true)
+    try {
+      const next: AttachmentRef[] = []
+      for (const file of Array.from(files)) {
+        const validation = validateAttachmentFile(file)
+        if (validation) throw new Error(`${file.name}: ${validation}`)
+        const saved = await saveAttachmentFile(file)
+        next.push(saved)
+      }
+      setAttachments((prev) => [...prev, ...next])
+      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add attachment.')
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setSaving(false)
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((item) => item.id !== id))
   }
 
   async function handleSave() {
@@ -79,11 +108,13 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
         await updatePrompt(initialPrompt.id, {
           title: t,
           content: rawContent,
+          attachments,
         }, storageArea)
         const saved: Prompt = {
           ...initialPrompt,
           title: t,
           content: rawContent,
+          attachments,
           updatedAt: Date.now(),
         }
         onSaved?.(saved)
@@ -94,6 +125,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
           id: generateClientId(),
           title: t,
           content: rawContent,
+          attachments,
           usageCount: 0,
           createdAt: now,
           updatedAt: now,
@@ -206,6 +238,51 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
               rows={4}
               placeholder="Your prompt content..."
             />
+          </div>
+
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void handleFilesPicked(e.target.files)
+              }}
+            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs text-gray-700 dark:text-gray-300">Attachments</label>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={saving}
+              >
+                <Paperclip size={12} />
+                Add files
+              </button>
+            </div>
+            {attachments.length === 0 ? (
+              <div className="text-[11px] text-gray-500 dark:text-gray-400">No attachments selected.</div>
+            ) : (
+              <ul className="space-y-1 max-h-24 overflow-auto">
+                {attachments.map((attachment) => (
+                  <li key={attachment.id} className="flex items-center justify-between gap-2 text-[11px] px-2 py-1 rounded border border-gray-200 dark:border-gray-700">
+                    <div className="min-w-0">
+                      <div className="truncate">{attachment.name}</div>
+                      <div className="text-gray-500 dark:text-gray-400">{Math.ceil(attachment.size / 1024)} KB</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => removeAttachment(attachment.id)}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
         </div>

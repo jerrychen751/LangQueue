@@ -43,7 +43,10 @@ export function PromptCard({ prompt, onEdit, onDelete, onInsert, onSend, canInse
       </div>
 
       <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <div>Used {prompt.usageCount ?? 0} times</div>
+        <div>
+          Used {prompt.usageCount ?? 0} times
+          {(prompt.attachments?.length ?? 0) > 0 ? ` · ${prompt.attachments.length} attachment${prompt.attachments.length === 1 ? '' : 's'}` : ''}
+        </div>
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => onEdit(prompt)} title="Edit">
             <Pencil size={14} />
@@ -86,4 +89,3 @@ export function PromptCard({ prompt, onEdit, onDelete, onInsert, onSend, canInse
     </>
   )
 }
-

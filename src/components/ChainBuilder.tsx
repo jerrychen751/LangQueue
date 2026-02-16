@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Trash2, X, Save, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Trash2, X, Save, Plus, Paperclip } from 'lucide-react'
 import { saveChain } from '../utils/storage'
 import { useToast } from './useToast'
+import type { AttachmentRef } from '../types'
+import { saveAttachmentFile, validateAttachmentFile } from '../utils/attachments'
 
 type ChainBuilderProps = {
   open: boolean
@@ -11,6 +13,7 @@ type ChainBuilderProps = {
 type ChainItem = {
   id: string
   content: string
+  attachments: AttachmentRef[]
 }
 
 const DEFAULT_STEP_COUNT = 2
@@ -19,6 +22,7 @@ function createEmptyItem(): ChainItem {
   return {
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     content: '',
+    attachments: [],
   }
 }
 
@@ -29,9 +33,11 @@ function createDefaultItems(): ChainItem[] {
 export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const lastActiveRef = useRef<HTMLElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const [items, setItems] = useState<ChainItem[]>(() => createDefaultItems())
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [pendingAttachmentStepId, setPendingAttachmentStepId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const { showToast } = useToast()
@@ -50,6 +56,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
     const defaults = createDefaultItems()
     setItems(defaults)
     setEditingId(null)
+    setPendingAttachmentStepId(null)
   }, [open])
 
   useEffect(() => {
@@ -89,6 +96,38 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, content } : item)))
   }
 
+  function removeAttachment(stepId: string, attachmentId: string) {
+    setItems((prev) => prev.map((item) => (
+      item.id === stepId
+        ? { ...item, attachments: item.attachments.filter((entry) => entry.id !== attachmentId) }
+        : item
+    )))
+  }
+
+  async function addAttachmentsToStep(stepId: string, files: FileList | null) {
+    if (!files || files.length === 0) return
+    setSaving(true)
+    try {
+      const next: AttachmentRef[] = []
+      for (const file of Array.from(files)) {
+        const validation = validateAttachmentFile(file)
+        if (validation) throw new Error(`${file.name}: ${validation}`)
+        const saved = await saveAttachmentFile(file)
+        next.push(saved)
+      }
+      setItems((prev) => prev.map((item) => (
+        item.id === stepId ? { ...item, attachments: [...item.attachments, ...next] } : item
+      )))
+      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` })
+    } catch (err) {
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to add attachment' })
+    } finally {
+      setSaving(false)
+      setPendingAttachmentStepId(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   function removeItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
@@ -123,7 +162,13 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
     setSaving(true)
     try {
       const now = Date.now()
-      await saveChain({ id: '', title: title.trim(), steps: items.map((it) => ({ content: it.content.trim() })), createdAt: now, updatedAt: now }, 'local')
+      await saveChain({
+        id: '',
+        title: title.trim(),
+        steps: items.map((it) => ({ content: it.content.trim(), attachments: it.attachments })),
+        createdAt: now,
+        updatedAt: now,
+      }, 'local')
       showToast({ variant: 'success', message: 'Chain saved to library' })
       setTitle('')
       handleClose()
@@ -151,6 +196,16 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
         aria-labelledby="chain-builder-title"
         className="w-popup max-w-popup bg-white rounded-md shadow-lg border outline-none dark:bg-gray-900 dark:border-gray-700"
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (!pendingAttachmentStepId) return
+            void addAttachmentsToStep(pendingAttachmentStepId, e.target.files)
+          }}
+        />
         <div className="flex items-center justify-between p-3 border-b">
           <div id="chain-builder-title" className="font-medium text-gray-900 dark:text-gray-100">
             Build Prompt Chain
@@ -199,6 +254,16 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                           </div>
                           <div className="flex items-center gap-1 pt-1">
                             <button
+                              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                              onClick={() => {
+                                setPendingAttachmentStepId(it.id)
+                                fileInputRef.current?.click()
+                              }}
+                              aria-label="Add attachment"
+                            >
+                              <Paperclip size={14} />
+                            </button>
+                            <button
                               className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
                               onClick={() => moveUp(idx)}
                               disabled={idx === 0}
@@ -223,6 +288,22 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                             </button>
                           </div>
                         </div>
+                        {it.attachments.length > 0 ? (
+                          <div className="mt-2 ml-8 flex flex-wrap gap-1">
+                            {it.attachments.map((attachment) => (
+                              <span key={attachment.id} className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-200 dark:border-gray-700">
+                                <span className="max-w-[150px] truncate">{attachment.name}</span>
+                                <button
+                                  type="button"
+                                  className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                  onClick={() => removeAttachment(it.id, attachment.id)}
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </li>
                     )
                   })}

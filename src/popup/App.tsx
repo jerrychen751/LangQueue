@@ -205,7 +205,7 @@ export default function App() {
 
   async function handleInsert(p: Prompt) {
     try {
-      await sendPromptToTab(p.content)
+      await sendPromptToTab(p.content, p.attachments || [])
       showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` })
     } catch {
       await navigator.clipboard.writeText(p.content)
@@ -315,7 +315,7 @@ export default function App() {
                 onInsert={handleInsert}
                   onSend={async (prompt) => {
                     try {
-                      await sendPromptToTab(prompt.content) // mirror card click injection
+                      await sendPromptToTab(prompt.content, prompt.attachments || []) // mirror card click injection
                       await clickSendOnTab()
                     showToast({ variant: 'success', message: 'Sent' })
                     window.close()

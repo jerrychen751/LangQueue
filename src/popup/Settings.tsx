@@ -32,6 +32,7 @@ export default function Settings({ onBack }: SettingsProps) {
       }
       const merged: AppSettings = {
         ...existing,
+        multimodalEnabled: existing.multimodalEnabled ?? true,
         shortcuts: {
           openLibrary: existing.shortcuts?.openLibrary ?? defaults.openLibrary,
           focusSearch: existing.shortcuts?.focusSearch ?? defaults.focusSearch,
@@ -72,7 +73,7 @@ export default function Settings({ onBack }: SettingsProps) {
   async function handleExport() {
     setExporting(true)
     try {
-      const data = await exportLibrary('local')
+      const data = await exportLibrary('local', { includeBinaries: Boolean(settings.exportIncludeBinaries) })
       const filename = `langqueue-backup-${new Date().toISOString().slice(0, 10)}.json`
       await downloadJson(filename, data)
       showToast({ variant: 'success', message: 'Exported to Downloads' })
@@ -103,6 +104,9 @@ export default function Settings({ onBack }: SettingsProps) {
         summaryParts.push(
           `chains imported ${chainStats.imported}, replaced ${chainStats.replaced}, skipped ${chainStats.skipped}`
         )
+      }
+      if (results.attachments) {
+        summaryParts.push(`attachments imported ${results.attachments.imported}`)
       }
       const summary = summaryParts.join(' • ') || 'No items imported'
       setImportSummary(summary)
@@ -154,6 +158,28 @@ export default function Settings({ onBack }: SettingsProps) {
       </header>
 
       <main className="flex-1 overflow-auto px-3 pt-3 pb-4 space-y-4 text-sm">
+        <section className="rounded-2xl border border-white/10 bg-white/5">
+          <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Features</div>
+          <div className="divide-y divide-white/10">
+            <label className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="font-medium">Enable multimodal attachments</div>
+                <div className="text-xs text-slate-400">Allow prompt and chain image/file attachments.</div>
+              </div>
+              <span className="relative inline-flex h-6 w-10 items-center">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={settings.multimodalEnabled !== false}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, multimodalEnabled: e.target.checked }))}
+                />
+                <span className="h-6 w-10 rounded-full bg-slate-700/80 border border-white/10 transition-colors peer-checked:bg-amber-500/80 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400/70" />
+                <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+              </span>
+            </label>
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-white/10 bg-white/5">
           <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Chain defaults</div>
           <div className="divide-y divide-white/10">
@@ -291,6 +317,22 @@ export default function Settings({ onBack }: SettingsProps) {
                 {exporting ? 'Exporting…' : 'Export JSON'}
               </button>
             </div>
+            <label className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="font-medium">Include attachment binaries</div>
+                <div className="text-xs text-slate-400">Larger export, but portable with files/images.</div>
+              </div>
+              <span className="relative inline-flex h-6 w-10 items-center">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={Boolean(settings.exportIncludeBinaries)}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, exportIncludeBinaries: e.target.checked }))}
+                />
+                <span className="h-6 w-10 rounded-full bg-slate-700/80 border border-white/10 transition-colors peer-checked:bg-amber-500/80 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400/70" />
+                <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+              </span>
+            </label>
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <div>
                 <div className="font-medium">Import from file</div>
