@@ -1,140 +1,130 @@
-import type { Adapter, InputElement, WaitForIdleOptions } from '../core/types'
-import { isButtonEnabledAndVisible, isVisible } from './shared'
+import { Adapter } from './adapter'
+import {
+  findVisibleFileInput,
+  isButtonEnabledAndVisible,
+  isVisible,
+  setFilesOnInput,
+  waitForSelectorsToDisappear,
+} from './utils'
 
-function getInputText(el: InputElement | null): string {
-  if (!el) return ''
-  if (el instanceof HTMLTextAreaElement) return el.value || ''
-  return el.textContent || ''
-}
+class GeminiAdapter extends Adapter {
+  id = 'gemini' as const
 
-function findInput(): InputElement | null {
-  const selector = 'div[contenteditable="true"][role="textbox"], textarea'
-  const el = document.querySelector(selector) as HTMLElement | null
-  if (!el) return null
-  if (el.tagName === 'TEXTAREA') return el as HTMLTextAreaElement
-  if (el.getAttribute('contenteditable') === 'true') return el
-  return null
-}
+  matchesAdapterDomain(): boolean {
+    return /gemini\.google\.com/.test(window.location.hostname)
+  }
 
-function clickSend(input?: InputElement | null): boolean {
-  const target = input || findInput()
-  if (!target) return false
+  getInputElement(): HTMLTextAreaElement | null {
+    // Gemini uses a contenteditable div with aria-label="Enter a prompt for Gemini"
+    const contentEditables = Array.from(
+      document.querySelectorAll('div[contenteditable="true"]')
+    ) as HTMLElement[]
+    const visibleCEs = contentEditables.filter((e) => isVisible(e))
 
-  const text = getInputText(target).trim()
-  if (!text) return false
+    if (visibleCEs.length === 1) {
+      return visibleCEs[0] as unknown as HTMLTextAreaElement
+    } else if (visibleCEs.length > 1) {
+      const keywords = ['gemini', 'prompt', 'message', 'chat']
+      const match = visibleCEs.find((e) => {
+        const label = (e.getAttribute('aria-label') || '').toLowerCase()
+        return keywords.some((kw) => label.includes(kw))
+      })
+      if (match) return match as unknown as HTMLTextAreaElement
+    }
 
-  const selectors = [
-    'button[aria-label="Send message"]',
-    'button[aria-label*="Send" i]',
-    'button.send-button',
-    'div[role="button"][aria-label*="Send" i]',
-    'div[role="button"][data-testid*="send" i]',
-    'button[type="submit"]',
-    'form button[type="submit"]',
-    'form [type="submit"]',
-  ]
+    // Fallback: try textarea
+    const textareas = Array.from(document.querySelectorAll('textarea')) as HTMLTextAreaElement[]
+    const visibleTA = textareas.find((e) => isVisible(e))
+    return visibleTA ?? null
+  }
 
-  for (const selector of selectors) {
-    const candidate = document.querySelector(selector)
-    if (isButtonEnabledAndVisible(candidate)) {
+  isGenerating(): boolean {
+    // Stop button only exists during generation (send button with .stop class toggled)
+    if (document.querySelector('button[aria-label="Stop response"]')) return true
+    if (document.querySelector('.send-button.stop')) return true
+
+    // Response footer without .complete means still generating
+    if (document.querySelector('.response-footer:not(.complete)')) return true
+
+    // Animated footer on the actively streaming response
+    if (document.querySelector('.response-footer.animated')) return true
+
+    return false
+  }
+
+  clickSend(input?: HTMLTextAreaElement | null): boolean {
+    const target = input || this.getInputElement()
+    if (!target) return false
+
+    const selectors = [
+      'button[aria-label="Send message"]',
+      'button[aria-label*="Send" i]',
+      'button.send-button',
+      'div[role="button"][aria-label*="Send" i]',
+      'div[role="button"][data-testid*="send" i]',
+      'button[type="submit"]',
+      'form button[type="submit"]',
+      'form [type="submit"]',
+    ]
+
+    for (const selector of selectors) {
+      const candidate = document.querySelector(selector)
+      if (isButtonEnabledAndVisible(candidate)) {
+        try {
+          candidate.click()
+          return true
+        } catch {
+          continue
+        }
+      }
+    }
+
+    const form = (target as HTMLElement | null)?.closest('form')
+    if (form) {
+      const withinForm = Array.from(form.querySelectorAll('button, [type="submit"]')) as HTMLElement[]
+      const btn = withinForm.find((el) => el.tagName === 'BUTTON' && isButtonEnabledAndVisible(el)) as HTMLButtonElement | undefined
+      if (btn) {
+        try {
+          btn.click()
+          return true
+        } catch {
+          void 0
+        }
+      }
       try {
-        candidate.click()
-        return true
+        const htmlForm = form as HTMLFormElement
+        if (typeof htmlForm.requestSubmit === 'function') {
+          htmlForm.requestSubmit()
+          return true
+        }
       } catch {
-        continue
+        // ignore
       }
     }
+
+    return false
   }
 
-  const form = (target as HTMLElement | null)?.closest('form')
-  if (form) {
-    const withinForm = Array.from(form.querySelectorAll('button, [type="submit"]')) as HTMLElement[]
-    const btn = withinForm.find((el) => el.tagName === 'BUTTON' && isButtonEnabledAndVisible(el)) as HTMLButtonElement | undefined
-    if (btn) {
-      try {
-        btn.click()
-        return true
-      } catch {
-        void 0
-      }
-    }
-    try {
-      const htmlForm = form as HTMLFormElement
-      if (typeof htmlForm.requestSubmit === 'function') {
-        htmlForm.requestSubmit()
-        return true
-      }
-    } catch {
-      // ignore
-    }
+  async attachFiles(files: File[]) {
+    if (!Array.isArray(files) || files.length === 0) return { ok: true }
+    const input = findVisibleFileInput([
+      'input[type="file"][accept*="image" i]',
+      'input[type="file"]',
+    ])
+    if (!input) return { ok: false, error: 'UPLOAD_INPUT_NOT_FOUND' }
+    return setFilesOnInput(input, files)
   }
 
-  return false
-}
-
-function anyVisible(selectors: string[]): boolean {
-  for (const selector of selectors) {
-    const el = document.querySelector(selector)
-    if (el && isVisible(el)) return true
+  async waitForUploadsComplete(options?: { timeoutMs?: number; pollMs?: number }): Promise<boolean> {
+    return waitForSelectorsToDisappear([
+      '[aria-label*="Uploading" i]',
+      '[class*="upload" i][class*="progress" i]',
+      '[role="progressbar"]',
+    ], options)
   }
-  return false
-}
 
-function isGenerating(): boolean {
-  const stopSelectors = [
-    'button[aria-label="Stop"]',
-    'button[aria-label*="Stop" i]',
-    'button[aria-label*="Cancel" i]',
-  ]
-  const spinnerSelectors = [
-    '[class*="spinner" i]',
-    '[class*="loading" i]',
-    '[class*="generating" i]',
-    '[role="progressbar"]',
-  ]
-  if (anyVisible(stopSelectors)) return true
-  if (anyVisible(spinnerSelectors)) return true
-
-  const sendBtn = document.querySelector('button[aria-label*="Send" i], button[type="submit"]') as HTMLButtonElement | null
-  if (sendBtn && isVisible(sendBtn)) {
-    const ariaDisabled = sendBtn.getAttribute('aria-disabled')
-    const disabledLike = sendBtn.disabled || (ariaDisabled && ariaDisabled.toLowerCase() === 'true')
-    if (disabledLike && getInputText(findInput()).trim().length > 0) return true
-  }
-  return false
-}
-
-function isInputReady(input: InputElement | null): boolean {
-  if (!input) return false
-  if (input instanceof HTMLTextAreaElement) {
-    return isVisible(input) && !input.disabled
-  }
-  const ariaDisabled = input.getAttribute('aria-disabled')
-  const ce = input.getAttribute('contenteditable')
-  const busy = input.getAttribute('aria-busy')
-  return isVisible(input) && (!ariaDisabled || ariaDisabled.toLowerCase() !== 'true') && (ce !== 'false') && (!busy || busy.toLowerCase() !== 'true')
-}
-
-async function waitForIdle(options?: WaitForIdleOptions): Promise<boolean> {
-  const timeoutMs = options?.timeoutMs ?? 120000
-  const pollMs = options?.pollMs ?? 200
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    const input = findInput()
-    if (!isGenerating() && isInputReady(input)) return true
-    await new Promise((r) => setTimeout(r, pollMs))
-  }
-  return false
 }
 
 export function createGeminiAdapter(): Adapter {
-  return {
-    id: 'gemini',
-    matches: () => /gemini\.google\.com/.test(window.location.hostname),
-    findInput,
-    isGenerating,
-    clickSend,
-    waitForIdle,
-  }
+  return new GeminiAdapter()
 }
-
