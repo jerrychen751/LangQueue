@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { getSettings, searchPrompts, searchChains, logUsage, updatePrompt, deletePrompt, savePrompt } from '../utils/storage'
+import { getAttachmentChunkBase64, getAttachmentMeta } from '../utils/attachments'
 import type { Platform, PromptSummary, ChainSummary } from '../types'
 
 const PLATFORM_VALUES = [
@@ -133,6 +134,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           id: p.id,
           title: p.title,
           content: p.content,
+          attachments: p.attachments || [],
         }))
         sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { prompts } })
       })
@@ -159,11 +161,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const id = message?.payload?.id
     const title = message?.payload?.title
     const content = message?.payload?.content
+    const attachments = Array.isArray(message?.payload?.attachments) ? message.payload.attachments : undefined
     if (typeof id !== 'string' || typeof title !== 'string' || typeof content !== 'string') {
       sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: false, error: 'INVALID_PAYLOAD' } })
       return
     }
-    updatePrompt(id, { title, content }, 'local')
+    updatePrompt(id, { title, content, ...(attachments ? { attachments } : {}) }, 'local')
       .then(() => sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: true } }))
       .catch((err) => {
         sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: false, error: err?.message || 'UPDATE_FAILED' } })
@@ -186,6 +189,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'PROMPT_CREATE') {
     const title = message?.payload?.title
     const content = message?.payload?.content
+    const attachments = Array.isArray(message?.payload?.attachments) ? message.payload.attachments : []
     if (typeof title !== 'string' || typeof content !== 'string') {
       sendResponse({ type: 'PROMPT_CREATE_RESULT', payload: { ok: false, error: 'INVALID_PAYLOAD' } })
       return
@@ -197,6 +201,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         id,
         title,
         content,
+        attachments,
         usageCount: 0,
         createdAt: now,
         updatedAt: now,
@@ -243,6 +248,67 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }, 600)
       sendResponse({ ok: true })
     })
+    return true
+  }
+  if (message?.type === 'ATTACHMENT_GET_META') {
+    const ids = Array.isArray(message?.payload?.ids) ? message.payload.ids.filter((id: unknown) => typeof id === 'string') : []
+    Promise.all(ids.map((id: string) => getAttachmentMeta(id)))
+      .then((items) => {
+        const attachments = items.filter((item): item is NonNullable<typeof item> => Boolean(item))
+        const foundIds = new Set(attachments.map((item) => item.id))
+        const missingIds = ids.filter((id: string) => !foundIds.has(id))
+        sendResponse({
+          type: 'ATTACHMENT_GET_META_RESULT',
+          payload: { ok: true, attachments, missingIds },
+        })
+      })
+      .catch((err) => {
+        sendResponse({
+          type: 'ATTACHMENT_GET_META_RESULT',
+          payload: { ok: false, attachments: [], missingIds: ids, error: err?.message || 'ATTACHMENT_META_FAILED' },
+        })
+      })
+    return true
+  }
+  if (message?.type === 'ATTACHMENT_GET_CHUNK') {
+    const id = message?.payload?.id
+    const offset = message?.payload?.offset
+    const length = message?.payload?.length
+    if (typeof id !== 'string' || typeof offset !== 'number' || typeof length !== 'number') {
+      sendResponse({
+        type: 'ATTACHMENT_GET_CHUNK_RESULT',
+        payload: { ok: false, id: String(id || ''), offset: 0, nextOffset: 0, totalBytes: 0, chunkBase64: '', done: true, error: 'INVALID_PAYLOAD' },
+      })
+      return
+    }
+    getAttachmentChunkBase64(id, offset, length)
+      .then((chunk) => {
+        if (!chunk) {
+          sendResponse({
+            type: 'ATTACHMENT_GET_CHUNK_RESULT',
+            payload: { ok: false, id, offset, nextOffset: offset, totalBytes: 0, chunkBase64: '', done: true, error: 'ATTACHMENT_NOT_FOUND' },
+          })
+          return
+        }
+        sendResponse({
+          type: 'ATTACHMENT_GET_CHUNK_RESULT',
+          payload: {
+            ok: true,
+            id,
+            offset,
+            nextOffset: chunk.nextOffset,
+            totalBytes: chunk.totalBytes,
+            chunkBase64: chunk.chunkBase64,
+            done: chunk.done,
+          },
+        })
+      })
+      .catch((err) => {
+        sendResponse({
+          type: 'ATTACHMENT_GET_CHUNK_RESULT',
+          payload: { ok: false, id, offset, nextOffset: offset, totalBytes: 0, chunkBase64: '', done: true, error: err?.message || 'ATTACHMENT_CHUNK_FAILED' },
+        })
+      })
     return true
   }
 })
