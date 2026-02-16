@@ -35,6 +35,7 @@
   ],
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "activeTab",
     "tabs",
     "downloads"

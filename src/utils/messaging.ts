@@ -8,7 +8,7 @@ import type {
   ChainStep,
   ClickSendMessage,
 } from '../types/messages'
-import type { Platform } from '../types'
+import type { AttachmentRef, Platform } from '../types'
 
 function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   return new Promise((resolve) => {
@@ -31,13 +31,16 @@ export async function checkTabCompatibility(): Promise<boolean> {
   }
 }
 
-export async function sendPromptToTab(promptContent: string): Promise<void> {
+export async function sendPromptToTab(promptContent: string, attachments: AttachmentRef[] = []): Promise<void> {
   const tab = await getActiveTab()
   if (!tab?.id || !tab.url) throw new Error('No active tab')
   const platform = detectPlatformFromUrl(tab.url)
   if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) throw new Error('Not on a compatible AI chat page')
   try {
-    const res = (await chrome.tabs.sendMessage(tab.id, { type: 'INJECT_PROMPT', payload: { content: promptContent } } as InjectPromptMessage)) as
+    const res = (await chrome.tabs.sendMessage(tab.id, {
+      type: 'INJECT_PROMPT',
+      payload: { content: promptContent, attachments },
+    } as InjectPromptMessage)) as
       | InjectPromptResultMessage
       | undefined
     if (!res || res.type !== 'INJECT_PROMPT_RESULT' || !res.payload.ok) {
@@ -111,5 +114,4 @@ export async function cancelChainOnTab(): Promise<void> {
     // swallow errors; cancellation is best-effort
   }
 }
-
 

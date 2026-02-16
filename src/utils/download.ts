@@ -4,7 +4,7 @@ export async function downloadJson(filename: string, data: unknown): Promise<voi
 
   if (typeof chrome !== 'undefined' && chrome.downloads && typeof chrome.downloads.download === 'function') {
     await new Promise<void>((resolve, reject) => {
-      chrome.downloads.download({ url, filename, saveAs: false }, (_downloadId) => {
+      chrome.downloads.download({ url, filename, saveAs: false }, () => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message))
           return
