@@ -1,5 +1,9 @@
-import type { AppSettings, Platform, PromptSummary, ChainSummary } from '../../types'
+import type { AppSettings, AttachmentRef, Platform, PromptSummary, ChainSummary } from '../../types'
 import type {
+  AttachmentGetChunkMessage,
+  AttachmentGetChunkResultMessage,
+  AttachmentGetMetaMessage,
+  AttachmentGetMetaResultMessage,
   GetSettingsMessage,
   SettingsResultMessage,
   PromptSearchMessage,
@@ -79,11 +83,11 @@ export async function openPromptEditor(promptId: string) {
   }
 }
 
-export async function updatePrompt(id: string, title: string, content: string): Promise<boolean> {
+export async function updatePrompt(id: string, title: string, content: string, attachments?: AttachmentRef[]): Promise<boolean> {
   try {
     const response = (await chrome.runtime.sendMessage({
       type: 'PROMPT_UPDATE',
-      payload: { id, title, content },
+      payload: { id, title, content, ...(attachments ? { attachments } : {}) },
     } as PromptUpdateMessage)) as PromptUpdateResultMessage | undefined
     if (response?.type !== 'PROMPT_UPDATE_RESULT') return false
     if (!response.payload.ok) {
@@ -108,11 +112,11 @@ export async function deletePrompt(id: string): Promise<boolean> {
   }
 }
 
-export async function createPrompt(title: string, content: string): Promise<boolean> {
+export async function createPrompt(title: string, content: string, attachments?: AttachmentRef[]): Promise<boolean> {
   try {
     const response = (await chrome.runtime.sendMessage({
       type: 'PROMPT_CREATE',
-      payload: { title, content },
+      payload: { title, content, ...(attachments ? { attachments } : {}) },
     } as PromptCreateMessage)) as PromptCreateResultMessage | undefined
     if (response?.type !== 'PROMPT_CREATE_RESULT') return false
     if (!response.payload.ok) {
@@ -123,4 +127,84 @@ export async function createPrompt(title: string, content: string): Promise<bool
     if (err instanceof Error) throw err
     throw new Error('Failed to save.')
   }
+}
+
+export async function getAttachmentMetas(ids: string[]): Promise<{ attachments: AttachmentRef[]; missingIds: string[] }> {
+  if (!Array.isArray(ids) || ids.length === 0) return { attachments: [], missingIds: [] }
+  try {
+    const response = (await chrome.runtime.sendMessage({
+      type: 'ATTACHMENT_GET_META',
+      payload: { ids },
+    } as AttachmentGetMetaMessage)) as AttachmentGetMetaResultMessage | undefined
+    if (!response || response.type !== 'ATTACHMENT_GET_META_RESULT' || !response.payload.ok) {
+      return { attachments: [], missingIds: ids }
+    }
+    return {
+      attachments: response.payload.attachments || [],
+      missingIds: response.payload.missingIds || [],
+    }
+  } catch {
+    return { attachments: [], missingIds: ids }
+  }
+}
+
+async function getAttachmentChunk(
+  id: string,
+  offset: number,
+  length: number
+): Promise<AttachmentGetChunkResultMessage['payload']> {
+  const response = (await chrome.runtime.sendMessage({
+    type: 'ATTACHMENT_GET_CHUNK',
+    payload: { id, offset, length },
+  } as AttachmentGetChunkMessage)) as AttachmentGetChunkResultMessage | undefined
+  if (!response || response.type !== 'ATTACHMENT_GET_CHUNK_RESULT') {
+    return {
+      ok: false,
+      id,
+      offset,
+      nextOffset: offset,
+      totalBytes: 0,
+      chunkBase64: '',
+      done: true,
+      error: 'INVALID_ATTACHMENT_CHUNK_RESPONSE',
+    }
+  }
+  return response.payload
+}
+
+export async function fetchAttachmentFiles(attachments: AttachmentRef[]): Promise<File[]> {
+  if (!Array.isArray(attachments) || attachments.length === 0) return []
+  const files: File[] = []
+  for (const attachment of attachments) {
+    let offset = 0
+    const chunks: string[] = []
+    let totalBytes = 0
+    let done = false
+    while (!done) {
+      const payload = await getAttachmentChunk(attachment.id, offset, 64 * 1024)
+      if (!payload.ok) throw new Error(payload.error || 'ATTACHMENT_CHUNK_FAILED')
+      chunks.push(payload.chunkBase64)
+      offset = payload.nextOffset
+      totalBytes = payload.totalBytes
+      done = payload.done
+    }
+    const bytes = decodeBase64Chunks(chunks, totalBytes)
+    files.push(new File([bytes], attachment.name, { type: attachment.mimeType }))
+  }
+  return files
+}
+
+function decodeBase64Chunks(chunks: string[], totalBytes: number): ArrayBuffer {
+  const out = new Uint8Array(Math.max(0, totalBytes))
+  let cursor = 0
+  for (const chunk of chunks) {
+    if (!chunk) continue
+    const binary = atob(chunk)
+    for (let i = 0; i < binary.length; i += 1) {
+      if (cursor >= out.length) break
+      out[cursor] = binary.charCodeAt(i)
+      cursor += 1
+    }
+  }
+  return out.buffer.slice(0, cursor)
 }

@@ -1,7 +1,10 @@
-import type { Adapter, InputElement } from '../types'
+import type { Adapter } from '../../adapters/adapter'
 import type { ChainStep } from '../../../types/messages'
 import type { AppSettings } from '../../../types'
 import { appendInputText, setInputText } from '../insert/composer'
+import { fetchAttachmentFiles } from '../messaging'
+
+type InputElement = HTMLTextAreaElement | HTMLElement
 
 type ChainDefaults = {
   autoSend?: boolean
@@ -37,13 +40,27 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
           return false
         }
 
-        const input = getInput() || adapter.findInput()
+        const input = getInput() || adapter.getInputElement()
         if (!input) {
           chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'INPUT_NOT_FOUND' } })
           return false
         }
 
         const step = steps[i]
+        if (Array.isArray(step.attachments) && step.attachments.length > 0) {
+          const files = await fetchAttachmentFiles(step.attachments)
+          const attached = await adapter.attachFiles(files)
+          if (!attached.ok) {
+            chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: attached.error || 'ATTACHMENT_UPLOAD_FAILED' } })
+            return false
+          }
+          const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: 250 })
+          if (!uploaded) {
+            chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'ATTACHMENT_UPLOAD_TIMEOUT' } })
+            return false
+          }
+        }
+
         if (mode === 'append') {
           appendInputText(input, step.content)
         } else {
@@ -56,7 +73,7 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
 
         if (shouldAutoSend) {
           chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
-          const sent = adapter.clickSend(input)
+          const sent = adapter.clickSend(input as HTMLTextAreaElement)
           if (!sent) {
             chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })
             return false

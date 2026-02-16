@@ -1,15 +1,19 @@
+import type { AttachmentRef } from '../../../types'
+import type { ChainStep } from '../../../types/messages'
+
 export type OverlayItem =
   | {
       kind: 'prompt'
       id: string
       title: string
       content: string
+      attachments: AttachmentRef[]
     }
   | {
       kind: 'chain'
       id: string
       title: string
-      steps: { content: string }[]
+      steps: ChainStep[]
     }
 
 type OverlayCallbacks = {

@@ -1,5 +1,5 @@
-import type { Adapter, InputElement } from './types'
-import type { AppSettings, Platform } from '../../types'
+import type { Adapter } from '../adapters/adapter'
+import type { AppSettings, AttachmentRef, Platform } from '../../types'
 import type { ChainStep, KnownMessage } from '../../types/messages'
 import { detectSlashContext } from './detect/slash'
 import { appendInputText, getInputText, setInputText } from './insert/composer'
@@ -8,7 +8,9 @@ import { createOverlay } from './overlay/overlay'
 import { createQueue } from './queue/queue'
 import { createChainExecutor } from './queue/chain_executor'
 import { applyTweaks } from './page_tweaks/tweaks'
-import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './messaging'
+import { createPrompt, deletePrompt, fetchAttachmentFiles, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './messaging'
+
+type InputElement = HTMLTextAreaElement | HTMLElement
 
 function mapPlatform(id: Adapter['id']): Platform {
   return id === 'chatgpt' || id === 'claude' || id === 'gemini' ? id : 'other'
@@ -20,6 +22,18 @@ export function initController(adapter: Adapter) {
   let pendingSearchToken = 0
   let readySent = false
 
+  async function attachToComposer(attachments: AttachmentRef[]): Promise<void> {
+    if (settings.multimodalEnabled === false) return
+    if (!attachments.length) return
+    const files = await fetchAttachmentFiles(attachments)
+    const result = await adapter.attachFiles(files)
+    if (!result.ok) {
+      throw new Error(result.error || 'ATTACHMENT_UPLOAD_FAILED')
+    }
+    const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: 250 })
+    if (!uploaded) throw new Error('ATTACHMENT_UPLOAD_TIMEOUT')
+  }
+
   const editor = createEditor({
     onSave: async (draft) => {
       if (draft.id) return updatePrompt(draft.id, draft.title, draft.content)
@@ -30,17 +44,24 @@ export function initController(adapter: Adapter) {
 
   const overlay = createOverlay({
     onSelect: (item) => {
-      const input = activeInput || adapter.findInput()
-      if (!input) return
-      if (item.kind === 'prompt') {
-        setInputText(input, item.content)
+      void (async () => {
+        const input = activeInput || adapter.getInputElement()
+        if (!input) return
+        if (item.kind === 'prompt') {
+          try {
+            await attachToComposer(item.attachments || [])
+          } catch {
+            // continue with text insertion even when upload fails
+          }
+          setInputText(input, item.content)
+          overlay.hide()
+          void logUsage(item.id, mapPlatform(adapter.id))
+          return
+        }
         overlay.hide()
-        void logUsage(item.id, mapPlatform(adapter.id))
-        return
-      }
-      overlay.hide()
-      if (chainExecutor.isRunning()) return
-      void chainExecutor.run(item.steps, settings, 'overwrite')
+        if (chainExecutor.isRunning()) return
+        void chainExecutor.run(item.steps, settings, 'overwrite')
+      })()
     },
     onEdit: (item) => {
       overlay.hide()
@@ -61,7 +82,7 @@ export function initController(adapter: Adapter) {
   const chainExecutor = createChainExecutor(adapter, () => activeInput)
 
   function refreshInput() {
-    const next = adapter.findInput()
+    const next = adapter.getInputElement()
     if (next && next !== activeInput) {
       activeInput = next
       if (!readySent) {
@@ -81,7 +102,7 @@ export function initController(adapter: Adapter) {
   }
 
   async function updateSlashSuggestions() {
-    const input = activeInput || adapter.findInput()
+    const input = activeInput || adapter.getInputElement()
     if (!input) {
       pendingSearchToken += 1
       overlay.hide()
@@ -106,6 +127,7 @@ export function initController(adapter: Adapter) {
         id: prompt.id,
         title: prompt.title,
         content: prompt.content,
+        attachments: prompt.attachments || [],
       })),
       ...chains.map((chain) => ({
         kind: 'chain' as const,
@@ -121,7 +143,7 @@ export function initController(adapter: Adapter) {
   function getEventInput(event: Event): InputElement | null {
     const target = event.target as Node | null
     if (!target) return null
-    const input = activeInput || adapter.findInput()
+    const input = activeInput || adapter.getInputElement()
     if (!input) return null
     if (target === input) return input
     if (input instanceof HTMLElement && input.contains(target)) return input
@@ -176,7 +198,7 @@ export function initController(adapter: Adapter) {
 
   function handlePointerDown(event: MouseEvent) {
     if (!overlay.isOpen()) return
-    const input = activeInput || adapter.findInput()
+    const input = activeInput || adapter.getInputElement()
     const target = event.target as Node | null
     if (input instanceof HTMLElement && target && input.contains(target)) return
     if (overlay.isEventInside(event)) return
@@ -184,7 +206,7 @@ export function initController(adapter: Adapter) {
   }
 
   function isInputActive(): boolean {
-    const input = activeInput || adapter.findInput()
+    const input = activeInput || adapter.getInputElement()
     if (!input) return false
     const active = document.activeElement as Node | null
     if (!active) return false
@@ -210,39 +232,45 @@ export function initController(adapter: Adapter) {
     if (!message || typeof message !== 'object' || !('type' in message)) return
     const msg = message as KnownMessage
     if (msg.type === 'COMPAT_CHECK') {
-      const ready = Boolean(adapter.findInput())
+      const ready = Boolean(adapter.getInputElement())
       sendResponse({ type: 'COMPAT_STATUS', payload: { ready } })
       return
     }
     if (msg.type === 'CLICK_SEND') {
-      const input = activeInput || adapter.findInput()
-      adapter.clickSend(input)
+      const input = activeInput || adapter.getInputElement()
+      adapter.clickSend(input as HTMLTextAreaElement | null)
       return
     }
     if (msg.type === 'INJECT_PROMPT') {
       const content = msg.payload?.content
-      if (!content) {
+      const attachments = Array.isArray(msg.payload?.attachments) ? msg.payload.attachments : []
+      if (!content && attachments.length === 0) {
         sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'NO_CONTENT' } })
         return
       }
-      const input = activeInput || adapter.findInput()
+      const input = activeInput || adapter.getInputElement()
       if (!input) {
         sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'INPUT_NOT_FOUND' } })
         return
       }
       const mode = settings.insertionMode || 'overwrite'
-      const contentWithNL = content.endsWith('\n') ? content : `${content}\n`
-      try {
-        if (mode === 'append') {
-          appendInputText(input, contentWithNL)
-        } else {
-          setInputText(input, contentWithNL)
+      void (async () => {
+        try {
+          await attachToComposer(attachments)
+          if (content) {
+            const contentWithNL = content.endsWith('\n') ? content : `${content}\n`
+            if (mode === 'append') {
+              appendInputText(input, contentWithNL)
+            } else {
+              setInputText(input, contentWithNL)
+            }
+          }
+          sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: true } })
+        } catch {
+          sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'INJECTION_FAILED' } })
         }
-        sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: true } })
-      } catch {
-        sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'INJECTION_FAILED' } })
-      }
-      return
+      })()
+      return true
     }
     if (msg.type === 'RUN_CHAIN') {
       const payload = msg.payload

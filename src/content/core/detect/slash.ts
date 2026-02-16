@@ -1,4 +1,4 @@
-import type { InputElement } from '../types'
+type InputElement = HTMLTextAreaElement | HTMLElement
 
 export type SlashContext =
   | {

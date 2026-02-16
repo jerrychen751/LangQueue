@@ -1,5 +1,6 @@
-import type { InputElement } from '../types'
 import type { SlashContext } from '../detect/slash'
+
+type InputElement = HTMLTextAreaElement | HTMLElement
 
 function inferInputType(data: string): InputEventInit['inputType'] {
   if (/[\r\n\t]/.test(data) || / {2,}/.test(data)) return 'insertFromPaste'
