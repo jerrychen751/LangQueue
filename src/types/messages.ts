@@ -1,8 +1,8 @@
-import type { AppSettings, Platform, PromptSummary, ChainSummary } from './index'
+import type { AppSettings, Platform, PromptSummary, ChainSummary, AttachmentRef } from './index'
 
 export type InjectPromptMessage = {
   type: 'INJECT_PROMPT'
-  payload: { content: string }
+  payload: { content: string; attachments?: AttachmentRef[] }
 }
 
 export type TextareaReadyMessage = {
@@ -32,16 +32,17 @@ export type LogUsageMessage = { type: 'LOG_USAGE'; payload: { promptId: string; 
 
 export type OpenPromptEditorMessage = { type: 'OPEN_PROMPT_EDITOR'; payload: { promptId: string } }
 
-export type PromptUpdateMessage = { type: 'PROMPT_UPDATE'; payload: { id: string; title: string; content: string } }
+export type PromptUpdateMessage = { type: 'PROMPT_UPDATE'; payload: { id: string; title: string; content: string; attachments?: AttachmentRef[] } }
 export type PromptUpdateResultMessage = { type: 'PROMPT_UPDATE_RESULT'; payload: { ok: boolean; error?: string } }
 export type PromptDeleteMessage = { type: 'PROMPT_DELETE'; payload: { id: string } }
 export type PromptDeleteResultMessage = { type: 'PROMPT_DELETE_RESULT'; payload: { ok: boolean; error?: string } }
-export type PromptCreateMessage = { type: 'PROMPT_CREATE'; payload: { title: string; content: string } }
+export type PromptCreateMessage = { type: 'PROMPT_CREATE'; payload: { title: string; content: string; attachments?: AttachmentRef[] } }
 export type PromptCreateResultMessage = { type: 'PROMPT_CREATE_RESULT'; payload: { ok: boolean; id?: string; error?: string } }
 
 // Prompt chaining types
 export type ChainStep = {
   content: string
+  attachments?: AttachmentRef[]
   autoSend?: boolean
   awaitResponse?: boolean
   delayMs?: number
@@ -50,6 +51,35 @@ export type ChainStep = {
 export type RunChainMessage = {
   type: 'RUN_CHAIN'
   payload: { steps: ChainStep[]; insertionModeOverride?: 'overwrite' | 'append' }
+}
+
+export type AttachmentGetMetaMessage = {
+  type: 'ATTACHMENT_GET_META'
+  payload: { ids: string[] }
+}
+
+export type AttachmentGetMetaResultMessage = {
+  type: 'ATTACHMENT_GET_META_RESULT'
+  payload: { ok: boolean; attachments: AttachmentRef[]; missingIds: string[]; error?: string }
+}
+
+export type AttachmentGetChunkMessage = {
+  type: 'ATTACHMENT_GET_CHUNK'
+  payload: { id: string; offset: number; length: number }
+}
+
+export type AttachmentGetChunkResultMessage = {
+  type: 'ATTACHMENT_GET_CHUNK_RESULT'
+  payload: {
+    ok: boolean
+    id: string
+    offset: number
+    nextOffset: number
+    totalBytes: number
+    chunkBase64: string
+    done: boolean
+    error?: string
+  }
 }
 
 export type ChainProgressMessage = {
@@ -92,3 +122,7 @@ export type KnownMessage =
   | PromptDeleteResultMessage
   | PromptCreateMessage
   | PromptCreateResultMessage
+  | AttachmentGetMetaMessage
+  | AttachmentGetMetaResultMessage
+  | AttachmentGetChunkMessage
+  | AttachmentGetChunkResultMessage

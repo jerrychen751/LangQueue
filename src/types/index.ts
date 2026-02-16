@@ -8,10 +8,26 @@ export type Platform =
   | 'huggingchat'
   | 'other'
 
+export type AttachmentKind = 'image' | 'file'
+
+export interface AttachmentRef {
+  id: string
+  name: string
+  mimeType: string
+  size: number
+  kind: AttachmentKind
+  createdAt: number
+}
+
+export interface AttachmentExportRecord extends AttachmentRef {
+  dataBase64: string
+}
+
 export interface Prompt {
   id: string
   title: string
   content: string
+  attachments: AttachmentRef[]
   usageCount: number
   createdAt: number
   updatedAt: number
@@ -25,7 +41,7 @@ export interface UsageLog {
 }
 
 export interface DBSchemaMeta {
-  schemaVersion: 2
+  schemaVersion: number
   createdAt: number
   updatedAt: number
 }
@@ -37,7 +53,17 @@ export interface DBSchema {
   usageLogs: UsageLog[]
 }
 
-export const CURRENT_SCHEMA_VERSION = 2 as const
+export const CURRENT_SCHEMA_VERSION = 3 as const
+export const CURRENT_CHAINS_SCHEMA_VERSION = 2 as const
+
+export interface MigrationStatus {
+  lastMigrationAt: number
+  fromVersion: number | null
+  toVersion: number
+  result: 'ok' | 'recovered_empty'
+  reason?: string
+  backupKey?: string
+}
 
 // App settings and import/export types
 export type ThemePreference = 'light' | 'dark'
@@ -54,6 +80,8 @@ export interface AppSettings {
   insertionMode?: 'overwrite' | 'append'
   chainDefaults?: ChainDefaults
   tweaks?: PageTweaks
+  multimodalEnabled?: boolean
+  exportIncludeBinaries?: boolean
 }
 
 export interface PromptExportFile {
@@ -80,22 +108,37 @@ export interface PromptSummary {
   id: string
   title: string
   content: string
+  attachments: AttachmentRef[]
+}
+
+export interface SavedChainStep {
+  content: string
+  attachments: AttachmentRef[]
+  autoSend?: boolean
+  awaitResponse?: boolean
+  delayMs?: number
 }
 
 export interface ChainSummary {
   id: string
   title: string
-  steps: { content: string }[]
+  steps: SavedChainStep[]
 }
 
 
 export interface SavedChain {
   id: string
   title: string
-  steps: { content: string }[]
+  steps: SavedChainStep[]
   createdAt: number
   updatedAt: number
   description?: string
+}
+
+export interface ChainsEnvelope {
+  version: number
+  updatedAt: number
+  items: SavedChain[]
 }
 
 export interface ChainExportFile {
@@ -109,4 +152,5 @@ export interface LibraryExportFile {
   exportedAt: number
   prompts: Prompt[]
   chains: SavedChain[]
+  attachments?: AttachmentExportRecord[]
 }
