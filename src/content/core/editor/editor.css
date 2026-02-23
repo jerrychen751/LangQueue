@@ -1,0 +1,223 @@
+/*
+Reset all inherited properties.
+*/
+:host {
+  all: initial;
+}
+
+/* 
+Darker backdrop against the rest of the popup modal editor.
+*/
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2147483647;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 
+Modal editor, which contains the shortcut name and prompt contents.
+*/
+.modal {
+  width: min(1080px, 92vw);
+  max-height: 85vh;
+  background: #15181b;
+  color: #e5e7eb;
+  border: 1px solid #1f2937;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* 
+Modal editor as well as all contained elements (descendents).
+*/
+.modal, .modal * {
+  box-sizing: border-box;
+}
+
+/* 
+Top bar of the modal (title + close button).
+*/
+.header {
+  padding: 14px 18px 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/*
+Title/label for the popup modal editor.
+*/
+.title {
+  font-size: 16px;
+  color: #d1d5db;
+}
+
+/*
+Close button for the popup modal editor ('X' char).
+*/
+.close {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 22px;
+}
+
+/*
+Text box for prompt instructions.
+*/
+.textarea {
+  field-sizing: content;
+  min-height: 300px;
+  line-height: 1.3;
+  white-space: pre-wrap;
+}
+
+.close:hover,
+.close:focus-visible {
+  background: #1f2327;
+  color: #f3f4f6;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2);
+}
+
+/*
+Body section containing form fields. overflow-y and min-height: 0
+allow this flex child to scroll when the modal hits max-height.
+*/
+.body {
+  padding: 6px 18px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/*
+Shared styles for the name input and instructions textarea.
+*/
+.input,
+.textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #2b3138;
+  background: #1a1e22;
+  color: #e5e7eb;
+  padding: 10px 12px;
+  font-size: 13px;
+  outline: none;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: #6b7280;
+}
+
+.error {
+  font-size: 12px;
+  color: #f87171;
+  min-height: 16px;
+}
+
+.hint {
+  font-size: 14px;
+  color: #b8b5b5;
+  text-align: right;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px 18px 18px;
+}
+
+/*
+Base button styles shared by Cancel and Save.
+*/
+.btn {
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  border: 1px solid #2b3138;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
+}
+
+.btn-secondary {
+  background: #22262a;
+  color: #e5e7eb;
+}
+
+.btn-primary {
+  background: #2f3439;
+  color: #e5e7eb;
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-secondary:focus-visible:not(:disabled) {
+  background: #2a2f34;
+  border-color: #3b4450;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-primary:focus-visible:not(:disabled) {
+  background: #3a4046;
+  border-color: #4b5563;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+Square delete button with trash icon.
+*/
+.delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #2b3138;
+  background: #1c2024;
+  color: #f87171;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.delete svg {
+  width: 16px;
+  height: 16px;
+}
+
+.delete:hover:not(:disabled),
+.delete:focus-visible:not(:disabled) {
+  background: #2a2f34;
+  border-color: #3b4450;
+  color: #fecaca;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.22);
+}
+
+.delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
