@@ -168,7 +168,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
         steps: items.map((it) => ({ content: it.content.trim(), attachments: it.attachments })),
         createdAt: now,
         updatedAt: now,
-      }, 'local')
+      })
       showToast({ variant: 'success', message: 'Chain saved to library' })
       setTitle('')
       handleClose()

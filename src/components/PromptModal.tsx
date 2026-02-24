@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Loader2, Paperclip, Trash2 } from 'lucide-react'
 import type { AttachmentRef, Prompt } from '../types'
-import { savePrompt, updatePrompt, type StorageArea } from '../utils/storage'
+import { savePrompt, updatePrompt } from '../utils/storage'
 import { useToast } from './useToast'
 import { saveAttachmentFile, validateAttachmentFile } from '../utils/attachments'
 
 type PromptModalProps = {
   open: boolean
   initialPrompt?: Prompt
-  storageArea?: StorageArea
   onClose: () => void
   onSaved?: (saved: Prompt) => void
 }
@@ -17,7 +16,7 @@ function generateClientId(): string {
   return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`
 }
 
-export default function PromptModal({ open, initialPrompt, storageArea = 'local', onClose, onSaved }: PromptModalProps) {
+export default function PromptModal({ open, initialPrompt, onClose, onSaved }: PromptModalProps) {
   const isEditing = Boolean(initialPrompt)
   const titleRef = useRef<HTMLInputElement | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
@@ -109,7 +108,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
           title: t,
           content: rawContent,
           attachments,
-        }, storageArea)
+        })
         const saved: Prompt = {
           ...initialPrompt,
           title: t,
@@ -130,7 +129,7 @@ export default function PromptModal({ open, initialPrompt, storageArea = 'local'
           createdAt: now,
           updatedAt: now,
         }
-        await savePrompt(newPrompt, storageArea)
+        await savePrompt(newPrompt)
         onSaved?.(newPrompt)
         showToast({ variant: 'success', message: 'Prompt saved' })
         close()

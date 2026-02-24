@@ -2,16 +2,13 @@
 
 import { getSettings, searchPrompts, searchChains, logUsage, updatePrompt, deletePrompt, savePrompt } from '../utils/storage'
 import { getAttachmentChunkBase64, getAttachmentMeta } from '../utils/attachments'
-import type { Platform, PromptSummary, ChainSummary } from '../types'
+import type { Platform } from '../types'
+import type { PromptData, ChainData } from '../types/messages'
 
 const PLATFORM_VALUES = [
   'chatgpt',
   'claude',
   'gemini',
-  'perplexity',
-  'bing',
-  'poe',
-  'huggingchat',
   'other',
 ] as const
 
@@ -119,7 +116,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return
   }
   if (message?.type === 'GET_SETTINGS') {
-    getSettings('local')
+    getSettings()
       .then((settings) => sendResponse({ type: 'SETTINGS_RESULT', payload: { settings } }))
       .catch(() => sendResponse({ type: 'SETTINGS_RESULT', payload: { settings: {} } }))
     return true
@@ -127,10 +124,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'PROMPT_SEARCH') {
     const query = typeof message?.payload?.query === 'string' ? message.payload.query : ''
     const limit = typeof message?.payload?.limit === 'number' ? message.payload.limit : null
-    searchPrompts(query, 'local')
+    searchPrompts(query)
       .then((results) => {
         const trimmed = typeof limit === 'number' ? results.slice(0, Math.max(0, limit)) : results
-        const prompts: PromptSummary[] = trimmed.map((p) => ({
+        const prompts: PromptData[] = trimmed.map((p) => ({
           id: p.id,
           title: p.title,
           content: p.content,
@@ -144,10 +141,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'CHAIN_SEARCH') {
     const query = typeof message?.payload?.query === 'string' ? message.payload.query : ''
     const limit = typeof message?.payload?.limit === 'number' ? message.payload.limit : null
-    searchChains(query, 'local')
+    searchChains(query)
       .then((results) => {
         const trimmed = typeof limit === 'number' ? results.slice(0, Math.max(0, limit)) : results
-        const chains: ChainSummary[] = trimmed.map((c) => ({
+        const chains: ChainData[] = trimmed.map((c) => ({
           id: c.id,
           title: c.title,
           steps: c.steps,
@@ -166,7 +163,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: false, error: 'INVALID_PAYLOAD' } })
       return
     }
-    updatePrompt(id, { title, content, ...(attachments ? { attachments } : {}) }, 'local')
+    updatePrompt(id, { title, content, ...(attachments ? { attachments } : {}) })
       .then(() => sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: true } }))
       .catch((err) => {
         sendResponse({ type: 'PROMPT_UPDATE_RESULT', payload: { ok: false, error: err?.message || 'UPDATE_FAILED' } })
@@ -179,7 +176,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ type: 'PROMPT_DELETE_RESULT', payload: { ok: false, error: 'INVALID_PAYLOAD' } })
       return
     }
-    deletePrompt(id, 'local')
+    deletePrompt(id)
       .then(() => sendResponse({ type: 'PROMPT_DELETE_RESULT', payload: { ok: true } }))
       .catch((err) => {
         sendResponse({ type: 'PROMPT_DELETE_RESULT', payload: { ok: false, error: err?.message || 'DELETE_FAILED' } })
@@ -205,8 +202,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         usageCount: 0,
         createdAt: now,
         updatedAt: now,
-      },
-      'local'
+      }
     )
       .then(() => sendResponse({ type: 'PROMPT_CREATE_RESULT', payload: { ok: true, id } }))
       .catch((err) => {
@@ -218,7 +214,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const promptId = message?.payload?.promptId
     const platform = normalizePlatform(message?.payload?.platform)
     if (typeof promptId === 'string') {
-      void logUsage({ timestamp: Date.now(), platform, promptId }, 'local').finally(() => {
+      void logUsage({ timestamp: Date.now(), platform, promptId }).finally(() => {
         sendResponse({ ok: true })
       })
       return true

@@ -1,5 +1,7 @@
-import type { AppSettings, AttachmentRef, Platform, PromptSummary, ChainSummary } from '../../types'
+import type { AppSettings, AttachmentRef, Platform } from '../../types'
 import type {
+  PromptData,
+  ChainData,
   AttachmentGetChunkMessage,
   AttachmentGetChunkResultMessage,
   AttachmentGetMetaMessage,
@@ -29,7 +31,7 @@ export async function getSettings(): Promise<AppSettings> {
   }
 }
 
-export async function searchPrompts(query: string, limit?: number): Promise<PromptSummary[]> {
+export async function searchPrompts(query: string, limit?: number): Promise<PromptData[]> {
   try {
     const payload: { query: string; limit?: number } = { query }
     if (typeof limit === 'number') {
@@ -45,7 +47,7 @@ export async function searchPrompts(query: string, limit?: number): Promise<Prom
   }
 }
 
-export async function searchChains(query: string, limit?: number): Promise<ChainSummary[]> {
+export async function searchChains(query: string, limit?: number): Promise<ChainData[]> {
   try {
     const payload: { query: string; limit?: number } = { query }
     if (typeof limit === 'number') {

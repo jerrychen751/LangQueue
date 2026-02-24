@@ -3,7 +3,7 @@ import { Plus, Settings as SettingsIcon, ArrowLeft, Play } from 'lucide-react'
 import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
-import type { Prompt, SavedChain } from '../types'
+import type { Prompt, PromptChain } from '../types'
 import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain, getPrompt, exportLibrary } from '../utils/storage'
 import { sendPromptToTab, detectActivePlatform, clickSendOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
@@ -28,8 +28,8 @@ export default function App() {
   const [stats, setStats] = useState<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }>({ totalPrompts: 0, totalUses: 0, mostUsedPrompt: null })
   const [view, setView] = useState<'main' | 'settings'>('main')
   const [chainOpen, setChainOpen] = useState(false)
-  const [chains, setChains] = useState<SavedChain[]>([])
-  const [deleteChainTarget, setDeleteChainTarget] = useState<SavedChain | null>(null)
+  const [chains, setChains] = useState<PromptChain[]>([])
+  const [deleteChainTarget, setDeleteChainTarget] = useState<PromptChain | null>(null)
   const { showToast } = useToast()
   const [focusSearchSignal, setFocusSearchSignal] = useState(0)
   const [exporting, setExporting] = useState(false)
@@ -50,7 +50,7 @@ export default function App() {
   }, [])
 
   const openPromptById = useCallback(async (promptId: string) => {
-    const prompt = await getPrompt(promptId, 'local')
+    const prompt = await getPrompt(promptId)
     if (!prompt) return
     setEditing(prompt)
     setModalOpen(true)
@@ -184,9 +184,9 @@ export default function App() {
 
   async function handleRefresh() {
     const [items, savedChains, stats] = await Promise.all([
-      getAllPrompts('local'),
-      getAllChains('local'),
-      getUsageStats('local'),
+      getAllPrompts(),
+      getAllChains(),
+      getUsageStats(),
     ])
     setPrompts(items)
     setChains(savedChains)
@@ -199,7 +199,7 @@ export default function App() {
   }
 
   async function handleDelete(p: Prompt) {
-    await deletePrompt(p.id, 'local')
+    await deletePrompt(p.id)
     await handleRefresh()
   }
 
@@ -211,7 +211,7 @@ export default function App() {
       await navigator.clipboard.writeText(p.content)
       showToast({ variant: 'info', message: 'Copied to clipboard' })
     }
-    await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id }, 'local')
+    await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id })
     await handleRefresh()
     window.close()
   }
@@ -219,7 +219,7 @@ export default function App() {
   async function handleExport() {
     setExporting(true)
     try {
-      const data = await exportLibrary('local')
+      const data = await exportLibrary()
       const date = new Date()
       const filename = `langqueue-backup-${date.toISOString().slice(0, 10)}.json`
       await downloadJson(filename, data)
@@ -347,8 +347,8 @@ export default function App() {
                           onClick={async () => {
                             const nextTitle = prompt('Rename chain', c.title)?.trim()
                             if (!nextTitle) return
-                            const updated: SavedChain = { ...c, title: nextTitle, updatedAt: Date.now() }
-                            await saveChain(updated, 'local')
+                            const updated: PromptChain = { ...c, title: nextTitle, updatedAt: Date.now() }
+                            await saveChain(updated)
                             await handleRefresh()
                           }}
                         >
@@ -445,7 +445,7 @@ export default function App() {
         onCancel={() => setDeleteChainTarget(null)}
         onConfirm={async () => {
           if (!deleteChainTarget) return
-          await deleteChain(deleteChainTarget.id, 'local')
+          await deleteChain(deleteChainTarget.id)
           await handleRefresh()
           setDeleteChainTarget(null)
         }}

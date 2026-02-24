@@ -6,11 +6,7 @@ import { fetchAttachmentFiles } from '../messaging'
 
 type InputElement = HTMLTextAreaElement | HTMLElement
 
-type ChainDefaults = {
-  autoSend?: boolean
-  awaitResponse?: boolean
-  defaultDelayMs?: number
-}
+const STEP_DELAY_MS = 1500
 
 export function createChainExecutor(adapter: Adapter, getInput: () => InputElement | null) {
   let running = false
@@ -28,7 +24,6 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
     if (running) return false
     running = true
     cancelled = false
-    const defaults = (settings.chainDefaults || {}) as ChainDefaults
     const mode = insertionModeOverride || settings.insertionMode || 'overwrite'
     const totalSteps = steps.length
     chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: 0, totalSteps, status: 'starting' } })
@@ -67,27 +62,19 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
           setInputText(input, step.content)
         }
 
-        const shouldAutoSend = typeof step.autoSend === 'boolean' ? step.autoSend : (typeof defaults.autoSend === 'boolean' ? defaults.autoSend : true)
-        const shouldAwait = typeof step.awaitResponse === 'boolean' ? step.awaitResponse : (typeof defaults.awaitResponse === 'boolean' ? defaults.awaitResponse : true)
-        const delayMs = typeof step.delayMs === 'number' ? step.delayMs : (typeof defaults.defaultDelayMs === 'number' ? defaults.defaultDelayMs : 0)
-
-        if (shouldAutoSend) {
-          chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
-          const sent = adapter.clickSend(input as HTMLTextAreaElement)
-          if (!sent) {
-            chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })
-            return false
-          }
-          if (shouldAwait) {
-            chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'awaiting_response' } })
-            await adapter.waitForIdle({ timeoutMs: 120000, pollMs: 200 })
-            await new Promise((r) => setTimeout(r, 150))
-          }
+        chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
+        const sent = adapter.clickSend(input as HTMLTextAreaElement)
+        if (!sent) {
+          chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })
+          return false
         }
 
-        if (delayMs > 0) {
+        chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'awaiting_response' } })
+        await adapter.waitForIdle({ timeoutMs: 120000, pollMs: 200 })
+
+        if (i < steps.length - 1) {
           chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'delayed' } })
-          await new Promise((r) => setTimeout(r, delayMs))
+          await new Promise((r) => setTimeout(r, STEP_DELAY_MS))
         }
       }
 

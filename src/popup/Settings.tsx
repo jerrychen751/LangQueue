@@ -22,7 +22,7 @@ export default function Settings({ onBack }: SettingsProps) {
 
   useEffect(() => {
     const load = async () => {
-      const existing = await getSettings('local')
+      const existing = await getSettings()
       // Prefill shortcut defaults by platform if not already set
       const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
       const defaults = {
@@ -53,7 +53,7 @@ export default function Settings({ onBack }: SettingsProps) {
     if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current)
     autosaveTimerRef.current = window.setTimeout(async () => {
       try {
-        await saveSettings(settings, 'local')
+        await saveSettings(settings)
         setStatus('Saved')
         window.setTimeout(() => setStatus(null), 1200)
       } catch {
@@ -66,14 +66,14 @@ export default function Settings({ onBack }: SettingsProps) {
   }, [settings])
 
   async function saveAll() {
-    await saveSettings(settings, 'local')
+    await saveSettings(settings)
     setStatus('Saved')
   }
 
   async function handleExport() {
     setExporting(true)
     try {
-      const data = await exportLibrary('local', { includeBinaries: Boolean(settings.exportIncludeBinaries) })
+      const data = await exportLibrary({ includeBinaries: Boolean(settings.exportIncludeBinaries) })
       const filename = `langqueue-backup-${new Date().toISOString().slice(0, 10)}.json`
       await downloadJson(filename, data)
       showToast({ variant: 'success', message: 'Exported to Downloads' })
@@ -91,7 +91,7 @@ export default function Settings({ onBack }: SettingsProps) {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
-      const results = await importLibrary(parsed, 'local')
+      const results = await importLibrary(parsed)
       const promptStats = results.prompts
       const chainStats = results.chains
       const summaryParts: string[] = []
@@ -177,70 +177,6 @@ export default function Settings({ onBack }: SettingsProps) {
                 <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
               </span>
             </label>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5">
-          <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Chain defaults</div>
-          <div className="divide-y divide-white/10">
-            <label className="flex items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <div className="font-medium">Auto-send prompts</div>
-                <div className="text-xs text-slate-400">Send each step automatically.</div>
-              </div>
-              <span className="relative inline-flex h-6 w-10 items-center">
-                <input
-                  type="checkbox"
-                  className="peer sr-only"
-                  checked={(settings.chainDefaults?.autoSend ?? true)}
-                  onChange={(e) => setSettings((prev) => ({
-                    ...prev,
-                    chainDefaults: { ...prev.chainDefaults, autoSend: e.target.checked },
-                  }))}
-                />
-                <span className="h-6 w-10 rounded-full bg-slate-700/80 border border-white/10 transition-colors peer-checked:bg-amber-500/80 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400/70" />
-                <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-              </span>
-            </label>
-            <label className="flex items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <div className="font-medium">Wait for response</div>
-                <div className="text-xs text-slate-400">Pause between steps until a reply.</div>
-              </div>
-              <span className="relative inline-flex h-6 w-10 items-center">
-                <input
-                  type="checkbox"
-                  className="peer sr-only"
-                  checked={(settings.chainDefaults?.awaitResponse ?? true)}
-                  onChange={(e) => setSettings((prev) => ({
-                    ...prev,
-                    chainDefaults: { ...prev.chainDefaults, awaitResponse: e.target.checked },
-                  }))}
-                />
-                <span className="h-6 w-10 rounded-full bg-slate-700/80 border border-white/10 transition-colors peer-checked:bg-amber-500/80 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400/70" />
-                <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-              </span>
-            </label>
-            <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <div className="font-medium">Delay between prompts</div>
-                <div className="text-xs text-slate-400">Milliseconds between steps.</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={30000}
-                  value={(settings.chainDefaults?.defaultDelayMs ?? 1000)}
-                  onChange={(e) => setSettings((prev) => ({
-                    ...prev,
-                    chainDefaults: { ...prev.chainDefaults, defaultDelayMs: Math.min(30000, Math.max(0, Number(e.target.value || 0))) },
-                  }))}
-                  className="w-20 px-2 py-1 text-xs text-right rounded-lg border border-white/10 bg-slate-900/80 text-slate-100"
-                />
-                <span className="text-xs text-slate-400">ms</span>
-              </div>
-            </div>
           </div>
         </section>
 
