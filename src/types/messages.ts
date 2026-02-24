@@ -1,4 +1,17 @@
-import type { AppSettings, Platform, PromptSummary, ChainSummary, AttachmentRef } from './index'
+import type { AppSettings, Platform, AttachmentRef, PromptStep } from './index'
+
+export interface PromptData {
+  id: string
+  title: string
+  content: string
+  attachments: AttachmentRef[]
+}
+
+export interface ChainData {
+  id: string
+  title: string
+  steps: PromptStep[]
+}
 
 export type InjectPromptMessage = {
   type: 'INJECT_PROMPT'
@@ -23,10 +36,10 @@ export type GetSettingsMessage = { type: 'GET_SETTINGS' }
 export type SettingsResultMessage = { type: 'SETTINGS_RESULT'; payload: { settings: AppSettings } }
 
 export type PromptSearchMessage = { type: 'PROMPT_SEARCH'; payload: { query: string; limit?: number } }
-export type PromptSearchResultMessage = { type: 'PROMPT_SEARCH_RESULT'; payload: { prompts: PromptSummary[] } }
+export type PromptSearchResultMessage = { type: 'PROMPT_SEARCH_RESULT'; payload: { prompts: PromptData[] } }
 
 export type ChainSearchMessage = { type: 'CHAIN_SEARCH'; payload: { query: string; limit?: number } }
-export type ChainSearchResultMessage = { type: 'CHAIN_SEARCH_RESULT'; payload: { chains: ChainSummary[] } }
+export type ChainSearchResultMessage = { type: 'CHAIN_SEARCH_RESULT'; payload: { chains: ChainData[] } }
 
 export type LogUsageMessage = { type: 'LOG_USAGE'; payload: { promptId: string; platform: Platform } }
 
@@ -43,9 +56,6 @@ export type PromptCreateResultMessage = { type: 'PROMPT_CREATE_RESULT'; payload:
 export type ChainStep = {
   content: string
   attachments?: AttachmentRef[]
-  autoSend?: boolean
-  awaitResponse?: boolean
-  delayMs?: number
 }
 
 export type RunChainMessage = {
