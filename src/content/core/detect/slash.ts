@@ -19,7 +19,7 @@ export type SlashContext =
       rect: DOMRect
     }
 
-const TRIGGER_RE = /\/\/([^\s]*)$/
+const TRIGGER_RE = /\$([^\s]*)$/
 const ZERO_WIDTH_RE = /[\u200B-\u200D\u2060\uFEFF]/g
 const SPACE_CHARS = new Set([' ', '\u00A0'])
 

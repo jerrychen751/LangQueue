@@ -136,7 +136,7 @@ export function initController(adapter: Adapter) {
         steps: chain.steps,
       })),
     ]
-    const label = query ? `//${query}` : ''
+    const label = query ? `$${query}` : ''
     overlay.show(overlayPositionFromRect(context.rect), items, label)
   }
 

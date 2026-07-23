@@ -30,7 +30,7 @@ Load the extension in Chrome via `chrome://extensions` → "Load unpacked" → s
 
 ## Project Overview
 
-LangQueue is a Chrome Extension (Manifest V3) for prompt orchestration with ChatGPT, Claude, and Google Gemini. Features include a local prompt library, slash command overlay (`//`), prompt queueing, multi-step chains, and an in-page editor.
+LangQueue is a Chrome Extension (Manifest V3) for prompt orchestration with ChatGPT, Claude, and Google Gemini. Features include a local prompt library, prompt command overlay (`$`), prompt queueing, multi-step chains, and an in-page editor.
 
 ## Architecture
 
