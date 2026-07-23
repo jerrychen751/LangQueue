@@ -186,7 +186,7 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="modal-backdrop"
       aria-hidden={!open}
       onMouseDown={(e) => {
         // Close when clicking the backdrop (overlay) area only
@@ -198,44 +198,47 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
         role="dialog"
         aria-modal="true"
         aria-labelledby="prompt-modal-title"
-        className="w-popup max-w-popup bg-white rounded-md shadow-lg border outline-none dark:bg-gray-900 dark:border-gray-700"
+        className="modal-surface outline-none"
       >
-        <div className="flex items-center justify-between p-3 border-b">
-          <div id="prompt-modal-title" className="font-medium text-gray-900 dark:text-gray-100">
-            {isEditing ? 'Edit Prompt' : 'New Prompt'}
+        <div className="modal-header">
+          <div>
+            <div className="popup-kicker">{isEditing ? 'Revise library item' : 'Add library item'}</div>
+            <div id="prompt-modal-title" className="modal-title mt-1">
+              {isEditing ? 'Edit prompt' : 'New prompt'}
+            </div>
           </div>
-          <button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={close} aria-label="Close">
+          <button className="icon-button" onClick={close} aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
-        <div className="p-3 space-y-3">
+        <div className="space-y-4 p-4">
           {error ? (
-            <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-1 dark:text-rose-200 dark:bg-rose-900/30 dark:border-rose-800" role="alert">
+            <div className="rounded-[4px] border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">
               {error}
             </div>
           ) : null}
 
           <div>
-            <label className="block text-xs text-gray-700 mb-1 dark:text-gray-300">Title</label>
+            <label className="field-label">Title</label>
             <input
               ref={titleRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
+              className="form-input w-full rounded-[4px] px-3 py-2.5 text-sm"
               placeholder="Enter a clear, descriptive title"
             />
           </div>
 
           <div>
-            <label className="block text-xs text-gray-700 mb-1 dark:text-gray-300">Content</label>
+            <label className="field-label">Prompt content</label>
             <textarea
               ref={contentRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-sky-300 min-h-[96px] bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
+              className="form-input min-h-[120px] w-full resize-none rounded-[4px] px-3 py-2.5 text-sm leading-6"
               rows={4}
-              placeholder="Your prompt content..."
+              placeholder="Write the prompt that you want to reuse."
             />
           </div>
 
@@ -249,11 +252,11 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
                 void handleFilesPicked(e.target.files)
               }}
             />
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs text-gray-700 dark:text-gray-300">Attachments</label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="field-label mb-0">Attachments</label>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700"
+                className="compact-button inline-flex items-center gap-1.5"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={saving}
               >
@@ -262,19 +265,20 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
               </button>
             </div>
             {attachments.length === 0 ? (
-              <div className="text-[11px] text-gray-500 dark:text-gray-400">No attachments selected.</div>
+              <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-3 text-[11px] text-[#6f7c82]">No attachments selected.</div>
             ) : (
-              <ul className="space-y-1 max-h-24 overflow-auto">
+              <ul className="max-h-24 space-y-1.5 overflow-auto">
                 {attachments.map((attachment) => (
-                  <li key={attachment.id} className="flex items-center justify-between gap-2 text-[11px] px-2 py-1 rounded border border-gray-200 dark:border-gray-700">
+                  <li key={attachment.id} className="flex items-center justify-between gap-2 rounded-[4px] border border-[#cfd6d8] bg-[#f8f9f9] px-3 py-2 text-[11px]">
                     <div className="min-w-0">
                       <div className="truncate">{attachment.name}</div>
-                      <div className="text-gray-500 dark:text-gray-400">{Math.ceil(attachment.size / 1024)} KB</div>
+                      <div className="mt-0.5 text-[9px] text-[#6f7c82]">{Math.ceil(attachment.size / 1024)} KB</div>
                     </div>
                     <button
                       type="button"
-                      className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="icon-button h-7 w-7"
                       onClick={() => removeAttachment(attachment.id)}
+                      aria-label={`Remove ${attachment.name}`}
                     >
                       <Trash2 size={12} />
                     </button>
@@ -286,15 +290,15 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
 
         </div>
 
-        <div className="flex items-center justify-between gap-2 p-3 border-t">
-          <div className="text-[11px] text-gray-500 dark:text-gray-400">
-            Tip: Press <span className="font-medium">{navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'} + Shift + Enter</span> to save
+        <div className="flex items-center gap-2 border-t border-[#d9dfe1] p-4">
+          <div className="mr-auto text-[10px] text-[#6f7c82]">
+            <span className="font-mono">{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Enter</span>
           </div>
-          <button className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white hover:bg-white/15" onClick={close} disabled={saving}>
+          <button className="secondary-button min-h-10" onClick={close} disabled={saving}>
             Cancel
           </button>
           <button
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15 disabled:opacity-60"
+            className="primary-button min-h-10"
             onClick={handleSave}
             disabled={saving}
           >

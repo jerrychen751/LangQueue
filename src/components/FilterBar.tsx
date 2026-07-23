@@ -61,33 +61,31 @@ export default function FilterBar({ initialQuery = '', initialSort = 'recent', a
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="relative">
-        <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+    <div className="flex items-center gap-2">
+      <div className="relative min-w-0 flex-1">
+        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6f7c82]" />
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full pl-7 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-          placeholder="Search prompts"
+          className="search-input h-10 w-full rounded-[4px] py-2 pl-9 pr-3 text-xs"
+          placeholder="Find a prompt"
+          aria-label="Search prompts"
         />
       </div>
-      <div className="flex items-center gap-2 text-xs">
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortOption)}
-          className="px-2 py-1 border rounded-md bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700"
-        >
-          <option value="recent">Recently used</option>
-          <option value="alpha">Alphabetical</option>
-          <option value="mostUsed">Most used</option>
-        </select>
-        <button className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/10 dark:hover:bg-white/10" onClick={clearAll}>
-          <X size={12} />
-          Clear
-        </button>
-      </div>
+      <select
+        value={sort}
+        onChange={(e) => setSort(e.target.value as SortOption)}
+        className="select-input h-10 w-[112px] rounded-[4px] px-2.5 text-[10px] font-semibold"
+        aria-label="Sort prompts"
+      >
+        <option value="recent">Recent</option>
+        <option value="alpha">A–Z</option>
+        <option value="mostUsed">Most used</option>
+      </select>
+      <button className="icon-button h-10 w-10" onClick={clearAll} title="Clear search and sort" aria-label="Clear search and sort">
+        <X size={14} />
+      </button>
     </div>
   )
 }
-

@@ -40,22 +40,22 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed left-1/2 -translate-x-1/2 bottom-3 z-[9999] space-y-2 w-[calc(100%-24px)] max-w-popup">
+      <div className="fixed bottom-3 left-[200px] z-[9999] w-[376px] -translate-x-1/2 space-y-2">
         {toasts.map((t) => (
           <div
             key={t.id}
             role="status"
-            className={`px-3 py-2 rounded-md text-xs shadow border flex items-start gap-2
-              ${t.variant === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-200' : ''}
-              ${t.variant === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-900/30 dark:border-rose-800 dark:text-rose-200' : ''}
-              ${t.variant === 'info' ? 'bg-gray-50 border-gray-200 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100' : ''}
+            className={`flex items-start gap-2 rounded-[4px] border px-3 py-2.5 text-xs shadow-lg
+              ${t.variant === 'success' ? 'border-[#b5c9be] bg-[#eef4f0] text-[#3f6954]' : ''}
+              ${t.variant === 'error' ? 'border-rose-300 bg-rose-50 text-rose-700' : ''}
+              ${t.variant === 'info' ? 'border-[#cfd6d8] bg-white text-[#1c272c]' : ''}
             `}
           >
             <div className="flex-1">
               {t.title ? <div className="font-medium mb-0.5">{t.title}</div> : null}
               <div>{t.message}</div>
             </div>
-            <button className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => removeToast(t.id)} aria-label="Dismiss">
+            <button className="text-[#6f7c82] hover:text-[#1c272c]" onClick={() => removeToast(t.id)} aria-label="Dismiss">
               ×
             </button>
           </div>
@@ -64,5 +64,3 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     </ToastContext.Provider>
   )
 }
-
-

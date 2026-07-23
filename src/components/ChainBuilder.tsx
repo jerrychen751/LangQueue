@@ -183,7 +183,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="modal-backdrop"
       aria-hidden={!open}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) handleClose()
@@ -194,7 +194,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="chain-builder-title"
-        className="w-popup max-w-popup bg-white rounded-md shadow-lg border outline-none dark:bg-gray-900 dark:border-gray-700"
+        className="modal-surface outline-none"
       >
         <input
           ref={fileInputRef}
@@ -206,29 +206,32 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
             void addAttachmentsToStep(pendingAttachmentStepId, e.target.files)
           }}
         />
-        <div className="flex items-center justify-between p-3 border-b">
-          <div id="chain-builder-title" className="font-medium text-gray-900 dark:text-gray-100">
-            Build Prompt Chain
+        <div className="modal-header">
+          <div>
+            <div className="popup-kicker">Sequential workflow</div>
+            <div id="chain-builder-title" className="modal-title mt-1">
+              Build prompt chain
+            </div>
           </div>
-          <button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={handleClose} aria-label="Close">
+          <button className="icon-button" onClick={handleClose} aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
-        <div className="p-3 space-y-3">
-          <div className="border rounded-md overflow-hidden">
-            <div className="px-3 py-2 text-xs font-medium border-b bg-gray-50 dark:bg-gray-800 dark:text-gray-200">Chain sequence</div>
-            <div className="max-h-[360px] overflow-auto">
+        <div className="space-y-3 p-4">
+          <div className="settings-panel">
+            <div className="settings-heading border-b border-[#d9dfe1]">Chain sequence</div>
+            <div className="max-h-[330px] overflow-auto">
               {items.length === 0 ? (
-                <div className="p-3 text-xs text-gray-500">Add a step to start building a chain.</div>
+                <div className="p-4 text-xs text-[#6f7c82]">Add a step to start the chain.</div>
               ) : (
-                <ol className="divide-y">
+                <ol className="divide-y divide-[#d9dfe1]">
                   {items.map((it, idx) => {
                     const isEditing = it.content.trim().length === 0 || editingId === it.id
                     return (
-                      <li key={it.id} className="px-3 py-2">
+                      <li key={it.id} className="px-3 py-3">
                         <div className="flex items-start gap-2">
-                          <div className="w-6 shrink-0 text-xs text-gray-500 pt-1">{idx + 1}.</div>
+                          <div className="chain-number h-7 w-7">{String(idx + 1).padStart(2, '0')}</div>
                           <div className="flex-1 min-w-0">
                             {isEditing ? (
                               <textarea
@@ -239,22 +242,22 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                                 onBlur={() => {
                                   if (editingId === it.id) setEditingId(null)
                                 }}
-                                className="w-full min-h-[64px] resize-none rounded-md border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                className="form-input min-h-[72px] w-full resize-none rounded-[4px] px-3 py-2 text-sm"
                               />
                             ) : (
                               <button
                                 type="button"
-                                className="w-full text-left"
+                                className="w-full rounded-[3px] px-1 py-1 text-left hover:bg-[#edf2f3]"
                                 onClick={() => setEditingId(it.id)}
                                 title={it.content}
                               >
-                                <div className="text-sm text-gray-900 dark:text-gray-100 truncate">{it.content}</div>
+                                <div className="truncate text-sm text-[#1c272c]">{it.content}</div>
                               </button>
                             )}
                           </div>
                           <div className="flex items-center gap-1 pt-1">
                             <button
-                              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                              className="icon-button h-7 w-7"
                               onClick={() => {
                                 setPendingAttachmentStepId(it.id)
                                 fileInputRef.current?.click()
@@ -264,7 +267,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                               <Paperclip size={14} />
                             </button>
                             <button
-                              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                              className="icon-button h-7 w-7 disabled:opacity-30"
                               onClick={() => moveUp(idx)}
                               disabled={idx === 0}
                               aria-label="Move up"
@@ -272,7 +275,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                               <ArrowUp size={14} />
                             </button>
                             <button
-                              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                              className="icon-button h-7 w-7 disabled:opacity-30"
                               onClick={() => moveDown(idx)}
                               disabled={idx === items.length - 1}
                               aria-label="Move down"
@@ -280,7 +283,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                               <ArrowDown size={14} />
                             </button>
                             <button
-                              className="p-1 rounded hover:bg-rose-50 text-rose-700 dark:hover:bg-rose-900/30 dark:text-rose-300"
+                              className="icon-button h-7 w-7 text-rose-700 hover:border-rose-300 hover:bg-rose-50"
                               onClick={() => removeItem(idx)}
                               aria-label="Remove"
                             >
@@ -289,13 +292,13 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                           </div>
                         </div>
                         {it.attachments.length > 0 ? (
-                          <div className="mt-2 ml-8 flex flex-wrap gap-1">
+                          <div className="ml-9 mt-2 flex flex-wrap gap-1">
                             {it.attachments.map((attachment) => (
-                              <span key={attachment.id} className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-200 dark:border-gray-700">
+                              <span key={attachment.id} className="inline-flex items-center gap-1 rounded-[3px] border border-[#cfd6d8] bg-[#f8f9f9] px-2 py-1 text-[10px]">
                                 <span className="max-w-[150px] truncate">{attachment.name}</span>
                                 <button
                                   type="button"
-                                  className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                  className="rounded-[2px] p-0.5 hover:bg-[#e7ecee]"
                                   onClick={() => removeAttachment(it.id, attachment.id)}
                                 >
                                   <X size={10} />
@@ -310,9 +313,9 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                 </ol>
               )}
             </div>
-            <div className="border-t px-3 py-2 bg-gray-50 dark:bg-gray-800">
+            <div className="border-t border-[#d9dfe1] px-3 py-2.5">
               <button
-                className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white"
+                className="compact-button inline-flex items-center gap-2"
                 onClick={addStep}
                 type="button"
               >
@@ -321,22 +324,22 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             <input
               type="text"
               value={title}
               placeholder="Chain title"
               onChange={(e) => setTitle(e.target.value)}
-              className="flex-1 px-2 py-1 text-xs border rounded bg-white dark:bg-gray-900 dark:border-gray-700"
+              className="form-input min-w-0 flex-1 rounded-[4px] px-3 py-2.5 text-xs"
             />
             <button
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-xl bg-emerald-600 text-white shadow hover:bg-emerald-700 disabled:opacity-60"
+              className="primary-button min-h-10 disabled:opacity-50"
               onClick={handleSaveChain}
               disabled={!canSave}
             >
-              <Save size={16} /> Save prompt chain
+              <Save size={15} /> Save chain
             </button>
-            <button className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white" onClick={handleClose} disabled={saving}>
+            <button className="secondary-button min-h-10" onClick={handleClose} disabled={saving}>
               Cancel
             </button>
           </div>

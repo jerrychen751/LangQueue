@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Settings as SettingsIcon, ArrowLeft, Play } from 'lucide-react'
+import { Plus, Settings as SettingsIcon, Download, Workflow } from 'lucide-react'
 import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
@@ -13,6 +13,13 @@ import Settings from './Settings'
 import ChainBuilder from '../components/ChainBuilder'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { downloadJson } from '../utils/download'
+
+const PLATFORM_NAMES = {
+  chatgpt: 'ChatGPT',
+  gemini: 'Gemini',
+  claude: 'Claude',
+  other: 'No chat',
+} as const
 
 export default function App() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -33,6 +40,10 @@ export default function App() {
   const { showToast } = useToast()
   const [focusSearchSignal, setFocusSearchSignal] = useState(0)
   const [exporting, setExporting] = useState(false)
+  const handleFilterChange = useCallback((next: { query: string; sort: SortOption }) => {
+    setQuery(next.query)
+    setSort(next.sort)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -232,118 +243,132 @@ export default function App() {
     }
   }
 
+  if (view === 'settings') {
+    return <Settings onBack={() => setView('main')} />
+  }
+
+  const platformName = PLATFORM_NAMES[platform]
+
   return (
-    <div className="w-popup min-w-popup max-w-popup h-[600px] bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col relative">
-      <header className="border-b bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900">
-        <div className="flex items-center gap-2 p-3">
-          {view === 'settings' ? (
-            <button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setView('main')} aria-label="Back">
-              <ArrowLeft size={16} />
+    <div className="popup-shell">
+      <header className="popup-header">
+        <div className="flex items-center gap-3">
+          <div className="logo-frame">
+            <Logo size={22} ariaLabel="LangQueue" />
+          </div>
+          <div>
+            <div className="popup-kicker">Prompt operations</div>
+            <div className="popup-title">LangQueue</div>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <div
+              className="platform-status"
+              data-ready={!checking && compatible}
+              title={checking ? 'Detecting compatibility' : compatible ? `Ready on ${platformName}` : 'Open a supported chat page'}
+            >
+              <span className={`status-dot ${checking ? 'animate-pulse' : ''}`} aria-hidden />
+              <span>{checking ? 'Detecting' : compatible ? platformName : 'Offline'}</span>
+            </div>
+            <button className="icon-button" onClick={() => setView('settings')} aria-label="Settings">
+              <SettingsIcon size={15} />
             </button>
-          ) : null}
-          <Logo size={18} ariaLabel="LangQueue" className="shrink-0" />
-          <div className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-purple-400 to-pink-400">LangQueue</div>
-          <div className="ml-auto flex items-center gap-2 text-xs" title={checking ? 'Detecting compatibility…' : compatible ? `Ready on ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : platform === 'chatgpt' ? 'ChatGPT' : 'this page'}` : 'Not detected on current tab'}>
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${checking ? 'bg-gray-300 dark:bg-gray-700 animate-pulse' : compatible ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
-              aria-hidden
-            />
-            <span className={compatible ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'}>
-              {checking ? 'Detecting…' : compatible ? (platform === 'gemini' ? 'Gemini detected' : platform === 'claude' ? 'Claude detected' : platform === 'chatgpt' ? 'ChatGPT detected' : 'Detected') : 'Open ChatGPT, Gemini, or Claude to enable Insert'}
-            </span>
-            {view === 'main' ? (
-              <button className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setView('settings')} aria-label="Settings">
-                <SettingsIcon size={16} />
-              </button>
-            ) : null}
           </div>
         </div>
-        <div className="px-3 pb-3">
-          {view === 'main' ? (
-            <FilterBar
-              initialQuery={query}
-              initialSort={sort}
-              autoFocus={false}
-              focusSignal={focusSearchSignal}
-              onChange={(s) => {
-                setQuery(s.query)
-                setSort(s.sort)
-              }}
-            />
-          ) : (
-            <div className="text-xs text-gray-500 dark:text-gray-400">Configure settings below.</div>
-          )}
+        <div className="mt-4">
+          <FilterBar
+            initialQuery={query}
+            initialSort={sort}
+            autoFocus={false}
+            focusSignal={focusSearchSignal}
+            onChange={handleFilterChange}
+          />
         </div>
       </header>
 
-      {view === 'settings' ? (
-        <Settings onBack={() => setView('main')} />
-      ) : (
-      <main className="flex-1 overflow-auto p-3">
+      <main className="popup-scroll">
         {loading ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">Loading…</div>
+          <div className="section-label">Loading library</div>
         ) : prompts.length > 0 ? (
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Showing {visiblePrompts.length} of {prompts.length} prompts</div>
+          <div className="section-label">
+            <span>Prompt library</span>
+            <span className="section-count">{visiblePrompts.length} / {prompts.length}</span>
+          </div>
         ) : null}
         {!loading && prompts.length === 0 ? (
-          <div className="text-sm text-gray-600 dark:text-gray-300 text-center py-12 space-y-3">
-            <div className="text-base font-medium">You have no prompts yet</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Create your first prompt to get started.</div>
+          <div className="empty-panel">
             <div>
+              <div className="popup-kicker text-[#527d8c]">Library empty</div>
+              <div className="mt-2 text-lg font-semibold">Save your first reusable prompt.</div>
+              <div className="mt-2 text-xs leading-5 text-[#6f7c82]">Create it once, then insert it into any supported chat.</div>
               <button
                 onClick={handleCreate}
-                className="inline-flex items-center justify-center gap-2 text-sm px-3 py-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15"
+                className="primary-button mt-5"
               >
                 <Plus size={16} /> Create your first prompt
               </button>
             </div>
           </div>
         ) : !loading && visiblePrompts.length === 0 ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-12">No results. Try clearing filters or adjusting your search.</div>
+          <div className="empty-panel">
+            <div>
+              <div className="popup-kicker text-[#527d8c]">No match</div>
+              <div className="mt-2 text-base font-semibold">Try another search.</div>
+              <div className="mt-2 text-xs text-[#6f7c82]">Search checks prompt titles and content.</div>
+            </div>
+          </div>
         ) : (
           <>
-            <div className="grid gap-3 grid-cols-1">
-            {visiblePrompts.map((p) => (
+            <div className="grid grid-cols-1 gap-3">
+              {visiblePrompts.map((p, index) => (
                 <PromptCard
                   key={p.id}
+                  index={index}
                   prompt={p}
                   onEdit={() => {
                     setEditing(p)
                     setModalOpen(true)
                   }}
                   onDelete={handleDelete}
-                onInsert={handleInsert}
+                  onInsert={handleInsert}
                   onSend={async (prompt) => {
                     try {
-                      await sendPromptToTab(prompt.content, prompt.attachments || []) // mirror card click injection
+                      await sendPromptToTab(prompt.content, prompt.attachments || [])
                       await clickSendOnTab()
-                    showToast({ variant: 'success', message: 'Sent' })
-                    window.close()
-                  } catch (err: unknown) {
-                    const message = err instanceof Error ? err.message : 'Failed to send'
-                    showToast({ variant: 'error', message })
-                  }
-                }}
+                      showToast({ variant: 'success', message: 'Sent' })
+                      window.close()
+                    } catch (err: unknown) {
+                      const message = err instanceof Error ? err.message : 'Failed to send'
+                      showToast({ variant: 'error', message })
+                    }
+                  }}
                   canInsert={compatible}
                 />
               ))}
             </div>
 
-            <div className="mt-4">
-              <div className="px-1 py-2 text-xs font-medium text-gray-600 dark:text-gray-300">Chains</div>
+            <section className="mt-6">
+              <div className="section-label">
+                <span>Prompt chains</span>
+                <span className="section-count">{chains.length}</span>
+              </div>
               {chains.length === 0 ? (
-                <div className="text-xs text-gray-500 dark:text-gray-400 px-1">No saved chains.</div>
+                <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-4 text-xs text-[#6f7c82]">
+                  Link prompts into a repeatable sequence.
+                </div>
               ) : (
-                <ul className="divide-y rounded-md border dark:border-gray-700">
-                  {chains.map((c) => (
-                    <li key={c.id} className="p-3 flex items-center justify-between gap-2">
+                <ul className="space-y-2">
+                  {chains.map((c, index) => (
+                    <li key={c.id} className="chain-card">
+                      <div className="chain-number">{String(index + 1).padStart(2, '0')}</div>
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{c.title}</div>
-                        <div className="text-[11px] text-gray-500 dark:text-gray-400">{c.steps.length} step{c.steps.length === 1 ? '' : 's'}</div>
+                        <div className="truncate text-xs font-semibold text-[#1c272c]">{c.title}</div>
+                        <div className="mt-1 text-[10px] text-[#6f7c82]">
+                          {c.steps.length} step{c.steps.length === 1 ? '' : 's'}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="ml-auto flex items-center gap-1.5">
                         <button
-                          className="px-2 py-1.5 text-xs rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white hover:bg-white/15"
+                          className="compact-button"
                           onClick={async () => {
                             const nextTitle = prompt('Rename chain', c.title)?.trim()
                             if (!nextTitle) return
@@ -355,7 +380,7 @@ export default function App() {
                           Edit
                         </button>
                         <button
-                          className="px-2 py-1.5 text-xs rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white hover:bg-white/15"
+                          className="compact-button"
                           onClick={async () => {
                             setDeleteChainTarget(c)
                           }}
@@ -367,49 +392,43 @@ export default function App() {
                   ))}
                 </ul>
               )}
-            </div>
+            </section>
           </>
         )}
       </main>
-      )}
 
-      {/* Initial full-screen loading overlay */}
       {loading ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 z-50">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f2f4f3]/90 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-7 w-7 rounded-full border-2 border-gray-300 dark:border-gray-700 border-t-sky-400 animate-spin" aria-label="Loading" />
-            <div className="text-xs font-medium bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-purple-400 to-pink-400">Loading…</div>
+            <div className="loading-orbit" aria-label="Loading" />
+            <div className="popup-kicker">Loading library</div>
           </div>
         </div>
       ) : null}
 
-      <footer className="border-t p-3">
-        <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-4">
-          <span>Total prompts: <span className="font-medium">{stats.totalPrompts}</span></span>
-          <span>Total uses: <span className="font-medium">{stats.totalUses}</span></span>
+      <footer className="popup-footer">
+        <div className="mb-2.5 flex items-center gap-3 text-[10px] text-[#6f7c82]">
+          <span><strong className="text-[#1c272c]">{stats.totalPrompts}</strong> prompts</span>
+          <span><strong className="text-[#1c272c]">{stats.totalUses}</strong> uses</span>
+          <button className="text-button ml-auto inline-flex items-center gap-1.5" onClick={handleExport} disabled={exporting}>
+            <Download size={11} />
+            {exporting ? 'Exporting' : 'Export'}
+          </button>
         </div>
-        <div className="grid grid-cols-2 gap-2 mb-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setChainOpen(true)}
-            className="inline-flex items-center justify-center gap-2 text-sm px-3 py-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15"
+            className="secondary-button"
           >
-            <Play size={16} /> Build Prompt Chain
+            <Workflow size={15} /> New chain
           </button>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center justify-center gap-2 text-sm px-3 py-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md text-white shadow-lg shadow-sky-500/10 hover:bg-white/15"
+            className="primary-button"
           >
-            <Plus size={16} /> New Prompt
+            <Plus size={15} /> New prompt
           </button>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="w-full inline-flex items-center justify-center gap-2 text-xs px-3 py-2 rounded-xl border border-white/15 backdrop-blur-md text-white hover:bg-white/15 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {exporting ? 'Exporting…' : 'Export library to Downloads'}
-        </button>
-        <button className="hidden" />
       </footer>
 
       <PromptModal

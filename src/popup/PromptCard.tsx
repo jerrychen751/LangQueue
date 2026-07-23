@@ -5,6 +5,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useState } from 'react'
 
 type PromptCardProps = {
+  index: number
   prompt: Prompt
   onEdit: (prompt: Prompt) => void
   onDelete: (prompt: Prompt) => void
@@ -13,79 +14,100 @@ type PromptCardProps = {
   canInsert?: boolean
 }
 
-export function PromptCard({ prompt, onEdit, onDelete, onInsert, onSend, canInsert = true }: PromptCardProps) {
+export function PromptCard({
+  index,
+  prompt,
+  onEdit,
+  onDelete,
+  onInsert,
+  onSend,
+  canInsert = true,
+}: PromptCardProps) {
   const { showToast } = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const promptNumber = String(index + 1).padStart(2, '0')
 
   return (
     <>
-    <div className="rounded-lg p-[1px] bg-gradient-to-br from-sky-500/20 via-purple-500/20 to-pink-500/20">
-    <div
-      className={`border rounded-lg p-3 shadow-sm hover:shadow-lg transition bg-white dark:bg-gray-900 dark:border-gray-700 ${canInsert ? 'cursor-pointer' : 'cursor-default'}`}
-      onClick={async () => { if (canInsert) await onInsert(prompt) }}
-      title={canInsert ? 'Click to insert' : 'Open ChatGPT tab to enable insert'}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 break-words max-w-full" title={prompt.title}>
-            {prompt.title || 'Untitled'}
-          </div>
-          <div className="relative mt-1 overflow-hidden">
-            <div
-              className="text-[11px] leading-5 text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words overflow-hidden"
-              style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as unknown as undefined }}
-            >
-              {prompt.content}
-            </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-white to-transparent dark:from-gray-900" />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <div>
-          Used {prompt.usageCount ?? 0} times
-          {(prompt.attachments?.length ?? 0) > 0 ? ` · ${prompt.attachments.length} attachment${prompt.attachments.length === 1 ? '' : 's'}` : ''}
-        </div>
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => onEdit(prompt)} title="Edit">
-            <Pencil size={14} />
-          </button>
+      <article
+        className="prompt-card"
+        data-enabled={canInsert}
+      >
+        <div className="flex items-start gap-3">
           <button
-            className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-            onClick={() => setConfirmOpen(true)}
-            title="Delete"
+            type="button"
+            className="min-w-0 flex-1 text-left"
+            onClick={async () => onInsert(prompt)}
+            disabled={!canInsert}
+            title={canInsert ? 'Insert prompt' : 'Open ChatGPT, Gemini, or Claude to enable insert'}
+            aria-label={`Insert ${prompt.title || 'prompt'}`}
           >
-            <Trash2 size={14} />
+            <div className="prompt-index">PROMPT {promptNumber}</div>
+            <div className="prompt-title break-words" title={prompt.title}>
+              {prompt.title || 'Untitled'}
+            </div>
+            <div className="prompt-copy">{prompt.content}</div>
           </button>
+          <div
+            className="flex items-center gap-1"
+          >
+            <button
+              className="card-action"
+              onClick={() => onEdit(prompt)}
+              title="Edit prompt"
+              aria-label={`Edit ${prompt.title || 'prompt'}`}
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              className="card-action"
+              onClick={() => setConfirmOpen(true)}
+              title="Delete prompt"
+              aria-label={`Delete ${prompt.title || 'prompt'}`}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between border-t border-[#d9dfe1] pt-3">
+          <div className="prompt-meta">
+            <span>{prompt.usageCount ?? 0} uses</span>
+            {(prompt.attachments?.length ?? 0) > 0 ? (
+              <>
+                <span aria-hidden>•</span>
+                <span>{prompt.attachments.length} file{prompt.attachments.length === 1 ? '' : 's'}</span>
+              </>
+            ) : null}
+          </div>
           <button
-            className={`px-2 py-1 rounded ${canInsert ? 'hover:bg-gray-100 dark:hover:bg-gray-700' : 'opacity-50 cursor-not-allowed'}`}
+            className="card-action"
+            data-primary="true"
             onClick={async () => {
               if (!canInsert) return
               if (onSend) await onSend(prompt)
               else await onInsert(prompt)
             }}
-            title={canInsert ? 'Insert' : 'Open ChatGPT tab to enable insert'}
+            title={canInsert ? 'Send prompt' : 'Open a supported chat page to enable send'}
+            aria-label={`Send ${prompt.title || 'prompt'}`}
             disabled={!canInsert}
           >
-            <Send size={14} />
+            <Send size={13} />
           </button>
         </div>
-      </div>
-    </div>
-    </div>
-    <DeleteConfirmModal
-      open={confirmOpen}
-      title="Delete this prompt?"
-      description="This action cannot be undone."
-      confirmLabel="Delete"
-      onCancel={() => setConfirmOpen(false)}
-      onConfirm={() => {
-        setConfirmOpen(false)
-        onDelete(prompt)
-        showToast({ variant: 'success', message: 'Prompt deleted' })
-      }}
-    />
+      </article>
+      <DeleteConfirmModal
+        open={confirmOpen}
+        title="Delete this prompt?"
+        description="This action cannot be undone."
+        confirmLabel="Delete"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false)
+          onDelete(prompt)
+          showToast({ variant: 'success', message: 'Prompt deleted' })
+        }}
+      />
     </>
   )
 }

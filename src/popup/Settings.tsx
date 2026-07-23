@@ -125,11 +125,11 @@ export default function Settings({ onBack }: SettingsProps) {
   }
 
   const statusTone = status?.toLowerCase().includes('fail')
-    ? 'text-rose-200 border-rose-400/30 bg-rose-500/15'
-    : 'text-emerald-200 border-emerald-400/30 bg-emerald-500/15'
+    ? 'text-rose-700 border-rose-300 bg-rose-50'
+    : 'text-[#3f6954] border-[#b5c9be] bg-[#eef4f0]'
 
   return (
-    <div className="w-popup min-w-popup max-w-popup h-[600px] bg-slate-950 text-slate-100 flex flex-col bg-[radial-gradient(120%_120%_at_50%_0%,rgba(56,189,248,0.12),transparent_60%)]">
+    <div className="popup-shell">
       <input
         ref={fileInputRef}
         type="file"
@@ -140,31 +140,31 @@ export default function Settings({ onBack }: SettingsProps) {
           if (file) void handleImportFile(file)
         }}
       />
-      <header className="border-b border-white/10 px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2">
-          <button className="p-2 rounded-full hover:bg-white/10 transition" onClick={onBack} aria-label="Back">
+      <header className="popup-header">
+        <div className="flex items-center gap-3">
+          <button className="icon-button" onClick={onBack} aria-label="Back">
             <ArrowLeft size={16} />
           </button>
           <div className="flex-1">
-            <div className="text-sm font-semibold">Settings</div>
-            <div className="text-xs text-slate-400">Tune how LangQueue behaves.</div>
+            <div className="popup-kicker">Workspace controls</div>
+            <div className="popup-title">Settings</div>
           </div>
           {status ? (
-            <div className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-full border ${statusTone}`} role="status">
+            <div className={`rounded-[3px] border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.06em] ${statusTone}`} role="status">
               {status}
             </div>
           ) : null}
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto px-3 pt-3 pb-4 space-y-4 text-sm">
-        <section className="rounded-2xl border border-white/10 bg-white/5">
-          <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Features</div>
-          <div className="divide-y divide-white/10">
+      <main className="popup-scroll space-y-3 pb-24 text-sm">
+        <section className="settings-panel">
+          <div className="settings-heading">Features</div>
+          <div className="divide-y divide-[#d9dfe1]">
             <label className="flex items-center justify-between gap-3 px-4 py-3">
               <div>
                 <div className="font-medium">Enable multimodal attachments</div>
-                <div className="text-xs text-slate-400">Allow prompt and chain image/file attachments.</div>
+                <div className="mt-1 text-[11px] text-[#6f7c82]">Add files and images to prompts and chains.</div>
               </div>
               <span className="relative inline-flex h-6 w-10 items-center">
                 <input
@@ -173,15 +173,15 @@ export default function Settings({ onBack }: SettingsProps) {
                   checked={settings.multimodalEnabled !== false}
                   onChange={(e) => setSettings((prev) => ({ ...prev, multimodalEnabled: e.target.checked }))}
                 />
-                <span className="h-6 w-10 rounded-full bg-slate-700/80 border border-white/10 transition-colors peer-checked:bg-amber-500/80 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400/70" />
-                <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                <span className="h-6 w-10 rounded-[3px] border border-[#cfd6d8] bg-[#dfe4e6] transition-colors peer-checked:border-[#527d8c] peer-checked:bg-[#527d8c] peer-focus-visible:ring-2 peer-focus-visible:ring-[#527d8c]/40" />
+                <span className="absolute left-1 h-4 w-4 rounded-[2px] border border-[#c7d0d3] bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
               </span>
             </label>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5">
-          <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Insertion behavior</div>
+        <section className="settings-panel">
+          <div className="settings-heading">Insertion behavior</div>
           <div className="grid grid-cols-2 gap-2 px-4 pb-4">
             <label className="cursor-pointer">
               <input
@@ -191,9 +191,9 @@ export default function Settings({ onBack }: SettingsProps) {
                 checked={(settings.insertionMode ?? 'overwrite') === 'overwrite'}
                 onChange={() => setSettings((prev) => ({ ...prev, insertionMode: 'overwrite' }))}
               />
-              <div className="rounded-xl border border-white/10 bg-slate-900/40 p-3 text-xs text-slate-300 transition peer-checked:border-sky-400/60 peer-checked:bg-sky-500/15 peer-checked:text-slate-100">
+              <div className="rounded-[4px] border border-[#cfd6d8] bg-[#f8f9f9] p-3 text-xs text-[#46555c] transition peer-checked:border-[#527d8c] peer-checked:bg-[#eef3f5] peer-checked:text-[#1c272c]">
                 <div className="text-sm font-medium">Overwrite</div>
-                <div className="mt-1 text-[11px] opacity-70">Replace current input</div>
+                <div className="mt-1 text-[11px] opacity-70">Replace the current input</div>
               </div>
             </label>
             <label className="cursor-pointer">
@@ -204,21 +204,21 @@ export default function Settings({ onBack }: SettingsProps) {
                 checked={settings.insertionMode === 'append'}
                 onChange={() => setSettings((prev) => ({ ...prev, insertionMode: 'append' }))}
               />
-              <div className="rounded-xl border border-white/10 bg-slate-900/40 p-3 text-xs text-slate-300 transition peer-checked:border-sky-400/60 peer-checked:bg-sky-500/15 peer-checked:text-slate-100">
+              <div className="rounded-[4px] border border-[#cfd6d8] bg-[#f8f9f9] p-3 text-xs text-[#46555c] transition peer-checked:border-[#527d8c] peer-checked:bg-[#eef3f5] peer-checked:text-[#1c272c]">
                 <div className="text-sm font-medium">Append</div>
-                <div className="mt-1 text-[11px] opacity-70">Keep and add after</div>
+                <div className="mt-1 text-[11px] opacity-70">Add after the current input</div>
               </div>
             </label>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5">
-          <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Page tweaks</div>
-          <div className="divide-y divide-white/10">
+        <section className="settings-panel">
+          <div className="settings-heading">Page behavior</div>
+          <div className="divide-y divide-[#d9dfe1]">
             <label className="flex items-center justify-between gap-3 px-4 py-3">
               <div>
                 <div className="font-medium">Prevent auto-scroll on submit</div>
-                <div className="text-xs text-slate-400">Keep the page from jumping after send.</div>
+                <div className="mt-1 text-[11px] text-[#6f7c82]">Keep the page position after send.</div>
               </div>
               <span className="relative inline-flex h-6 w-10 items-center">
                 <input
@@ -230,23 +230,23 @@ export default function Settings({ onBack }: SettingsProps) {
                     tweaks: { ...prev.tweaks, preventAutoScrollOnSubmit: e.target.checked },
                   }))}
                 />
-                <span className="h-6 w-10 rounded-full bg-slate-700/80 border border-white/10 transition-colors peer-checked:bg-amber-500/80 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400/70" />
-                <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                <span className="h-6 w-10 rounded-[3px] border border-[#cfd6d8] bg-[#dfe4e6] transition-colors peer-checked:border-[#527d8c] peer-checked:bg-[#527d8c] peer-focus-visible:ring-2 peer-focus-visible:ring-[#527d8c]/40" />
+                <span className="absolute left-1 h-4 w-4 rounded-[2px] border border-[#c7d0d3] bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
               </span>
             </label>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5">
-          <div className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wide text-slate-400">Import / Export</div>
-          <div className="divide-y divide-white/10">
+        <section className="settings-panel">
+          <div className="settings-heading">Import and export</div>
+          <div className="divide-y divide-[#d9dfe1]">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <div className="font-medium">Export library</div>
-                <div className="text-xs text-slate-400">Prompts and chains saved to Downloads.</div>
-              </div>
-              <button
-                className="px-3 py-2 text-xs rounded-xl border border-white/10 bg-slate-900/60 hover:bg-slate-800/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                <div>
+                  <div className="font-medium">Export library</div>
+                  <div className="mt-1 text-[11px] text-[#6f7c82]">Save prompts and chains to Downloads.</div>
+                </div>
+                <button
+                className="compact-button"
                 onClick={handleExport}
                 disabled={exporting}
               >
@@ -254,10 +254,10 @@ export default function Settings({ onBack }: SettingsProps) {
               </button>
             </div>
             <label className="flex items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <div className="font-medium">Include attachment binaries</div>
-                <div className="text-xs text-slate-400">Larger export, but portable with files/images.</div>
-              </div>
+                <div>
+                  <div className="font-medium">Include attachment binaries</div>
+                  <div className="mt-1 text-[11px] text-[#6f7c82]">Make a larger file that includes attachments.</div>
+                </div>
               <span className="relative inline-flex h-6 w-10 items-center">
                 <input
                   type="checkbox"
@@ -265,17 +265,17 @@ export default function Settings({ onBack }: SettingsProps) {
                   checked={Boolean(settings.exportIncludeBinaries)}
                   onChange={(e) => setSettings((prev) => ({ ...prev, exportIncludeBinaries: e.target.checked }))}
                 />
-                <span className="h-6 w-10 rounded-full bg-slate-700/80 border border-white/10 transition-colors peer-checked:bg-amber-500/80 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-400/70" />
-                <span className="absolute left-1 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                <span className="h-6 w-10 rounded-[3px] border border-[#cfd6d8] bg-[#dfe4e6] transition-colors peer-checked:border-[#527d8c] peer-checked:bg-[#527d8c] peer-focus-visible:ring-2 peer-focus-visible:ring-[#527d8c]/40" />
+                <span className="absolute left-1 h-4 w-4 rounded-[2px] border border-[#c7d0d3] bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
               </span>
             </label>
             <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <div className="font-medium">Import from file</div>
-                <div className="text-xs text-slate-400">Merge and replace duplicates by ID.</div>
-              </div>
-              <button
-                className="px-3 py-2 text-xs rounded-xl border border-white/10 bg-slate-900/60 hover:bg-slate-800/80 disabled:opacity-60 disabled:cursor-not-allowed"
+                <div>
+                  <div className="font-medium">Import from file</div>
+                  <div className="mt-1 text-[11px] text-[#6f7c82]">Merge data and replace matching IDs.</div>
+                </div>
+                <button
+                className="compact-button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
               >
@@ -283,15 +283,15 @@ export default function Settings({ onBack }: SettingsProps) {
               </button>
             </div>
             {importSummary ? (
-              <div className="px-4 py-2 text-[11px] text-slate-300">{importSummary}</div>
+              <div className="px-4 py-2 text-[11px] text-[#46555c]">{importSummary}</div>
             ) : null}
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-white/10 p-3 bg-slate-950/90 backdrop-blur">
+      <footer className="popup-footer">
         <button
-          className="w-full inline-flex items-center justify-center gap-2 text-sm px-4 py-3 rounded-2xl bg-emerald-400 text-slate-950 font-semibold shadow-lg shadow-emerald-500/20 hover:bg-emerald-300 transition"
+          className="primary-button w-full"
           onClick={saveAll}
         >
           Save settings

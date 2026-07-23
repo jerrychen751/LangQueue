@@ -5,8 +5,10 @@ import { ToastProvider } from '../components/ToastProvider'
 import '../index.css'
 
 async function bootstrap() {
-  // Force dark theme always
-  document.documentElement.classList.add('dark')
+  if (import.meta.env.DEV && !globalThis.chrome?.runtime?.onMessage) {
+    const { installDevChromeMock } = await import('./devChromeMock')
+    installDevChromeMock()
+  }
 
   const container = document.getElementById('root')!
   const root = createRoot(container)
@@ -23,5 +25,3 @@ async function bootstrap() {
 }
 
 bootstrap()
-
-

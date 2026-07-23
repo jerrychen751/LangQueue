@@ -6,17 +6,14 @@ type LogoProps = {
   ariaLabel?: string
 }
 
-// Draw the exact same logo as the action icon: a rounded-stroke "L" on a dark gradient background
+// Draw the same logo as the action icon: a light L on a blue-gray background.
 function drawLIcon(ctx: CanvasRenderingContext2D, size: number) {
-  // Background gradient
-  const gradient = ctx.createLinearGradient(0, 0, 0, size)
-  gradient.addColorStop(0, '#0f172a')
-  gradient.addColorStop(1, '#1f2937')
-  ctx.fillStyle = gradient
+  // Background
+  ctx.fillStyle = '#3f616d'
   ctx.fillRect(0, 0, size, size)
 
   // Subtle border
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'
   ctx.lineWidth = Math.max(1, Math.floor(size * 0.05))
   ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth)
 
@@ -35,9 +32,9 @@ function drawLIcon(ctx: CanvasRenderingContext2D, size: number) {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.lineWidth = strokeWidth
-  ctx.strokeStyle = '#e5e7eb' // gray-200
-  ctx.shadowColor = 'rgba(0,0,0,0.18)'
-  ctx.shadowBlur = Math.max(0, Math.floor(size * 0.06))
+  ctx.strokeStyle = '#f4f7f7'
+  ctx.shadowColor = 'transparent'
+  ctx.shadowBlur = 0
 
   ctx.beginPath()
   ctx.moveTo(originX, originY)
@@ -69,5 +66,3 @@ export default function Logo({ size = 20, className, ariaLabel = 'LangQueue logo
     <canvas ref={canvasRef} aria-label={ariaLabel} role="img" className={className} />
   )
 }
-
-

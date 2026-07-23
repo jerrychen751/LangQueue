@@ -36,16 +36,17 @@ export default function DeleteConfirmModal({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative z-[101] w-[340px] rounded-lg border bg-white text-gray-900 p-4 shadow-xl dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700">
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">{description}</div>
+    <div className="fixed left-0 top-0 z-[100] flex h-[600px] w-popup items-center justify-center">
+      <div className="absolute inset-0 bg-[#1c272c]/30 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative z-[101] w-[340px] rounded-[6px] border border-[#bcc7ca] bg-white p-5 text-[#1c272c] shadow-lg">
+        <div className="popup-kicker text-rose-700">Confirm action</div>
+        <div className="modal-title mt-1">{title}</div>
+        <div className="mt-2 text-xs leading-5 text-[#6f7c82]">{description}</div>
         <div className="mt-4 flex items-center justify-end gap-2">
-          <button ref={cancelRef} className="px-3 py-1.5 text-sm rounded-md border hover:bg-gray-50 dark:hover:bg-gray-800" onClick={onCancel}>
+          <button ref={cancelRef} className="secondary-button min-h-10" onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button className="px-3 py-1.5 text-sm rounded-md bg-rose-600 text-white hover:bg-rose-700" onClick={onConfirm}>
+          <button className="inline-flex min-h-10 items-center justify-center rounded-[4px] bg-rose-700 px-4 text-xs font-bold text-white transition hover:bg-rose-600" onClick={onConfirm}>
             {confirmLabel}
           </button>
         </div>
@@ -53,5 +54,3 @@ export default function DeleteConfirmModal({
     </div>
   )
 }
-
-
