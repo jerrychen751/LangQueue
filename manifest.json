@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LangQueue",
   "description": "Save, find, and reuse prompts in ChatGPT, Gemini, and Claude.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "action": {
     "default_title": "LangQueue",
     "default_popup": "popup.html",
