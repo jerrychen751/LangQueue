@@ -19,21 +19,21 @@ export function isButtonEnabledAndVisible(btn: Element | null): btn is HTMLButto
   return isVisible(btn)
 }
 
-export function isFileInputEnabledAndVisible(input: Element | null): input is HTMLInputElement {
+export function isFileInputEnabled(input: Element | null): input is HTMLInputElement {
   if (!input) return false
   if (!(input instanceof HTMLInputElement)) return false
   if (input.type !== 'file') return false
   if (input.disabled) return false
-  return isVisible(input)
+  return true
 }
 
-export function findVisibleFileInput(selectors: string[]): HTMLInputElement | null {
+export function findEnabledFileInput(selectors: string[]): HTMLInputElement | null {
   for (const selector of selectors) {
     const input = document.querySelector(selector)
-    if (isFileInputEnabledAndVisible(input)) return input
+    if (isFileInputEnabled(input)) return input
   }
   const any = document.querySelector('input[type="file"]')
-  if (isFileInputEnabledAndVisible(any)) return any
+  if (isFileInputEnabled(any)) return any
   return null
 }
 

@@ -1,6 +1,6 @@
 import { Adapter } from './adapter'
 import {
-  findVisibleFileInput,
+  findEnabledFileInput,
   isButtonEnabledAndVisible,
   isVisible,
   setFilesOnInput,
@@ -15,6 +15,16 @@ class ClaudeAdapter extends Adapter {
   }
 
   getInputElement(): HTMLTextAreaElement | null {
+    const contentEditables = Array.from(
+      document.querySelectorAll(
+        '[data-testid="chat-input"][contenteditable="true"], [contenteditable="true"][role="textbox"]'
+      )
+    ) as HTMLElement[]
+    const visibleContentEditable = contentEditables.find((element) => isVisible(element))
+    if (visibleContentEditable) {
+      return visibleContentEditable as unknown as HTMLTextAreaElement
+    }
+
     const allTextareas = Array.from(document.querySelectorAll('textarea'))
     const visibleTextareas = allTextareas.filter((e) => isVisible(e))
 
@@ -106,7 +116,8 @@ class ClaudeAdapter extends Adapter {
 
   async attachFiles(files: File[]) {
     if (!Array.isArray(files) || files.length === 0) return { ok: true }
-    const input = findVisibleFileInput([
+    const input = findEnabledFileInput([
+      'input[data-testid="file-upload"][type="file"]',
       'input[type="file"][accept*="image" i]',
       'input[type="file"]',
     ])

@@ -1,6 +1,6 @@
 import { Adapter } from './adapter'
 import {
-  findVisibleFileInput,
+  findEnabledFileInput,
   isButtonEnabledAndVisible,
   isVisible,
   setFilesOnInput,
@@ -107,7 +107,7 @@ class GeminiAdapter extends Adapter {
 
   async attachFiles(files: File[]) {
     if (!Array.isArray(files) || files.length === 0) return { ok: true }
-    const input = findVisibleFileInput([
+    const input = findEnabledFileInput([
       'input[type="file"][accept*="image" i]',
       'input[type="file"]',
     ])
