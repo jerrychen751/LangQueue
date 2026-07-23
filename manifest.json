@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LangQueue",
-  "description": "Prompt library, enhancement, chaining, and automation for interacting with LLMs.",
-  "version": "0.3.0",
+  "description": "Save, find, and reuse prompts in ChatGPT, Gemini, and Claude.",
+  "version": "0.4.0",
   "action": {
     "default_title": "LangQueue",
     "default_popup": "popup.html",
