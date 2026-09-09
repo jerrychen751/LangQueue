@@ -33,10 +33,11 @@ function createScope(inputs) {
 }
 
 function createFixture(createAdapter, local, outside = [], hasForm = true) {
-  const scope = createScope(local)
+  const scope = { ...createScope(local), isConnected: true }
   const documentScope = createScope([...outside, ...local])
   globalThis.document = { ...documentScope, body: {}, documentElement: {} }
-  const composer = { closest: () => hasForm ? scope : null, parentElement: scope }
+  const area = { localName: 'input-area-v2', isConnected: true, querySelectorAll: () => [] }
+  const composer = { isConnected: true, closest: selector => createAdapter === createGeminiAdapter && selector === 'input-area-v2' ? area : createAdapter === createClaudeAdapter && selector === '[data-cds="ChatComposer"]' ? scope : hasForm ? scope : null, parentElement: scope }
   const adapter = createAdapter()
   adapter.getInputElement = () => composer
   return adapter

@@ -30,7 +30,7 @@ function createFixture() {
   const button = new Button()
   const nested = { offsetParent: {}, getAttribute: () => 'Upload file options', querySelectorAll: () => fixture.uploaders }
   const outer = { offsetParent: {}, getAttribute: () => 'Menu options', contains: node => node === nested }
-  const area = { localName: 'input-area-v2', isConnected: true, querySelectorAll: () => [button] }
+  const area = { localName: 'input-area-v2', isConnected: true, querySelectorAll: selector => selector === 'uploader-file-preview' ? [] : [button] }
   const scope = { querySelectorAll: () => fixture.local }
   const composer = { isConnected: true, parentElement: scope, closest: selector => selector === 'input-area-v2' ? area : null }
   button.onClick = () => { fixture.menus = [outer, nested] }

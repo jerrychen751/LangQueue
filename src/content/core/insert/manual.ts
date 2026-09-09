@@ -40,7 +40,7 @@ export async function insertComposerPrompt(
       if (!attached.ok) throw new Error(attached.error || 'An attachment could not be uploaded. Check the files in the composer before retrying.')
       const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: 250, files })
       assertComposerUnchanged()
-      if (!uploaded) throw new Error('Attachment upload timed out. Check the files in the composer before retrying.')
+      if (!uploaded) throw new Error('Attachment upload could not be confirmed. Check the files in the composer before retrying.')
     }
     assertComposerUnchanged()
     input.removeEventListener('input', handleDraftChange)

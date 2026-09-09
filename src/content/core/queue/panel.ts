@@ -48,7 +48,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
       MODEL_IDLE_TIMEOUT: 'The chat did not become ready in time. Check the conversation before continuing.',
       RESPONSE_TIMEOUT: 'The response did not finish in time. Check the conversation before continuing.',
       GENERATION_START_TIMEOUT: 'Sending was attempted, but no response was detected. Check the conversation before removing this item.',
-      ATTACHMENT_UPLOAD_TIMEOUT: 'The attachment upload timed out. Check the files in the composer before retrying.',
+      ATTACHMENT_UPLOAD_TIMEOUT: 'Attachment upload could not be confirmed. Check the files in the composer before retrying.',
       ATTACHMENT_UPLOAD_FAILED: 'An attachment could not be uploaded. Check the files in the composer before retrying.',
     }
     host.hidden = !snapshot.items.length && !notice && !progress && !snapshot.error
