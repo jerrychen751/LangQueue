@@ -5,7 +5,7 @@ import styles from './panel.css?inline'
 export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: ReturnType<typeof createChainExecutor>) {
   const host = document.createElement('div')
   host.id = 'langqueue-execution'
-  const shadow = host.attachShadow({ mode: 'open' })
+  const shadow = host.attachShadow({ mode: 'closed' })
   const style = document.createElement('style')
   style.textContent = styles
   shadow.append(style)
@@ -84,7 +84,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
       remove.textContent = 'Remove'
       remove.disabled = snapshot.running && item.id === snapshot.items[0]?.id
       remove.setAttribute('aria-label', `Remove queued prompt: ${item.content.slice(0, 80)}`)
-      remove.addEventListener('click', () => queue.remove(item.id))
+      remove.addEventListener('click', (event) => { if (event.isTrusted) queue.remove(item.id) })
       row.append(remove)
       list.append(row)
     }
@@ -95,15 +95,17 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
     dismiss.hidden = snapshot.items.length > 0 || runningChain
   }
 
-  retry.addEventListener('click', () => { notice = ''; queue.retry() })
-  cancel.addEventListener('click', () => { notice = ''; queue.cancel() })
-  cancelChain.addEventListener('click', () => {
+  retry.addEventListener('click', (event) => { if (!event.isTrusted) return; notice = ''; queue.retry() })
+  cancel.addEventListener('click', (event) => { if (!event.isTrusted) return; notice = ''; queue.cancel() })
+  cancelChain.addEventListener('click', (event) => {
+    if (!event.isTrusted) return
     notice = 'Cancelling. Any upload already in progress must settle before the composer is released.'
     chain.cancel()
     render()
   })
-  dismiss.addEventListener('click', () => { notice = ''; queue.clearError(); host.hidden = true })
-  toggle.addEventListener('click', () => {
+  dismiss.addEventListener('click', (event) => { if (!event.isTrusted) return; notice = ''; queue.clearError(); host.hidden = true })
+  toggle.addEventListener('click', (event) => {
+    if (!event.isTrusted) return
     body.hidden = !body.hidden
     toggle.textContent = body.hidden ? 'Show details' : 'Hide details'
     toggle.setAttribute('aria-expanded', String(!body.hidden))

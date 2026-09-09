@@ -214,7 +214,7 @@ const STYLES = `
 export function createOverlay(callbacks: OverlayCallbacks) {
   const host = document.createElement('div')
   host.setAttribute('data-langqueue-overlay', 'true')
-  const shadow = host.attachShadow({ mode: 'open' })
+  const shadow = host.attachShadow({ mode: 'closed' })
   const style = document.createElement('style')
   style.textContent = STYLES
   const container = document.createElement('div')
@@ -233,7 +233,7 @@ export function createOverlay(callbacks: OverlayCallbacks) {
     </svg>
     <span>Create new shortcut</span>
   `
-  createButton.addEventListener('click', () => callbacks.onCreate())
+  createButton.addEventListener('click', (event) => { if (event.isTrusted) callbacks.onCreate() })
   const list = document.createElement('ul')
   list.className = 'lq-list'
   container.appendChild(header)
@@ -288,12 +288,14 @@ export function createOverlay(callbacks: OverlayCallbacks) {
         callbacks.onSelect(item)
       }
       li.addEventListener('mousedown', (event) => {
+        if (!event.isTrusted) return
         if (event.button !== 0) return
         const target = event.target as HTMLElement | null
         if (target?.closest('button[data-action="edit"]')) return
         selectItem()
       })
-      li.addEventListener('click', () => {
+      li.addEventListener('click', (event) => {
+        if (!event.isTrusted) return
         selectItem()
       })
       li.appendChild(textWrap)
@@ -309,11 +311,13 @@ export function createOverlay(callbacks: OverlayCallbacks) {
           <span class="lq-tooltip">Edit</span>
         `
         edit.addEventListener('click', (event) => {
+          if (!event.isTrusted) return
           event.stopPropagation()
           state.selectedIndex = index
           callbacks.onEdit(item)
         })
         edit.addEventListener('mousedown', (event) => {
+          if (!event.isTrusted) return
           event.stopPropagation()
         })
         li.appendChild(edit)

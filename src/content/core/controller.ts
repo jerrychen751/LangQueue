@@ -154,6 +154,7 @@ export function initController(adapter: Adapter) {
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    if (!event.isTrusted) return
     if (overlay.isOpen()) {
       if (event.key === 'ArrowDown') {
         overlay.moveSelection(1)
@@ -195,6 +196,7 @@ export function initController(adapter: Adapter) {
   }
 
   function handleInput(event: Event) {
+    if (!event.isTrusted) return
     const input = getEventInput(event)
     if (!input) return
     void updateSlashSuggestions()
@@ -205,6 +207,7 @@ export function initController(adapter: Adapter) {
   }
 
   function handlePointerDown(event: MouseEvent) {
+    if (!event.isTrusted) return
     if (!overlay.isOpen()) return
     const input = activeInput || adapter.getInputElement()
     const target = event.target as Node | null

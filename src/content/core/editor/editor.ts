@@ -22,7 +22,7 @@ export function createEditor(callbacks: {
   // Build elements of DOM/HTML for modal editor
   const host = document.createElement('div');
   host.setAttribute('data-langqueue-editor', 'true');
-  const shadow = host.attachShadow({ mode: 'open' });
+  const shadow = host.attachShadow({ mode: 'closed' });
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(styles);
 
@@ -200,6 +200,7 @@ export function createEditor(callbacks: {
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    if (!event.isTrusted) return;
     if (!isOpen) return;
     if (event.key === 'Tab') {
       const controls = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')).filter((element) => element.getClientRects().length > 0);
@@ -228,11 +229,12 @@ export function createEditor(callbacks: {
     }
   }
 
-  closeBtn.addEventListener('click', () => close());
-  cancelBtn.addEventListener('click', () => close());
-  saveBtn.addEventListener('click', () => void handleSave());
-  deleteBtn.addEventListener('click', () => void handleDelete());
+  closeBtn.addEventListener('click', (event) => { if (event.isTrusted) close(); });
+  cancelBtn.addEventListener('click', (event) => { if (event.isTrusted) close(); });
+  saveBtn.addEventListener('click', (event) => { if (event.isTrusted) void handleSave(); });
+  deleteBtn.addEventListener('click', (event) => { if (event.isTrusted) void handleDelete(); });
   backdrop.addEventListener('mousedown', (event) => {
+    if (!event.isTrusted) return;
     if (event.target === backdrop) close();
   });
   document.addEventListener('keydown', handleKeydown, true);
