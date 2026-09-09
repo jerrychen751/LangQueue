@@ -203,10 +203,6 @@ async function getUsage(): Promise<UsageSchema> {
   return existing;
 }
 
-async function saveUsage(usage: UsageSchema): Promise<void> {
-  await setInLocalStorage(USAGE_KEY, usage);
-}
-
 async function getChainsEnvelope(): Promise<ChainsEnvelope> {
   const existing = await getFromLocalStorage<ChainsEnvelope>(CHAINS_KEY);
   if (!existing) {
@@ -260,7 +256,7 @@ function collectReferencedAttachmentIds(db: PromptsSchema, chains: PromptChain[]
 async function cleanupUnusedAttachments(): Promise<void> {
   const [db, chains, metas] = await Promise.all([
     getPrompts(),
-    getAllChains(),
+    getAllChainsUnlocked(),
     listAttachmentMetas(),
   ]);
   const referenced = collectReferencedAttachmentIds(db, chains);
@@ -272,7 +268,7 @@ async function cleanupUnusedAttachments(): Promise<void> {
 }
 
 // Prompt operations
-export async function savePrompt(prompt: Prompt): Promise<void> {
+async function savePromptUnlocked(prompt: Prompt): Promise<void> {
   const db = await getPrompts();
   const existing = db.promptsById[prompt.id];
   const normalizedTitle = assertUniqueTitle(db, prompt.title, prompt.id);
@@ -291,17 +287,17 @@ export async function savePrompt(prompt: Prompt): Promise<void> {
   await cleanupUnusedAttachments();
 }
 
-export async function getPrompt(id: string): Promise<Prompt | null> {
+async function getPromptUnlocked(id: string): Promise<Prompt | null> {
   const db = await getPrompts();
   return db.promptsById[id] ?? null;
 }
 
-export async function getAllPrompts(): Promise<Prompt[]> {
+async function getAllPromptsUnlocked(): Promise<Prompt[]> {
   const db = await getPrompts();
   return Object.values(db.promptsById).sort((a, b) => a.title.localeCompare(b.title));
 }
 
-export async function deletePrompt(id: string): Promise<void> {
+async function deletePromptUnlocked(id: string): Promise<void> {
   const db = await getPrompts();
   if (db.promptsById[id]) {
     delete db.promptsById[id];
@@ -310,7 +306,7 @@ export async function deletePrompt(id: string): Promise<void> {
   }
 }
 
-export async function updatePrompt(
+async function updatePromptUnlocked(
   id: string,
   updates: Partial<Prompt>): Promise<void> {
   const db = await getPrompts();
@@ -330,9 +326,9 @@ export async function updatePrompt(
   await cleanupUnusedAttachments();
 }
 
-export async function searchPrompts(query: string): Promise<Prompt[]> {
+async function searchPromptsUnlocked(query: string): Promise<Prompt[]> {
   const q = query.trim().toLowerCase();
-  if (!q) return getAllPrompts();
+  if (!q) return getAllPromptsUnlocked();
   const db = await getPrompts();
 
   function scorePrompt(p: Prompt): number {
@@ -360,7 +356,7 @@ export async function searchPrompts(query: string): Promise<Prompt[]> {
     .map(({ p }) => p);
 }
 
-export async function logUsage(log: UsageLog): Promise<void> {
+async function logUsageUnlocked(log: UsageLog): Promise<void> {
   const [db, usage] = await Promise.all([getPrompts(), getUsage()]);
 
   usage.logs.push({ ...log });
@@ -376,10 +372,11 @@ export async function logUsage(log: UsageLog): Promise<void> {
     prompt.updatedAt = Date.now();
   }
 
-  await Promise.all([savePrompts(db), saveUsage(usage)]);
+  db.meta.updatedAt = Date.now();
+  await chrome.storage.local.set({ [PROMPTS_KEY]: db, [USAGE_KEY]: usage });
 }
 
-export async function getUsageStats(): Promise<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }> {
+async function getUsageStatsUnlocked(): Promise<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }> {
   const [db, usage] = await Promise.all([getPrompts(), getUsage()]);
   const prompts = Object.values(db.promptsById);
   let mostUsedPrompt: Prompt | null = null;
@@ -391,7 +388,7 @@ export async function getUsageStats(): Promise<{ totalPrompts: number; totalUses
   return { totalPrompts: prompts.length, totalUses: usage.totalUses, mostUsedPrompt };
 }
 
-export async function getRecentlyUsedPrompts(limit = 5): Promise<Prompt[]> {
+async function getRecentlyUsedPromptsUnlocked(limit = 5): Promise<Prompt[]> {
   const db = await getPrompts();
   const prompts = Object.values(db.promptsById);
   return prompts
@@ -407,15 +404,15 @@ export async function getRecentlyUsedPrompts(limit = 5): Promise<Prompt[]> {
 }
 
 // Settings helpers
-export async function getSettings(): Promise<AppSettings> {
+async function getSettingsUnlocked(): Promise<AppSettings> {
   return (await getFromLocalStorage<AppSettings>(SETTINGS_KEY)) ?? {};
 }
 
-export async function saveSettings(settings: AppSettings): Promise<void> {
+async function saveSettingsUnlocked(settings: AppSettings): Promise<void> {
   await setInLocalStorage(SETTINGS_KEY, settings);
 }
 
-export async function clearAllData(): Promise<void> {
+async function clearAllDataUnlocked(): Promise<void> {
   await setInLocalStorage(PROMPTS_KEY, createEmptyPrompts());
   await setInLocalStorage(CHAINS_KEY, createEmptyChainsEnvelope());
   await setInLocalStorage(USAGE_KEY, createEmptyUsage());
@@ -425,7 +422,7 @@ export async function clearAllData(): Promise<void> {
 }
 
 // Export / Import
-export async function exportPrompts(): Promise<PromptExportFile> {
+async function exportPromptsUnlocked(): Promise<PromptExportFile> {
   const db = await getPrompts();
   const prompts = Object.values(db.promptsById);
   return {
@@ -435,7 +432,7 @@ export async function exportPrompts(): Promise<PromptExportFile> {
   };
 }
 
-export async function importPrompts(
+async function importPromptsUnlocked(
   data: unknown,
   options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<{ imported: number; skipped: number; replaced: number; duplicated: number }> {
   if (!data || typeof data !== 'object') throw new Error('Invalid import data');
@@ -482,16 +479,15 @@ export async function importPrompts(
   }
 
   await savePrompts(db);
-  await cleanupUnusedAttachments();
   return { imported, skipped, replaced, duplicated };
 }
 
-export async function getAllChains(): Promise<PromptChain[]> {
+async function getAllChainsUnlocked(): Promise<PromptChain[]> {
   const envelope = await getChainsEnvelope();
   return envelope.items;
 }
 
-export async function saveChain(chain: PromptChain): Promise<void> {
+async function saveChainUnlocked(chain: PromptChain): Promise<void> {
   const envelope = await getChainsEnvelope();
   const list = envelope.items;
   const idx = list.findIndex((c) => c.id === chain.id);
@@ -509,16 +505,16 @@ export async function saveChain(chain: PromptChain): Promise<void> {
   await cleanupUnusedAttachments();
 }
 
-export async function deleteChain(id: string): Promise<void> {
+async function deleteChainUnlocked(id: string): Promise<void> {
   const envelope = await getChainsEnvelope();
   const next = envelope.items.filter((c) => c.id !== id);
   await saveChainsEnvelope({ ...envelope, items: next });
   await cleanupUnusedAttachments();
 }
 
-export async function searchChains(query: string): Promise<PromptChain[]> {
+async function searchChainsUnlocked(query: string): Promise<PromptChain[]> {
   const q = query.trim().toLowerCase();
-  const chains = await getAllChains();
+  const chains = await getAllChainsUnlocked();
   if (!q) return chains;
 
   function scoreChain(chain: PromptChain): number {
@@ -544,8 +540,8 @@ export async function searchChains(query: string): Promise<PromptChain[]> {
     .map(({ chain }) => chain);
 }
 
-export async function exportChains(): Promise<ChainExportFile> {
-  const chains = await getAllChains();
+async function exportChainsUnlocked(): Promise<ChainExportFile> {
+  const chains = await getAllChainsUnlocked();
   return {
     version: 2,
     exportedAt: Date.now(),
@@ -553,7 +549,7 @@ export async function exportChains(): Promise<ChainExportFile> {
   };
 }
 
-export async function importChains(
+async function importChainsUnlocked(
   data: unknown,
   options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<{ imported: number; skipped: number; replaced: number; duplicated: number }> {
   if (!data || typeof data !== 'object') throw new Error('Invalid import data');
@@ -602,14 +598,13 @@ export async function importChains(
   }
 
   await saveChainsEnvelope({ ...envelope, items: list });
-  await cleanupUnusedAttachments();
   return { imported, skipped, replaced, duplicated };
 }
 
-export async function exportLibrary(
+async function exportLibraryUnlocked(
   options?: { includeBinaries?: boolean }
 ): Promise<LibraryExportFile> {
-  const [promptFile, chainFile] = await Promise.all([exportPrompts(), exportChains()]);
+  const [promptFile, chainFile] = await Promise.all([exportPromptsUnlocked(), exportChainsUnlocked()]);
   const out: LibraryExportFile = {
     version: 3,
     exportedAt: Date.now(),
@@ -663,22 +658,20 @@ function isChainExportFile(input: unknown): input is ChainExportFile {
   );
 }
 
-export async function importLibrary(
+async function importLibraryUnlocked(
   data: unknown): Promise<{ prompts?: ImportCounts; chains?: ImportCounts; attachments?: { imported: number } }> {
   const parsed = typeof data === 'string' ? JSON.parse(data) : data;
   const importOptions = { mode: 'merge' as ImportMode, duplicateStrategy: 'replace' as DuplicateStrategy };
 
   if (isLibraryExportFile(parsed)) {
-    const [promptResult, chainResult] = await Promise.all([
-      importPrompts(
-        { version: parsed.version, exportedAt: parsed.exportedAt, prompts: parsed.prompts },
-        importOptions
-      ),
-      importChains(
-        { version: parsed.version, exportedAt: parsed.exportedAt, chains: parsed.chains },
-        importOptions
-      ),
-    ]);
+    const promptResult = await importPromptsUnlocked(
+      { version: parsed.version, exportedAt: parsed.exportedAt, prompts: parsed.prompts },
+      importOptions
+    );
+    const chainResult = await importChainsUnlocked(
+      { version: parsed.version, exportedAt: parsed.exportedAt, chains: parsed.chains },
+      importOptions
+    );
 
     let attachmentsImported = 0;
     const attachments = Array.isArray(parsed.attachments) ? parsed.attachments as AttachmentExportRecord[] : [];
@@ -686,7 +679,6 @@ export async function importLibrary(
       attachmentsImported = await importAttachmentRecords(attachments);
     }
 
-    await cleanupUnusedAttachments();
     return {
       prompts: promptResult,
       chains: chainResult,
@@ -695,15 +687,48 @@ export async function importLibrary(
   }
 
   if (isPromptExportFile(parsed)) {
-    const prompts = await importPrompts(parsed, importOptions);
+    const prompts = await importPromptsUnlocked(parsed, importOptions);
     return { prompts };
   }
 
   if (isChainExportFile(parsed)) {
-    const chains = await importChains(parsed, importOptions);
+    const chains = await importChainsUnlocked(parsed, importOptions);
     return { chains };
   }
 
   throw new Error('Unrecognized export format. Expected prompts, chains, or combined library export.');
 }
 
+function serializeStorageOperation<Args extends unknown[], Result>(
+  operation: (...args: Args) => Promise<Result>,
+  shouldCleanup = false
+): (...args: Args) => Promise<Result> {
+  return async (...args) => await navigator.locks.request('langqueue-storage', async () => {
+    const result = await operation(...args);
+    if (shouldCleanup) await cleanupUnusedAttachments();
+    return result;
+  });
+}
+
+export const savePrompt = serializeStorageOperation(savePromptUnlocked);
+export const getPrompt = serializeStorageOperation(getPromptUnlocked);
+export const getAllPrompts = serializeStorageOperation(getAllPromptsUnlocked);
+export const deletePrompt = serializeStorageOperation(deletePromptUnlocked);
+export const updatePrompt = serializeStorageOperation(updatePromptUnlocked);
+export const searchPrompts = serializeStorageOperation(searchPromptsUnlocked);
+export const logUsage = serializeStorageOperation(logUsageUnlocked);
+export const getUsageStats = serializeStorageOperation(getUsageStatsUnlocked);
+export const getRecentlyUsedPrompts = serializeStorageOperation(getRecentlyUsedPromptsUnlocked);
+export const getSettings = serializeStorageOperation(getSettingsUnlocked);
+export const saveSettings = serializeStorageOperation(saveSettingsUnlocked);
+export const clearAllData = serializeStorageOperation(clearAllDataUnlocked);
+export const exportPrompts = serializeStorageOperation(exportPromptsUnlocked);
+export const importPrompts = serializeStorageOperation(importPromptsUnlocked, true);
+export const getAllChains = serializeStorageOperation(getAllChainsUnlocked);
+export const saveChain = serializeStorageOperation(saveChainUnlocked);
+export const deleteChain = serializeStorageOperation(deleteChainUnlocked);
+export const searchChains = serializeStorageOperation(searchChainsUnlocked);
+export const exportChains = serializeStorageOperation(exportChainsUnlocked);
+export const importChains = serializeStorageOperation(importChainsUnlocked, true);
+export const exportLibrary = serializeStorageOperation(exportLibraryUnlocked);
+export const importLibrary = serializeStorageOperation(importLibraryUnlocked, true);
