@@ -2,6 +2,8 @@ import { Adapter } from './adapter'
 import {
   findEnabledFileInput,
   findComposerSendButton,
+  isFileInputEnabled,
+  isButtonEnabledAndVisible,
   isVisible,
   setFilesOnInput,
   waitForSelectorsToDisappear,
@@ -76,9 +78,39 @@ class GeminiAdapter extends Adapter {
 
   async attachFiles(files: File[]) {
     if (!Array.isArray(files) || files.length === 0) return { ok: true }
-    const input = findEnabledFileInput(this.getInputElement(), [])
-    if (!input) return { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' }
-    return setFilesOnInput(input, files)
+    const composer = this.getInputElement()
+    const input = findEnabledFileInput(composer, [])
+    if (input) return setFilesOnInput(input, files)
+    const failure = { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' }
+    const area = composer?.closest('input-area-v2')
+    if (!composer || area?.localName !== 'input-area-v2') return failure
+    const localScope = composer.closest('form') || composer.parentElement
+    if (localScope?.querySelectorAll('input[type="file"]').length) return failure
+    const buttons = area.querySelectorAll('button[aria-label="Upload & tools"][aria-haspopup="menu"]')
+    if (buttons.length !== 1 || !isButtonEnabledAndVisible(buttons[0])) return failure
+    const button = buttons[0]
+    const href = location.href
+    if (!composer.isConnected || !area.isConnected) return failure
+    if (button.getAttribute('aria-expanded') !== 'true') {
+      if (Array.from(document.querySelectorAll('[role="menu"]')).some(isVisible)) return failure
+      button.click()
+    }
+    const started = Date.now()
+    while (Date.now() - started < 1500) {
+      if (location.href !== href || !composer.isConnected || this.getInputElement() !== composer || composer.closest('input-area-v2') !== area || !button.isConnected) return failure
+      const menus = Array.from(document.querySelectorAll('[role="menu"]')).filter(isVisible)
+      const outer = menus.filter(menu => menu.getAttribute('aria-label') === 'Menu options')
+      const nested = menus.filter(menu => menu.getAttribute('aria-label') === 'Upload file options')
+      if (menus.some(menu => !outer.includes(menu) && !nested.includes(menu)) || outer.length > 1 || nested.length > 1) return failure
+      if (outer.length === 1 && nested.length === 1) {
+        if (!outer[0].contains(nested[0]) || button.getAttribute('aria-expanded') !== 'true') return failure
+        const uploaders = nested[0].querySelectorAll('images-files-uploader > input.hidden-file-input[type="file"]')
+        if (uploaders.length > 1) return failure
+        if (uploaders.length === 1) return isFileInputEnabled(uploaders[0]) ? setFilesOnInput(uploaders[0], files) : failure
+      }
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    return failure
   }
 
   async waitForUploadsComplete(options?: { timeoutMs?: number; pollMs?: number }): Promise<boolean> {
