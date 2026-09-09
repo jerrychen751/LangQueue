@@ -30,14 +30,20 @@ export function createEditor(callbacks: {
   backdrop.className = 'backdrop';
   const modal = document.createElement('div');
   modal.className = 'modal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'editor-title');
 
   const header = document.createElement('div');
   header.className = 'header';
   const title = document.createElement('div');
   title.className = 'title';
+  title.id = 'editor-title';
   title.textContent = 'Edit Shortcut';
   const closeBtn = document.createElement('button');
   closeBtn.className = 'close';
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label', 'Close prompt editor');
   closeBtn.innerHTML = '&times;';
   header.append(title, closeBtn);
 
@@ -45,20 +51,25 @@ export function createEditor(callbacks: {
   body.className = 'body';
   const nameLabel = document.createElement('label');
   nameLabel.className = 'label';
+  nameLabel.htmlFor = 'shortcut-name';
   nameLabel.textContent = 'Shortcut name';
   const nameInput = document.createElement('input');
   nameInput.className = 'input';
+  nameInput.id = 'shortcut-name';
   nameInput.placeholder = 'e.g., draft-email';
 
   const instructionsLabel = document.createElement('label');
   instructionsLabel.className = 'label';
+  instructionsLabel.htmlFor = 'shortcut-instructions';
   instructionsLabel.textContent = 'Instructions';
   const instructionsArea = document.createElement('textarea');
   instructionsArea.className = 'textarea';
+  instructionsArea.id = 'shortcut-instructions';
   instructionsArea.placeholder = 'Write the prompt instructions here';
 
   const errorEl = document.createElement('div');
   errorEl.className = 'error';
+  errorEl.setAttribute('role', 'alert');
   const shortcutHintEl = document.createElement('div');
   shortcutHintEl.className = 'hint';
   const isMac = navigator.userAgent.toLowerCase().includes('mac');
@@ -70,6 +81,8 @@ export function createEditor(callbacks: {
   footer.className = 'footer';
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete';
+  deleteBtn.type = 'button';
+  deleteBtn.setAttribute('aria-label', 'Delete prompt');
   deleteBtn.innerHTML = trashSvg;
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn btn-secondary';
@@ -96,6 +109,10 @@ export function createEditor(callbacks: {
     saveBtn.disabled = next;
     cancelBtn.disabled = next;
     deleteBtn.disabled = next;
+    closeBtn.disabled = next;
+    nameInput.disabled = next;
+    instructionsArea.disabled = next;
+    modal.setAttribute('aria-busy', String(next));
   }
 
   function setError(message: string) {
@@ -110,6 +127,7 @@ export function createEditor(callbacks: {
   function open(draft: PromptDraft) {
     lastFocused = document.activeElement as HTMLElement | null;
     activePromptId = draft.id;
+    title.textContent = activePromptId ? 'Edit shortcut' : 'New shortcut';
     nameInput.value = draft.title || '';
     instructionsArea.value = draft.content || '';
     resetError();
@@ -120,6 +138,7 @@ export function createEditor(callbacks: {
   }
 
   function close() {
+    if (busy) return;
     backdrop.style.display = 'none';
     isOpen = false;
     callbacks.onClose?.();
@@ -148,6 +167,7 @@ export function createEditor(callbacks: {
     try {
       const ok = await callbacks.onSave({ id: activePromptId, title: titleVal, content: rawContent });
       if (ok) {
+        setBusy(false);
         close();
       } else {
         setError('Failed to save.');
@@ -166,6 +186,7 @@ export function createEditor(callbacks: {
     try {
       const ok = await callbacks.onDelete(activePromptId);
       if (ok) {
+        setBusy(false);
         close();
       } else {
         setError('Failed to delete.');
@@ -180,6 +201,22 @@ export function createEditor(callbacks: {
 
   function handleKeydown(event: KeyboardEvent) {
     if (!isOpen) return;
+    if (event.key === 'Tab') {
+      const controls = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')).filter((element) => element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        return;
+      }
+      if (event.shiftKey && (shadow.activeElement === first || !shadow.activeElement)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (shadow.activeElement === last || !shadow.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       close();
