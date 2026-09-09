@@ -27,14 +27,17 @@ export function isFileInputEnabled(input: Element | null): input is HTMLInputEle
   return true
 }
 
-export function findEnabledFileInput(selectors: string[]): HTMLInputElement | null {
-  for (const selector of selectors) {
-    const input = document.querySelector(selector)
-    if (isFileInputEnabled(input)) return input
+export function findEnabledFileInput(target: HTMLElement | null, recognizedSelectors: string[]): HTMLInputElement | null {
+  if (!target) return null
+  const scope = target.closest('form') || target.parentElement
+  if (scope && scope !== document.body && scope !== document.documentElement) {
+    const recognized = recognizedSelectors.length ? Array.from(scope.querySelectorAll(recognizedSelectors.join(', '))) : []
+    if (recognized.length) return recognized.length === 1 && isFileInputEnabled(recognized[0]) ? recognized[0] : null
+    const local = Array.from(scope.querySelectorAll('input[type="file"]'))
+    if (local.length) return local.length === 1 && isFileInputEnabled(local[0]) ? local[0] : null
   }
-  const any = document.querySelector('input[type="file"]')
-  if (isFileInputEnabled(any)) return any
-  return null
+  const recognized = recognizedSelectors.length ? Array.from(document.querySelectorAll(recognizedSelectors.join(', '))) : []
+  return recognized.length === 1 && isFileInputEnabled(recognized[0]) ? recognized[0] : null
 }
 
 export function setFilesOnInput(input: HTMLInputElement, files: File[]): { ok: boolean; error?: string } {
@@ -60,8 +63,7 @@ export async function waitForSelectorsToDisappear(
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     const hasBusy = selectors.some((selector) => {
-      const el = document.querySelector(selector)
-      return Boolean(el && isVisible(el))
+      return Array.from(document.querySelectorAll(selector)).some(isVisible)
     })
     if (!hasBusy) return true
     await new Promise((resolve) => setTimeout(resolve, pollMs))

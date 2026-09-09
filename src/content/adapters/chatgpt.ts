@@ -80,12 +80,8 @@ class ChatGPTAdapter extends Adapter {
 
   async attachFiles(files: File[]) {
     if (!Array.isArray(files) || files.length === 0) return { ok: true }
-    const input = findEnabledFileInput([
-      'input#upload-files[type="file"]',
-      'input[type="file"][accept*="image" i]',
-      'input[type="file"]',
-    ])
-    if (!input) return { ok: false, error: 'UPLOAD_INPUT_NOT_FOUND' }
+    const input = findEnabledFileInput(this.getInputElement(), ['input#upload-files[type="file"]'])
+    if (!input) return { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' }
     return setFilesOnInput(input, files)
   }
 
