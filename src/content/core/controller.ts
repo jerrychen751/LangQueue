@@ -273,6 +273,10 @@ export function initController(adapter: Adapter) {
         sendResponse({ ok: false, reason: 'NO_STEPS' })
         return
       }
+      if (typeof payload.expectedHref !== 'string' || payload.expectedHref !== getConversationHref()) {
+        sendResponse({ ok: false, reason: 'CONVERSATION_CHANGED' })
+        return
+      }
       if (!isConversationReady()) {
         sendResponse({ ok: false, reason: 'CONVERSATION_REQUIRED' })
         void chainExecutor.run(payload.steps as ChainStep[], settings, payload.insertionModeOverride)

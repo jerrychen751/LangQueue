@@ -63,7 +63,7 @@ export type ChainStep = {
 
 export type RunChainMessage = {
   type: 'RUN_CHAIN'
-  payload: { steps: ChainStep[]; insertionModeOverride?: 'overwrite' | 'append' }
+  payload: { steps: ChainStep[]; expectedHref: string; insertionModeOverride?: 'overwrite' | 'append' }
 }
 
 export type AttachmentGetMetaMessage = {

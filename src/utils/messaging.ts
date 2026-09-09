@@ -101,12 +101,14 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
     // ignore errors; still attempt to start chain
   }
 
-  const msg: RunChainMessage = { type: 'RUN_CHAIN', payload: { steps, insertionModeOverride } }
+  const msg: RunChainMessage = { type: 'RUN_CHAIN', payload: { steps, expectedHref: tab.url, insertionModeOverride } }
   try {
     const response = await chrome.tabs.sendMessage(tab.id, msg)
     if (!response?.ok) throw new Error(response?.reason === 'CONVERSATION_REQUIRED'
       ? 'Start a conversation first, then run the chain. Your draft was kept.'
-      : response?.reason || 'Failed to start chain')
+      : response?.reason === 'CONVERSATION_CHANGED'
+        ? 'The conversation changed before the chain started. Return to the intended conversation and try again.'
+        : response?.reason || 'Failed to start chain')
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to start chain'
     throw new Error(message)
