@@ -128,8 +128,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message?.type === 'GET_SETTINGS') {
     getSettings()
-      .then((settings) => sendResponse({ type: 'SETTINGS_RESULT', payload: { settings } }))
-      .catch(() => sendResponse({ type: 'SETTINGS_RESULT', payload: { settings: {} } }))
+      .then((settings) => sendResponse({ type: 'SETTINGS_RESULT', payload: { ok: true, settings } }))
+      .catch((error) => sendResponse({ type: 'SETTINGS_RESULT', payload: { ok: false, error: error instanceof Error ? error.message : 'Settings could not be loaded' } }))
     return true
   }
   if (message?.type === 'PROMPT_SEARCH') {
@@ -144,9 +144,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           content: p.content,
           attachments: p.attachments || [],
         }))
-        sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { prompts } })
+        sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { ok: true, prompts } })
       })
-      .catch(() => sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { prompts: [] } }))
+      .catch((error) => sendResponse({ type: 'PROMPT_SEARCH_RESULT', payload: { ok: false, error: error instanceof Error ? error.message : 'Prompt search failed' } }))
     return true
   }
   if (message?.type === 'CHAIN_SEARCH') {
@@ -160,9 +160,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           title: c.title,
           steps: c.steps,
         }))
-        sendResponse({ type: 'CHAIN_SEARCH_RESULT', payload: { chains } })
+        sendResponse({ type: 'CHAIN_SEARCH_RESULT', payload: { ok: true, chains } })
       })
-      .catch(() => sendResponse({ type: 'CHAIN_SEARCH_RESULT', payload: { chains: [] } }))
+      .catch((error) => sendResponse({ type: 'CHAIN_SEARCH_RESULT', payload: { ok: false, error: error instanceof Error ? error.message : 'Chain search failed' } }))
     return true
   }
   if (message?.type === 'PROMPT_UPDATE') {
@@ -225,12 +225,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const promptId = message?.payload?.promptId
     const platform = normalizePlatform(message?.payload?.platform)
     if (typeof promptId === 'string') {
-      void logUsage({ timestamp: Date.now(), platform, promptId }).finally(() => {
-        sendResponse({ ok: true })
-      })
+      void logUsage({ timestamp: Date.now(), platform, promptId })
+        .then(() => sendResponse({ type: 'LOG_USAGE_RESULT', payload: { ok: true } }))
+        .catch((error) => sendResponse({ type: 'LOG_USAGE_RESULT', payload: { ok: false, error: error instanceof Error ? error.message : 'Usage could not be saved' } }))
       return true
     }
-    sendResponse({ ok: false })
+    sendResponse({ type: 'LOG_USAGE_RESULT', payload: { ok: false, error: 'Invalid prompt ID' } })
     return
   }
   if (message?.type === 'OPEN_PROMPT_EDITOR') {

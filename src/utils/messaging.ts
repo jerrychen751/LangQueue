@@ -106,9 +106,13 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
     const response = await chrome.tabs.sendMessage(tab.id, msg)
     if (!response?.ok) throw new Error(response?.reason === 'CONVERSATION_REQUIRED'
       ? 'Start a conversation first, then run the chain. Your draft was kept.'
-      : response?.reason === 'CONVERSATION_CHANGED'
-        ? 'The conversation changed before the chain started. Return to the intended conversation and try again.'
-        : response?.reason || 'Failed to start chain')
+      : response?.reason === 'SETTINGS_UNAVAILABLE'
+        ? 'Settings are unavailable. Try the action again to reload settings; if it still fails, reload the extension.'
+        : response?.reason === 'COMPOSER_CHANGED'
+          ? 'The draft changed while settings loaded. Start the chain again when ready.'
+          : response?.reason === 'CONVERSATION_CHANGED'
+            ? 'The conversation changed before the chain started. Return to the intended conversation and try again.'
+            : response?.reason || 'Failed to start chain')
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to start chain'
     throw new Error(message)

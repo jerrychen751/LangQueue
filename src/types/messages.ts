@@ -36,15 +36,16 @@ export type InsertAndSendPromptResultMessage = { type: 'INSERT_AND_SEND_PROMPT_R
 export type GetSettingsMessage = { type: 'GET_SETTINGS' }
 export type SaveSettingsMessage = { type: 'SAVE_SETTINGS'; payload: { settings: AppSettings } }
 export type SaveSettingsResultMessage = { type: 'SAVE_SETTINGS_RESULT'; payload: { ok: boolean; error?: string } }
-export type SettingsResultMessage = { type: 'SETTINGS_RESULT'; payload: { settings: AppSettings } }
+export type SettingsResultMessage = { type: 'SETTINGS_RESULT'; payload: { ok: true; settings: AppSettings } | { ok: false; error: string } }
 
 export type PromptSearchMessage = { type: 'PROMPT_SEARCH'; payload: { query: string; limit?: number } }
-export type PromptSearchResultMessage = { type: 'PROMPT_SEARCH_RESULT'; payload: { prompts: PromptData[] } }
+export type PromptSearchResultMessage = { type: 'PROMPT_SEARCH_RESULT'; payload: { ok: true; prompts: PromptData[] } | { ok: false; error: string } }
 
 export type ChainSearchMessage = { type: 'CHAIN_SEARCH'; payload: { query: string; limit?: number } }
-export type ChainSearchResultMessage = { type: 'CHAIN_SEARCH_RESULT'; payload: { chains: ChainData[] } }
+export type ChainSearchResultMessage = { type: 'CHAIN_SEARCH_RESULT'; payload: { ok: true; chains: ChainData[] } | { ok: false; error: string } }
 
 export type LogUsageMessage = { type: 'LOG_USAGE'; payload: { promptId: string; platform: Platform } }
+export type LogUsageResultMessage = { type: 'LOG_USAGE_RESULT'; payload: { ok: true } | { ok: false; error: string } }
 
 export type OpenPromptEditorMessage = { type: 'OPEN_PROMPT_EDITOR'; payload: { promptId: string } }
 
@@ -131,6 +132,7 @@ export type KnownMessage =
   | ChainSearchMessage
   | ChainSearchResultMessage
   | LogUsageMessage
+  | LogUsageResultMessage
   | OpenPromptEditorMessage
   | PromptUpdateMessage
   | PromptUpdateResultMessage

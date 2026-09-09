@@ -21,6 +21,11 @@ function mapPlatform(id: Adapter['id']): Platform {
 
 export function initController(adapter: Adapter) {
   let settings: AppSettings = {}
+  let settingsLoaded = false
+  let settingsRequest: Promise<boolean> | null = null
+  let settingsVersion = 0
+  let settingsErrorShown = false
+  let searchErrorShown = false
   let activeInput: InputElement | null = null
   let pendingSearchToken = 0
   let readySent = false
@@ -37,18 +42,31 @@ export function initController(adapter: Adapter) {
   const overlay = createOverlay({
     onSelect: (item) => {
       void (async () => {
+        const expectedHref = getConversationHref()
+        const expectedInput = adapter.getInputElement()
+        const expectedText = expectedInput ? getInputText(expectedInput) : null
+        if (!await ensureSettingsLoaded()) return
+        if (expectedHref !== getConversationHref()) {
+          executionPanel.showMessage('The conversation changed while settings loaded. Select the prompt again in the intended conversation.')
+          return
+        }
         const input = adapter.getInputElement()
-        if (!input) return
+        if (!input || input !== expectedInput || getInputText(input) !== expectedText) {
+          executionPanel.showMessage('The draft changed while settings loaded. Select the prompt again when ready.')
+          return
+        }
         if (item.kind === 'prompt') {
           const result = await insertComposerPrompt(adapter, coordinator, item.content,
-            settings.multimodalEnabled === false ? [] : item.attachments || [], 'overwrite', false, getConversationHref())
+            settings.multimodalEnabled === false ? [] : item.attachments || [], 'overwrite', false, expectedHref)
           if (!result.ok) {
             // Stop text insertion when the attachment or composer check fails
             executionPanel.showMessage(result.reason || 'Prompt insertion failed. Check the composer before trying again.')
             return
           }
           overlay.hide()
-          void logUsage(item.id, mapPlatform(adapter.id))
+          void logUsage(item.id, mapPlatform(adapter.id)).catch(() => {
+            executionPanel.showMessage('The prompt was inserted, but its usage count could not be saved. Do not insert it again just to update the count.')
+          })
           return
         }
         overlay.hide()
@@ -95,9 +113,32 @@ export function initController(adapter: Adapter) {
     }
   }
 
-  async function updateSettings() {
-    settings = await getSettings()
-    applyTweaks(settings)
+  function ensureSettingsLoaded(): Promise<boolean> {
+    if (settingsLoaded) return Promise.resolve(true)
+    if (settingsRequest) return settingsRequest
+    const version = settingsVersion
+    settingsRequest = (async () => {
+      try {
+        const next = await getSettings()
+        if (version !== settingsVersion) return settingsLoaded
+        settings = next
+        settingsLoaded = true
+        applyTweaks(settings)
+        if (settingsErrorShown) executionPanel.showMessage('')
+        settingsErrorShown = false
+        return true
+      } catch {
+        if (version === settingsVersion) {
+          settingsLoaded = false
+          settingsErrorShown = true
+          executionPanel.showMessage('Settings are unavailable. Your draft was kept. Try the action again to reload settings; if it still fails, reload the extension.')
+        }
+        return false
+      } finally {
+        if (version === settingsVersion) settingsRequest = null
+      }
+    })()
+    return settingsRequest
   }
 
   function overlayPositionFromRect(rect: DOMRect) {
@@ -119,28 +160,37 @@ export function initController(adapter: Adapter) {
     }
     const query = context.query || ''
     const token = ++pendingSearchToken
-    const [prompts, chains] = await Promise.all([
-      searchPrompts(query),
-      searchChains(query),
-    ])
-    if (token !== pendingSearchToken) return
-    const items = [
-      ...prompts.map((prompt) => ({
-        kind: 'prompt' as const,
-        id: prompt.id,
-        title: prompt.title,
-        content: prompt.content,
-        attachments: prompt.attachments || [],
-      })),
-      ...chains.map((chain) => ({
-        kind: 'chain' as const,
-        id: chain.id,
-        title: chain.title,
-        steps: chain.steps,
-      })),
-    ]
-    const label = query ? `$${query}` : ''
-    overlay.show(overlayPositionFromRect(context.rect), items, label)
+    try {
+      const [prompts, chains] = await Promise.all([
+        searchPrompts(query),
+        searchChains(query),
+      ])
+      if (token !== pendingSearchToken) return
+      const items = [
+        ...prompts.map((prompt) => ({
+          kind: 'prompt' as const,
+          id: prompt.id,
+          title: prompt.title,
+          content: prompt.content,
+          attachments: prompt.attachments || [],
+        })),
+        ...chains.map((chain) => ({
+          kind: 'chain' as const,
+          id: chain.id,
+          title: chain.title,
+          steps: chain.steps,
+        })),
+      ]
+      const label = query ? `$${query}` : ''
+      overlay.show(overlayPositionFromRect(context.rect), items, label)
+      if (searchErrorShown) executionPanel.showMessage('')
+      searchErrorShown = false
+    } catch {
+      if (token !== pendingSearchToken) return
+      overlay.hide()
+      searchErrorShown = true
+      executionPanel.showMessage('The prompt library could not be loaded. Type your shortcut again to retry; if it still fails, reload the extension.')
+    }
   }
 
   function getEventInput(event: Event): InputElement | null {
@@ -185,13 +235,21 @@ export function initController(adapter: Adapter) {
       const text = getInputText(input)
       if (!text.trim()) return
       event.preventDefault()
-      setInputText(input, '')
-      if (!queue.enqueue({ content: text })) {
-        setInputText(input, text)
-        executionPanel.showMessage(queue.getSnapshot().error === 'CONVERSATION_REQUIRED'
-          ? 'Start a conversation first, then run the queue or chain. Your draft was kept.'
-          : 'Cancellation is still finishing. Your draft is preserved; send it again when cancellation finishes.')
-      }
+      const expectedHref = getConversationHref()
+      void ensureSettingsLoaded().then((ready) => {
+        if (!ready) return
+        if (getConversationHref() !== expectedHref || adapter.getInputElement() !== input || getInputText(input) !== text) {
+          executionPanel.showMessage('The composer changed while settings loaded. Your draft was kept; queue it again when ready.')
+          return
+        }
+        setInputText(input, '')
+        if (!queue.enqueue({ content: text })) {
+          setInputText(input, text)
+          executionPanel.showMessage(queue.getSnapshot().error === 'CONVERSATION_REQUIRED'
+            ? 'Start a conversation first, then run the queue or chain. Your draft was kept.'
+            : 'Cancellation is still finishing. Your draft is preserved; send it again when cancellation finishes.')
+        }
+      })
     }
   }
 
@@ -260,11 +318,24 @@ export function initController(adapter: Adapter) {
         sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'The target conversation is missing. Reload the extension and try again.' } })
         return
       }
-      const mode = settings.insertionMode || 'overwrite'
-      const contentWithNL = !content || content.endsWith('\n') ? content || '' : content + '\n'
-      void insertComposerPrompt(adapter, coordinator, contentWithNL,
-        settings.multimodalEnabled === false ? [] : attachments, mode, shouldSend, msg.payload.expectedHref)
-        .then(result => sendResponse({ type: resultType, payload: result }))
+      const expectedInput = adapter.getInputElement()
+      const expectedText = expectedInput ? getInputText(expectedInput) : null
+      void (async () => {
+        if (!await ensureSettingsLoaded()) {
+          sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'Settings are unavailable. Try the action again to reload settings.' } })
+          return
+        }
+        const input = adapter.getInputElement()
+        if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
+          sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'The draft changed while settings loaded. Try again when ready.' } })
+          return
+        }
+        const mode = settings.insertionMode || 'overwrite'
+        const contentWithNL = !content || content.endsWith('\n') ? content || '' : content + '\n'
+        await insertComposerPrompt(adapter, coordinator, contentWithNL,
+          settings.multimodalEnabled === false ? [] : attachments, mode, shouldSend, msg.payload.expectedHref)
+          .then(result => sendResponse({ type: resultType, payload: result }))
+      })()
       return true
     }
     if (msg.type === 'RUN_CHAIN') {
@@ -277,18 +348,37 @@ export function initController(adapter: Adapter) {
         sendResponse({ ok: false, reason: 'CONVERSATION_CHANGED' })
         return
       }
-      if (!isConversationReady()) {
-        sendResponse({ ok: false, reason: 'CONVERSATION_REQUIRED' })
+      const expectedInput = adapter.getInputElement()
+      const expectedText = expectedInput ? getInputText(expectedInput) : null
+      void (async () => {
+        if (!await ensureSettingsLoaded()) {
+          sendResponse({ ok: false, reason: 'SETTINGS_UNAVAILABLE' })
+          return
+        }
+        if (payload.expectedHref !== getConversationHref()) {
+          sendResponse({ ok: false, reason: 'CONVERSATION_CHANGED' })
+          return
+        }
+        const input = adapter.getInputElement()
+        if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
+          sendResponse({ ok: false, reason: 'COMPOSER_CHANGED' })
+          executionPanel.showMessage('The draft changed while settings loaded. Start the chain again when ready.')
+          return
+        }
+        if (!isConversationReady()) {
+          sendResponse({ ok: false, reason: 'CONVERSATION_REQUIRED' })
+          void chainExecutor.run(payload.steps as ChainStep[], settings, payload.insertionModeOverride)
+          return
+        }
+        if (coordinator.isBusy()) {
+          sendResponse({ ok: false, reason: 'COMPOSER_BUSY' })
+          return
+        }
+        sendResponse({ ok: true })
         void chainExecutor.run(payload.steps as ChainStep[], settings, payload.insertionModeOverride)
         return
-      }
-      if (coordinator.isBusy()) {
-        sendResponse({ ok: false, reason: 'COMPOSER_BUSY' })
-        return
-      }
-      sendResponse({ ok: true })
-      void chainExecutor.run(payload.steps as ChainStep[], settings, payload.insertionModeOverride)
-      return
+      })()
+      return true
     }
     if (msg.type === 'CANCEL_CHAIN') {
       chainExecutor.cancel()
@@ -310,11 +400,13 @@ export function initController(adapter: Adapter) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return
     if (changes.langqueue_settings) {
-      settings = changes.langqueue_settings.newValue || {}
-      applyTweaks(settings)
+      settingsVersion += 1
+      settingsLoaded = false
+      settingsRequest = null
+      void ensureSettingsLoaded()
     }
   })
 
   refreshInput()
-  void updateSettings()
+  void ensureSettingsLoaded()
 }

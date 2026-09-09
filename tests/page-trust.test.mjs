@@ -103,10 +103,11 @@ test('controller ignores synthetic library input and selection but keeps runtime
     './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/one', createExecutionCoordinator: () => ({}) },
     './messaging': { getSettings: async () => ({}), searchPrompts() { searched++; return [] } },
     './page_tweaks/tweaks': { applyTweaks() {} },
+    './insert/composer': { getInputText: element => element.value },
     './insert/manual': { async insertComposerPrompt() { inserted++; return { ok: true } } },
   })
   const input = new fixture.Element('textarea')
-  fixture.exports.initController({ getInputElement: () => input })
+  fixture.exports.initController({ getInputElement: () => input, getText: element => element.value })
   fixture.document.dispatch('input', { target: input })
   fixture.document.dispatch('keydown', { key: 'Enter', target: input })
   assert.deepEqual([selected, searched], [0, 0])
@@ -114,5 +115,6 @@ test('controller ignores synthetic library input and selection but keeps runtime
   assert.equal(selected, 1)
   fixture.document.receive({ type: 'INJECT_PROMPT', payload: { content: 'prompt', expectedHref: 'https://chatgpt.com/c/one' } }, {}, () => {})
   await Promise.resolve()
+  await new Promise(resolve => setImmediate(resolve))
   assert.equal(inserted, 1)
 })

@@ -32,18 +32,18 @@ function createReceiver() {
     require(name) { return dependencies[name] || {} },
   })
   exports.initController({ getInputElement: () => null })
-  return { receive(payload) { let response; receiver({ type: 'RUN_CHAIN', payload }, {}, value => { response = value }); return response }, getStarts: () => starts }
+  return { receive(payload) { return new Promise(resolve => receiver({ type: 'RUN_CHAIN', payload }, {}, resolve)) }, getStarts: () => starts }
 }
 
-test('chain receiver refuses missing and changed target URLs before starting', () => {
+test('chain receiver refuses missing and changed target URLs before starting', async () => {
   const fixture = createReceiver()
   for (const expectedHref of [undefined, 'https://chatgpt.com/c/original']) {
-    const response = fixture.receive({ steps: [{ content: 'private' }], expectedHref })
+    const response = await fixture.receive({ steps: [{ content: 'private' }], expectedHref })
     assert.equal(response.ok, false)
     assert.equal(response.reason, 'CONVERSATION_CHANGED')
   }
   assert.equal(fixture.getStarts(), 0)
-  assert.equal(fixture.receive({ steps: [{ content: 'private' }], expectedHref: 'https://chatgpt.com/c/current' }).ok, true)
+  assert.equal((await fixture.receive({ steps: [{ content: 'private' }], expectedHref: 'https://chatgpt.com/c/current' })).ok, true)
   assert.equal(fixture.getStarts(), 1)
 })
 
@@ -58,4 +58,14 @@ test('chain caller pins the original tab and URL across readiness checks', async
   assert.equal(queries, 1)
   assert.deepEqual(messages.map(item => item.id), [12, 12])
   assert.equal(messages[1].message.payload.expectedHref, 'https://chatgpt.com/c/original')
+})
+
+test('chain caller explains settings and changed draft failures', async () => {
+  for (const [reason, expected] of [['SETTINGS_UNAVAILABLE', /Settings are unavailable.*reload settings/], ['COMPOSER_CHANGED', /draft changed.*Start the chain again/]]) {
+    globalThis.chrome = { tabs: {
+      query(options, callback) { callback([{ id: 12, url: 'https://chatgpt.com/c/original' }]) },
+      async sendMessage(id, message) { return message.type === 'COMPAT_CHECK' ? { type: 'COMPAT_STATUS', payload: { ready: true } } : { ok: false, reason } },
+    } }
+    await assert.rejects(runChainOnTab([{ content: 'private' }]), expected)
+  }
 })

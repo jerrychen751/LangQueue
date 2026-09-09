@@ -56,7 +56,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
       ? `Chain · Step ${progress.stepIndex + 1} of ${progress.totalSteps} · ${labels[progress.status] || progress.status}`
       : snapshot.items.length ? `Queue · ${snapshot.items.length} ${snapshot.items.length === 1 ? 'prompt' : 'prompts'} · ${labels[snapshot.status] || snapshot.status}`
       : snapshot.error ? `Queue · ${labels[snapshot.status] || snapshot.status}`
-      : progress ? `Chain · ${labels[progress.status] || progress.status}` : 'Queue cleared'
+      : progress ? `Chain · ${labels[progress.status] || progress.status}` : notice ? 'LangQueue notice' : 'Queue cleared'
     const error = snapshot.error || (!snapshot.items.length ? progress?.error : undefined)
     const errorCode = error?.split(/[: ]/, 1)[0]
     const detail = error ? errors[errorCode || ''] || error.replaceAll('_', ' ') : ''

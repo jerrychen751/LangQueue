@@ -1,0 +1,149 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+import test from 'node:test'
+import vm from 'node:vm'
+
+const require = createRequire(resolve('package.json'))
+const ts = require('typescript')
+const settle = () => new Promise(resolve => setImmediate(resolve))
+
+function createController() {
+  const loads = []
+  const notices = []
+  const inserted = []
+  const queued = []
+  const chains = []
+  const shown = []
+  const events = {}
+  const input = { value: 'My draft' }
+  let receiver
+  let changeSettings
+  let selection
+  let searchFailed = false
+  const dependencies = {
+    './editor/editor': { createEditor: () => ({}) },
+    './overlay/overlay': { createOverlay(callbacks) { selection = callbacks.onSelect; return { isOpen: () => false, hide() {}, show(...args) { shown.push(args) } } } },
+    './queue/queue': { createQueue: () => ({ enqueue(item) { queued.push(item); return true } }) },
+    './queue/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args) } }) },
+    './queue/panel': { createQueuePanel: () => ({ showMessage(message) { notices.push(message) } }) },
+    './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/current', createExecutionCoordinator: () => ({}) },
+    './messaging': {
+      getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })),
+      searchPrompts: async () => { if (searchFailed) throw new Error('read failed'); return [] },
+      searchChains: async () => [],
+      logUsage: async () => { throw new Error('usage failed') },
+    },
+    './page_tweaks/tweaks': { applyTweaks() {} },
+    './insert/composer': { getInputText: input => input.value, setInputText(input, text) { input.value = text } },
+    './insert/manual': { async insertComposerPrompt(...args) { inserted.push(args); return { ok: true } } },
+    './detect/slash': { detectSlashContext: () => ({ query: '', rect: {} }) },
+  }
+  const exports = {}
+  vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/core/controller.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, {
+    exports, document: { documentElement: {}, addEventListener(name, callback) { events[name] = callback } },
+    window: { addEventListener() {} }, MutationObserver: class { observe() {} },
+    chrome: { runtime: { sendMessage: async () => {}, onMessage: { addListener(fn) { receiver = fn } } }, storage: { onChanged: { addListener(fn) { changeSettings = fn } } } },
+    require: name => dependencies[name] || {},
+  })
+  exports.initController({ id: 'chatgpt', getInputElement: () => input, isGenerating: () => true })
+  return {
+    loads, notices, inserted, queued, shown, input, chains,
+    runChain() { return new Promise(resolve => receiver({ type: 'RUN_CHAIN', payload: { steps: [{ content: 'Private' }], expectedHref: 'https://chatgpt.com/c/current' } }, {}, resolve)) },
+    receive() { return new Promise(resolve => receiver({ type: 'INJECT_PROMPT', payload: { content: 'Private', attachments: [{ id: 'file' }], expectedHref: 'https://chatgpt.com/c/current' } }, {}, resolve)) },
+    select() { selection({ kind: 'prompt', id: 'p', content: 'Private', attachments: [{ id: 'file' }] }) },
+    enter() { events.keydown({ isTrusted: true, key: 'Enter', target: input, preventDefault() {} }) },
+    search(failed) { searchFailed = failed; events.input({ isTrusted: true, target: input }) },
+    invalidate() { changeSettings({ langqueue_settings: {} }, 'local') },
+  }
+}
+
+test('failed settings keep the draft and require another explicit action before insertion', async () => {
+  const fixture = createController()
+  fixture.loads[0].reject(new Error('unavailable'))
+  await settle()
+  const failed = fixture.receive()
+  fixture.loads[1].reject(new Error('unavailable'))
+  assert.equal((await failed).payload.ok, false)
+  assert.equal(fixture.input.value, 'My draft')
+  assert.equal(fixture.inserted.length, 0)
+  const retried = fixture.receive()
+  fixture.loads[2].resolve({ multimodalEnabled: false })
+  assert.equal((await retried).payload.ok, true)
+  assert.equal(fixture.inserted.length, 1)
+  assert.equal(fixture.inserted[0][3].length, 0)
+})
+
+test('manual and overlay selections refuse a draft changed during settings loading', async () => {
+  for (const action of ['receive', 'select']) {
+    const fixture = createController()
+    const pending = fixture[action]()
+    fixture.input.value = 'New draft'
+    fixture.loads[0].resolve({})
+    await pending
+    await settle()
+    assert.equal(fixture.inserted.length, 0)
+    assert.equal(fixture.input.value, 'New draft')
+  }
+})
+
+test('queued Enter preserves a draft on read failure and only retries on another Enter', async () => {
+  const fixture = createController()
+  fixture.enter()
+  fixture.loads[0].reject(new Error('unavailable'))
+  await settle()
+  assert.equal(fixture.queued.length, 0)
+  assert.equal(fixture.input.value, 'My draft')
+  fixture.enter()
+  fixture.loads[1].resolve({})
+  await settle()
+  assert.equal(fixture.queued.length, 1)
+  assert.equal(fixture.input.value, '')
+})
+
+test('search failure displays an error while successful empty search remains empty', async () => {
+  const fixture = createController()
+  fixture.loads[0].resolve({})
+  fixture.search(true)
+  await settle()
+  assert.equal(fixture.shown.length, 0)
+  assert.match(fixture.notices.at(-1), /library could not be loaded/)
+  fixture.search(false)
+  await settle()
+  assert.equal(fixture.shown.length, 1)
+  assert.equal(fixture.shown[0][1].length, 0)
+})
+
+test('usage failure reports success of insertion without retrying it', async () => {
+  const fixture = createController()
+  fixture.loads[0].resolve({})
+  await settle()
+  fixture.select()
+  await settle()
+  assert.equal(fixture.inserted.length, 1)
+  assert.match(fixture.notices.at(-1), /prompt was inserted.*usage count could not be saved/)
+})
+
+test('a stale settings read cannot overwrite a newer disabled-attachments preference', async () => {
+  const fixture = createController()
+  fixture.invalidate()
+  fixture.loads[1].resolve({ multimodalEnabled: false })
+  await settle()
+  fixture.loads[0].resolve({ multimodalEnabled: true })
+  await settle()
+  assert.equal((await fixture.receive()).payload.ok, true)
+  assert.equal(fixture.inserted[0][3].length, 0)
+})
+
+test('chain start refuses a draft changed during settings loading', async () => {
+  const fixture = createController()
+  const pending = fixture.runChain()
+  fixture.input.value = 'New draft'
+  fixture.loads[0].resolve({})
+  assert.equal((await pending).reason, 'COMPOSER_CHANGED')
+  assert.equal(fixture.chains.length, 0)
+  assert.equal(fixture.input.value, 'New draft')
+})

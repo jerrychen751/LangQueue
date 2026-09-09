@@ -13,6 +13,7 @@ import type {
   ChainSearchMessage,
   ChainSearchResultMessage,
   LogUsageMessage,
+  LogUsageResultMessage,
   OpenPromptEditorMessage,
   PromptUpdateMessage,
   PromptUpdateResultMessage,
@@ -23,54 +24,41 @@ import type {
 } from '../../types/messages'
 
 export async function getSettings(): Promise<AppSettings> {
-  try {
-    const response = (await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' } as GetSettingsMessage)) as SettingsResultMessage | undefined
-    return response?.type === 'SETTINGS_RESULT' ? response.payload.settings : {}
-  } catch {
-    return {}
-  }
+  const response = (await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' } as GetSettingsMessage)) as SettingsResultMessage | undefined
+  if (response?.type !== 'SETTINGS_RESULT') throw new Error('Settings response is missing. Reload the extension and try again.')
+  if (!response.payload?.ok) throw new Error(response.payload?.error || 'Settings could not be loaded.')
+  return response.payload.settings
 }
 
 export async function searchPrompts(query: string, limit?: number): Promise<PromptData[]> {
-  try {
-    const payload: { query: string; limit?: number } = { query }
-    if (typeof limit === 'number') {
-      payload.limit = limit
-    }
-    const response = (await chrome.runtime.sendMessage({
-      type: 'PROMPT_SEARCH',
-      payload,
-    } as PromptSearchMessage)) as PromptSearchResultMessage | undefined
-    return response?.type === 'PROMPT_SEARCH_RESULT' ? response.payload.prompts : []
-  } catch {
-    return []
-  }
+  const payload: { query: string; limit?: number } = { query }
+  if (typeof limit === 'number') payload.limit = limit
+  const response = (await chrome.runtime.sendMessage({ type: 'PROMPT_SEARCH', payload } as PromptSearchMessage)) as PromptSearchResultMessage | undefined
+  if (response?.type !== 'PROMPT_SEARCH_RESULT') throw new Error('Prompt search response is missing. Reload the extension and try again.')
+  if (!response.payload?.ok) throw new Error(response.payload?.error || 'Prompt search failed.')
+  return response.payload.prompts
 }
 
 export async function searchChains(query: string, limit?: number): Promise<ChainData[]> {
-  try {
-    const payload: { query: string; limit?: number } = { query }
-    if (typeof limit === 'number') {
-      payload.limit = limit
-    }
-    const response = (await chrome.runtime.sendMessage({
-      type: 'CHAIN_SEARCH',
-      payload,
-    } as ChainSearchMessage)) as ChainSearchResultMessage | undefined
-    return response?.type === 'CHAIN_SEARCH_RESULT' ? response.payload.chains : []
-  } catch {
-    return []
-  }
+  const payload: { query: string; limit?: number } = { query }
+  if (typeof limit === 'number') payload.limit = limit
+  const response = (await chrome.runtime.sendMessage({ type: 'CHAIN_SEARCH', payload } as ChainSearchMessage)) as ChainSearchResultMessage | undefined
+  if (response?.type !== 'CHAIN_SEARCH_RESULT') throw new Error('Chain search response is missing. Reload the extension and try again.')
+  if (!response.payload?.ok) throw new Error(response.payload?.error || 'Chain search failed.')
+  return response.payload.chains
 }
 
 export async function logUsage(promptId: string, platform: Platform) {
   try {
-    await chrome.runtime.sendMessage({
+    const response = (await chrome.runtime.sendMessage({
       type: 'LOG_USAGE',
       payload: { promptId, platform },
-    } as LogUsageMessage)
-  } catch {
-    // best-effort logging
+    } as LogUsageMessage)) as LogUsageResultMessage | undefined
+    if (response?.type !== 'LOG_USAGE_RESULT') throw new Error('Usage response is missing.')
+    if (!response.payload.ok) throw new Error(response.payload.error || 'Usage could not be saved.')
+  } catch (error) {
+    // Report logging failure without retrying the prompt
+    throw new Error(error instanceof Error ? error.message : 'Usage could not be saved.')
   }
 }
 
