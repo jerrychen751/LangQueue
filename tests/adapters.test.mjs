@@ -195,3 +195,14 @@ for (const [name, createAdapter] of [['ChatGPT', createChatGPTAdapter], ['Claude
     assert.equal(send.clicks, 1)
   })
 }
+
+test('Gemini ignores its auxiliary Quill clipboard when locating Send', () => {
+  const { form, input } = createFixture()
+  form.tagName = 'DIV'
+  const clipboard = new FakeElement('div', { contenteditable: 'true', class: 'ql-clipboard', tabindex: '-1' })
+  const send = new FakeButton({ 'aria-label': 'Send message' })
+  form.append(clipboard, send)
+  assert.equal(createGeminiAdapter().getSendButton(input), send)
+  clipboard.attributes.class = 'another-editor'
+  assert.equal(createGeminiAdapter().getSendButton(input), null)
+})

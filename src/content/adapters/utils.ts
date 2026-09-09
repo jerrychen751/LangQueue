@@ -77,7 +77,7 @@ export function findComposerSendButton(target: HTMLElement, selectors: string[])
   while (scope && scope !== document.body && scope !== document.documentElement) {
     if (!form) {
       const inputs = Array.from(scope.querySelectorAll('textarea, [contenteditable="true"]'))
-      if (inputs.some(input => input !== target && !target.contains(input) && isVisible(input))) return null
+      if (inputs.some(input => input !== target && !target.contains(input) && !(input.getAttribute('class')?.split(/\s+/).includes('ql-clipboard') && input.getAttribute('tabindex') === '-1') && isVisible(input))) return null
     }
     const matches = Array.from(scope.querySelectorAll(selectors.join(', ')))
     const candidates = matches.filter(candidate =>
