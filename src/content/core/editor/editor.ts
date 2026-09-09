@@ -5,6 +5,7 @@ export type PromptDraft = {
   id?: string;
   title: string;
   content: string;
+  attachmentCount?: number;
 };
 
 /**
@@ -100,6 +101,7 @@ export function createEditor(callbacks: {
 
   // Track internal state for UI logic (e.g., invalidate certain buttons during save operations)
   let activePromptId: string | undefined;
+  let hasAttachments = false;
   let isOpen = false; // allow check for events depending on visibility of modal editor (i.e., `esc` shouldn't do anything if editor not open)
   let busy = false; // guarantee one op at a time
   let lastFocused: HTMLElement | null = null; // restore focus to element after modal editor is closed
@@ -127,6 +129,7 @@ export function createEditor(callbacks: {
   function open(draft: PromptDraft) {
     lastFocused = document.activeElement as HTMLElement | null;
     activePromptId = draft.id;
+    hasAttachments = (draft.attachmentCount ?? 0) > 0;
     title.textContent = activePromptId ? 'Edit shortcut' : 'New shortcut';
     nameInput.value = draft.title || '';
     instructionsArea.value = draft.content || '';
@@ -157,7 +160,7 @@ export function createEditor(callbacks: {
       nameInput.focus();
       return;
     }
-    if (!trimmedContent) {
+    if (!trimmedContent && !hasAttachments) {
       setError('Instructions are required.');
       instructionsArea.focus();
       return;

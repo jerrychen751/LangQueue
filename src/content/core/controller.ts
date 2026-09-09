@@ -77,7 +77,7 @@ export function initController(adapter: Adapter) {
     onEdit: (item) => {
       overlay.hide()
       if (item.kind === 'prompt') {
-        editor.open({ id: item.id, title: item.title, content: item.content })
+        editor.open({ id: item.id, title: item.title, content: item.content, attachmentCount: item.attachments.length })
       }
     },
     onCreate: () => {

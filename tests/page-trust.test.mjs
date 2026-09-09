@@ -118,3 +118,18 @@ test('controller ignores synthetic library input and selection but keeps runtime
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(inserted, 1)
 })
+
+test('in-page editor allows file-only edits and resets attachment state for new prompts', async () => {
+  let saves = 0
+  const fixture = createFixture('src/content/core/editor/editor.ts')
+  const editor = fixture.exports.createEditor({ onSave() { saves++; return true }, onDelete() { return true } })
+  editor.open({ id: 'files', title: 'Files', content: '', attachmentCount: 1 })
+  const save = fixture.nodes.find(node => node.textContent === 'Save')
+  save.dispatch('click', { isTrusted: true })
+  await Promise.resolve()
+  assert.equal(saves, 1)
+  editor.open({ title: 'Empty', content: '' })
+  save.dispatch('click', { isTrusted: true })
+  await Promise.resolve()
+  assert.equal(saves, 1)
+})

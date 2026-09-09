@@ -109,8 +109,8 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
       titleRef.current?.focus()
       return
     }
-    if (!trimmedContent) {
-      setError('Content is required.')
+    if (!trimmedContent && attachments.length === 0) {
+      setError('Add prompt content or at least one attachment.')
       contentRef.current?.focus()
       return
     }

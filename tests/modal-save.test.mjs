@@ -245,3 +245,36 @@ for (const name of ['PromptModal', 'ChainBuilder']) {
     assert.equal(prevented, true);
   });
 }
+
+for (const editing of [true, false]) {
+  test(`file-only prompt ${editing ? 'editing' : 'creation'} saves attachments without content`, async () => {
+    const modal = createModal('PromptModal');
+    modal.render({ ...modal.getProps(), initialPrompt: editing ? { id: 'p1', title: 'Files', content: '', attachments: [{ id: 'file', name: 'notes.txt' }] } : undefined });
+    let tree = modal.render();
+    if (!editing) {
+      modal.find(tree, node => node.props.id === 'prompt-title').props.onChange({ target: { value: 'Files' } });
+      modal.find(tree, node => node.type === 'button' && node.props.className?.startsWith('compact-button')).props.onClick();
+      await modal.find(tree, node => node.props.type === 'file').props.onChange({ target: { files: [{ name: 'notes.txt', size: 1, type: 'text/plain' }] } });
+      tree = modal.render();
+    }
+    const pending = modal.find(tree, node => node.type === 'button' && node.props.onClick?.name === 'handleSave').props.onClick();
+    assert.equal(modal.getSaveCalls(), 1);
+    const saved = modal.savedValues[0][editing ? 1 : 0];
+    assert.equal(saved.content, '');
+    assert.equal(saved.attachments.length, 1);
+    modal.resolveSave();
+    await pending;
+  });
+}
+
+test('removing the last attachment keeps an empty prompt from saving', async () => {
+  const modal = createModal('PromptModal');
+  modal.render({ ...modal.getProps(), initialPrompt: { id: 'p1', title: 'Files', content: '  ', attachments: [{ id: 'file', name: 'notes.txt' }] } });
+  let tree = modal.render();
+  modal.find(tree, node => node.props['aria-label'] === 'Remove notes.txt').props.onClick();
+  tree = modal.render();
+  await modal.find(tree, node => node.type === 'button' && node.props.onClick?.name === 'handleSave').props.onClick();
+  assert.equal(modal.getSaveCalls(), 0);
+  tree = modal.render();
+  assert.equal(modal.find(tree, node => node.props.role === 'alert').props.children, 'Add prompt content or at least one attachment.');
+});
