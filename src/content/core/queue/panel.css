@@ -1,0 +1,26 @@
+:host { all: initial; position: fixed; top: 20px; right: 20px; z-index: 2147483646; color-scheme: light; }
+:host([hidden]) { display: none; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+section { width: 340px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid #cfd6d8; border-radius: 12px; background: #ffffff; color: #1c272c; box-shadow: 0 12px 36px #1c272c24; font: 13px/1.5 system-ui, sans-serif; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #d9dfe1; font-weight: 650; }
+.body { padding: 14px 16px; }
+p { margin: 0; }
+.status { font-weight: 600; }
+.message { margin-top: 10px; padding: 10px; border-radius: 6px; color: #75521e; background: #fff4df; overflow-wrap: anywhere; }
+ol { list-style: none; padding: 0; margin: 12px 0; max-height: 240px; overflow-y: auto; }
+li { padding: 10px 0; border-top: 1px solid #d9dfe1; }
+li p { white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+button { font: inherit; cursor: pointer; color: #1c272c; background: #f2f4f3; border: 1px solid #cfd6d8; border-radius: 6px; padding: 6px 10px; transition: background 150ms; }
+button:hover { background: #e7ecee; }
+button:focus-visible { outline: 2px solid #527d8c; outline-offset: 3px; }
+.toggle { border: 0; background: transparent; font-size: 12px; font-weight: 400; padding: 4px; color: #46555c; }
+.remove { margin-top: 7px; font-size: 12px; padding: 3px 8px; }
+.sent { display: block; margin-top: 6px; font-size: 12px; color: #75521e; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.retry { background: #527d8c; border-color: #527d8c; color: #f7fafb; }
+.retry:hover { background: #426c7a; }
+.note { margin-top: 12px; color: #6f7c82; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }
+button:disabled { opacity: 0.5; cursor: default; }
+button:disabled:hover { background: #f2f4f3; }

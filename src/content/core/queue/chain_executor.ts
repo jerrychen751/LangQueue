@@ -1,19 +1,26 @@
 import type { Adapter } from '../../adapters/adapter'
-import type { ChainStep } from '../../../types/messages'
+import type { ChainStep, ChainProgressMessage } from '../../../types/messages'
 import type { AppSettings } from '../../../types'
-import { appendInputText, setInputText } from '../insert/composer'
-import { fetchAttachmentFiles } from '../messaging'
+import { createExecutionCoordinator, executeStep, getConversationHref, isConversationReady, assertExecutionContext, waitForExecutionDelay } from './execution'
 
 type InputElement = HTMLTextAreaElement | HTMLElement
 
 const STEP_DELAY_MS = 1500
 
-export function createChainExecutor(adapter: Adapter, getInput: () => InputElement | null) {
+export function createChainExecutor(adapter: Adapter, getInput: () => InputElement | null, coordinator = createExecutionCoordinator()) {
   let running = false
-  let cancelled = false
+  let controller: AbortController | null = null
+  let snapshot: ChainProgressMessage['payload'] = { stepIndex: 0, totalSteps: 0, status: 'completed' }
+  const listeners = new Set<(snapshot: ChainProgressMessage['payload']) => void>()
+
+  function publish(next: ChainProgressMessage['payload']) {
+    snapshot = next
+    for (const listener of listeners) listener({ ...snapshot })
+    try { void chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: snapshot }).catch(() => {}) } catch { void 0 }
+  }
 
   function cancel() {
-    cancelled = true
+    controller?.abort()
   }
 
   async function run(
@@ -22,76 +29,59 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
     insertionModeOverride?: 'overwrite' | 'append'
   ): Promise<boolean> {
     if (running) return false
+    if (!isConversationReady()) {
+      publish({ stepIndex: 0, totalSteps: steps.length, status: 'error', error: 'CONVERSATION_REQUIRED' })
+      return false
+    }
+    if (!coordinator.tryAcquire('chain')) {
+      publish({ stepIndex: 0, totalSteps: steps.length, status: 'error', error: 'COMPOSER_BUSY' })
+      return false
+    }
     running = true
-    cancelled = false
+    controller = new AbortController()
     const mode = insertionModeOverride || settings.insertionMode || 'overwrite'
     const totalSteps = steps.length
-    chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: 0, totalSteps, status: 'starting' } })
-
+    let stepIndex = 0
+    let sent = false
+    const href = getConversationHref()
+    let terminal: ChainProgressMessage['payload']
+    publish({ stepIndex, totalSteps, status: 'starting' })
     try {
-      for (let i = 0; i < steps.length; i++) {
-        if (cancelled) {
-          chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'cancelled' } })
-          return false
-        }
-
-        const input = getInput() || adapter.getInputElement()
-        if (!input) {
-          chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'INPUT_NOT_FOUND' } })
-          return false
-        }
-
-        const step = steps[i]
-        if (Array.isArray(step.attachments) && step.attachments.length > 0) {
-          const files = await fetchAttachmentFiles(step.attachments)
-          const attached = await adapter.attachFiles(files)
-          if (!attached.ok) {
-            chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: attached.error || 'ATTACHMENT_UPLOAD_FAILED' } })
-            return false
-          }
-          const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: 250 })
-          if (!uploaded) {
-            chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'ATTACHMENT_UPLOAD_TIMEOUT' } })
-            return false
-          }
-        }
-
-        if (mode === 'append') {
-          appendInputText(input, step.content)
-        } else {
-          setInputText(input, step.content)
-        }
-
-        chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'sending' } })
-        const sent = adapter.clickSend(input as HTMLTextAreaElement)
-        if (!sent) {
-          chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'error', error: 'SEND_FAILED' } })
-          return false
-        }
-
-        chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'awaiting_response' } })
-        await adapter.waitForIdle({ timeoutMs: 120000, pollMs: 200 })
-
-        if (i < steps.length - 1) {
-          chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: i, totalSteps, status: 'delayed' } })
-          await new Promise((r) => setTimeout(r, STEP_DELAY_MS))
+      for (; stepIndex < steps.length; stepIndex++) {
+        assertExecutionContext(controller.signal, href)
+        sent = false
+        await executeStep(adapter, getInput, steps[stepIndex], mode, controller.signal, status => {
+          publish({ stepIndex, totalSteps, status })
+        }, () => { sent = true }, undefined, stepIndex > 0 ? '' : undefined, href)
+        if (stepIndex < steps.length - 1) {
+          publish({ stepIndex, totalSteps, status: 'delayed' })
+          await waitForExecutionDelay(STEP_DELAY_MS, controller.signal)
         }
       }
-
-      chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: steps.length - 1, totalSteps: steps.length, status: 'completed' } })
+      terminal = { stepIndex: Math.max(0, totalSteps - 1), totalSteps, status: 'completed' }
       return true
+    } catch (cause) {
+      const changedConversation = cause instanceof Error && cause.message === 'CONVERSATION_CHANGED'
+      const error = changedConversation ? 'CONVERSATION_CHANGED' : controller.signal.aborted ? 'Chain cancelled' : cause instanceof Error ? cause.message : 'EXECUTION_FAILED'
+      terminal = { stepIndex, totalSteps, status: controller.signal.aborted && !changedConversation ? 'cancelled' : 'error', error: sent && error !== 'SEND_FAILED' ? `${error}: the prompt may have been sent. Check the conversation before restarting.` : error }
+      return false
     } finally {
       running = false
+      controller = null
+      publish(terminal!)
+      coordinator.release()
     }
   }
 
-  function isRunning() {
-    return running
+  function stopForNavigation() {
+    controller?.abort(new Error('CONVERSATION_CHANGED'))
   }
 
-  return {
-    run,
-    cancel,
-    isRunning,
+  function subscribe(listener: (snapshot: ChainProgressMessage['payload']) => void) {
+    listeners.add(listener)
+    listener({ ...snapshot })
+    return () => { listeners.delete(listener) }
   }
+
+  return { run, cancel, isRunning: () => running, getSnapshot: () => ({ ...snapshot }), subscribe, stopForNavigation }
 }

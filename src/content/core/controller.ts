@@ -6,6 +6,8 @@ import { appendInputText, getInputText, setInputText } from './insert/composer'
 import { createEditor } from './editor/editor'
 import { createOverlay } from './overlay/overlay'
 import { createQueue } from './queue/queue'
+import { createExecutionCoordinator, getConversationHref, isConversationReady } from './queue/execution'
+import { createQueuePanel } from './queue/panel'
 import { createChainExecutor } from './queue/chain_executor'
 import { applyTweaks } from './page_tweaks/tweaks'
 import { createPrompt, deletePrompt, fetchAttachmentFiles, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './messaging'
@@ -21,16 +23,20 @@ export function initController(adapter: Adapter) {
   let activeInput: InputElement | null = null
   let pendingSearchToken = 0
   let readySent = false
+  let conversationHref = getConversationHref()
 
   async function attachToComposer(attachments: AttachmentRef[]): Promise<void> {
     if (settings.multimodalEnabled === false) return
     if (!attachments.length) return
+    const href = getConversationHref()
     const files = await fetchAttachmentFiles(attachments)
+    if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
     const result = await adapter.attachFiles(files)
     if (!result.ok) {
       throw new Error(result.error || 'ATTACHMENT_UPLOAD_FAILED')
     }
     const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: 250 })
+    if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
     if (!uploaded) throw new Error('ATTACHMENT_UPLOAD_TIMEOUT')
   }
 
@@ -45,17 +51,32 @@ export function initController(adapter: Adapter) {
   const overlay = createOverlay({
     onSelect: (item) => {
       void (async () => {
-        const input = activeInput || adapter.getInputElement()
+        const input = adapter.getInputElement()
         if (!input) return
         if (item.kind === 'prompt') {
+          if (!coordinator.tryAcquire('manual')) {
+            executionPanel.showMessage('Finish or cancel the current queue or chain before inserting another prompt.')
+            return
+          }
+          const href = getConversationHref()
           try {
             await attachToComposer(item.attachments || [])
-          } catch {
+            if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
+          } catch (cause) {
+            if (cause instanceof Error && cause.message === 'CONVERSATION_CHANGED') {
+              executionPanel.showMessage('The conversation changed. Prompt insertion was stopped.')
+              coordinator.release()
+              return
+            }
             // continue with text insertion even when upload fails
           }
-          setInputText(input, item.content)
-          overlay.hide()
-          void logUsage(item.id, mapPlatform(adapter.id))
+          try {
+            setInputText(input, item.content)
+            overlay.hide()
+            void logUsage(item.id, mapPlatform(adapter.id))
+          } finally {
+            coordinator.release()
+          }
           return
         }
         overlay.hide()
@@ -78,14 +99,24 @@ export function initController(adapter: Adapter) {
     },
   })
 
-  const queue = createQueue(adapter, () => activeInput)
-  const chainExecutor = createChainExecutor(adapter, () => activeInput)
+  const coordinator = createExecutionCoordinator()
+  const queue = createQueue(adapter, () => adapter.getInputElement(), coordinator)
+  const chainExecutor = createChainExecutor(adapter, () => adapter.getInputElement(), coordinator)
+  const executionPanel = createQueuePanel(queue, chainExecutor)
 
   function refreshInput() {
+    const nextHref = getConversationHref()
+    if (nextHref !== conversationHref) {
+      conversationHref = nextHref
+      queue.stopForNavigation()
+      chainExecutor.stopForNavigation()
+      overlay.hide()
+      pendingSearchToken += 1
+    }
     const next = adapter.getInputElement()
-    if (next && next !== activeInput) {
+    if (next !== activeInput) {
       activeInput = next
-      if (!readySent) {
+      if (next && !readySent) {
         readySent = true
         chrome.runtime.sendMessage({ type: 'TEXTAREA_READY' })
       }
@@ -178,11 +209,16 @@ export function initController(adapter: Adapter) {
       const input = getEventInput(event)
       if (!input) return
       if (!adapter.isGenerating()) return
-      const text = getInputText(input).trim()
-      if (!text) return
+      const text = getInputText(input)
+      if (!text.trim()) return
       event.preventDefault()
       setInputText(input, '')
-      queue.enqueue({ content: text })
+      if (!queue.enqueue({ content: text })) {
+        setInputText(input, text)
+        executionPanel.showMessage(queue.getSnapshot().error === 'CONVERSATION_REQUIRED'
+          ? 'Start a conversation first, then run the queue or chain. Your draft was kept.'
+          : 'Cancellation is still finishing. Your draft is preserved; send it again when cancellation finishes.')
+      }
     }
   }
 
@@ -237,8 +273,15 @@ export function initController(adapter: Adapter) {
       return
     }
     if (msg.type === 'CLICK_SEND') {
-      const input = activeInput || adapter.getInputElement()
-      adapter.clickSend(input as HTMLTextAreaElement | null)
+      if (!coordinator.tryAcquire('manual')) {
+        sendResponse({ ok: false, reason: 'COMPOSER_BUSY' })
+        return
+      }
+      try {
+        sendResponse({ ok: adapter.clickSend(adapter.getInputElement()) })
+      } finally {
+        coordinator.release()
+      }
       return
     }
     if (msg.type === 'INJECT_PROMPT') {
@@ -248,15 +291,21 @@ export function initController(adapter: Adapter) {
         sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'NO_CONTENT' } })
         return
       }
-      const input = activeInput || adapter.getInputElement()
+      const input = adapter.getInputElement()
       if (!input) {
         sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'INPUT_NOT_FOUND' } })
         return
       }
+      if (!coordinator.tryAcquire('manual')) {
+        sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'COMPOSER_BUSY' } })
+        return
+      }
       const mode = settings.insertionMode || 'overwrite'
+      const href = getConversationHref()
       void (async () => {
         try {
           await attachToComposer(attachments)
+          if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
           if (content) {
             const contentWithNL = content.endsWith('\n') ? content : `${content}\n`
             if (mode === 'append') {
@@ -268,6 +317,8 @@ export function initController(adapter: Adapter) {
           sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: true } })
         } catch {
           sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'INJECTION_FAILED' } })
+        } finally {
+          coordinator.release()
         }
       })()
       return true
@@ -278,8 +329,13 @@ export function initController(adapter: Adapter) {
         sendResponse({ ok: false, reason: 'NO_STEPS' })
         return
       }
-      if (chainExecutor.isRunning()) {
-        sendResponse({ ok: false, reason: 'ALREADY_RUNNING' })
+      if (!isConversationReady()) {
+        sendResponse({ ok: false, reason: 'CONVERSATION_REQUIRED' })
+        void chainExecutor.run(payload.steps as ChainStep[], settings, payload.insertionModeOverride)
+        return
+      }
+      if (coordinator.isBusy()) {
+        sendResponse({ ok: false, reason: 'COMPOSER_BUSY' })
         return
       }
       sendResponse({ ok: true })
@@ -288,13 +344,15 @@ export function initController(adapter: Adapter) {
     }
     if (msg.type === 'CANCEL_CHAIN') {
       chainExecutor.cancel()
-      chrome.runtime.sendMessage({ type: 'CHAIN_PROGRESS', payload: { stepIndex: 0, totalSteps: 0, status: 'cancelled' } })
+      sendResponse({ ok: true })
       return
     }
   }
 
   const observer = new MutationObserver(() => refreshInput())
   observer.observe(document.documentElement, { childList: true, subtree: true })
+  window.addEventListener('popstate', refreshInput)
+  window.addEventListener('hashchange', refreshInput)
   document.addEventListener('input', handleInput, true)
   document.addEventListener('keydown', handleKeydown, true)
   document.addEventListener('focusin', handleFocus, true)

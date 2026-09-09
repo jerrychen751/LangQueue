@@ -58,7 +58,8 @@ export async function clickSendOnTab(): Promise<void> {
   const platform = detectPlatformFromUrl(tab.url)
   if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) throw new Error('Not on a compatible AI chat page')
   try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'CLICK_SEND' } as ClickSendMessage)
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'CLICK_SEND' } as ClickSendMessage)
+    if (!response?.ok) throw new Error(response?.reason || 'Send failed')
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Click send failed'
     throw new Error(message)
@@ -97,7 +98,10 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
 
   const msg: RunChainMessage = { type: 'RUN_CHAIN', payload: { steps, insertionModeOverride } }
   try {
-    await chrome.tabs.sendMessage(tab.id, msg)
+    const response = await chrome.tabs.sendMessage(tab.id, msg)
+    if (!response?.ok) throw new Error(response?.reason === 'CONVERSATION_REQUIRED'
+      ? 'Start a conversation first, then run the chain. Your draft was kept.'
+      : response?.reason || 'Failed to start chain')
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to start chain'
     throw new Error(message)

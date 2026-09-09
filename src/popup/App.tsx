@@ -73,7 +73,7 @@ export default function App() {
           const { stepIndex, totalSteps, status, error } = (message as { payload?: { stepIndex?: number; totalSteps?: number; status?: string; error?: string } }).payload || {}
           if (!status || typeof stepIndex !== 'number' || typeof totalSteps !== 'number') return
           if (status === 'sending') {
-            showToast({ message: `Step ${stepIndex + 1}/${totalSteps} sent` })
+            showToast({ message: `Sending step ${stepIndex + 1}/${totalSteps}` })
           }
           if (status === 'completed' && stepIndex === totalSteps - 1) {
             showToast({ variant: 'success', message: 'Chain completed!' })
