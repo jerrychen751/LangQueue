@@ -68,3 +68,26 @@ export async function waitForSelectorsToDisappear(
   }
   return false
 }
+
+export function findComposerSendButton(target: HTMLElement, selectors: string[]): HTMLButtonElement | null {
+  const form = target.closest('form')
+  let scope = form || target.parentElement
+  while (scope && scope !== document.body && scope !== document.documentElement) {
+    if (!form) {
+      const inputs = Array.from(scope.querySelectorAll('textarea, [contenteditable="true"]'))
+      if (inputs.some(input => input !== target && !target.contains(input) && isVisible(input))) return null
+    }
+    const matches = Array.from(scope.querySelectorAll(selectors.join(', ')))
+    const candidates = matches.filter(candidate =>
+      isButtonEnabledAndVisible(candidate) &&
+      !/\bstop\b/i.test(candidate.getAttribute('aria-label') || '') &&
+      candidate.getAttribute('data-testid') !== 'stop-button' &&
+      !candidate.getAttribute('class')?.split(/\s+/).includes('stop')
+    ) as HTMLButtonElement[]
+    if (candidates.length > 1) return null
+    if (candidates.length === 1) return candidates[0]
+    if (form || matches.length) return null
+    scope = scope.parentElement
+  }
+  return null
+}

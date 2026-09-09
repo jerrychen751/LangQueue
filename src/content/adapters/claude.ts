@@ -1,7 +1,7 @@
 import { Adapter } from './adapter'
 import {
   findEnabledFileInput,
-  isButtonEnabledAndVisible,
+  findComposerSendButton,
   isVisible,
   setFilesOnInput,
   waitForSelectorsToDisappear,
@@ -63,52 +63,17 @@ class ClaudeAdapter extends Adapter {
     const target = input || this.getInputElement()
     if (!target) return false
 
-    const selectors = [
+    const candidate = findComposerSendButton(target, [
       'button[aria-label="Send message"]',
       'button[aria-label="Send"]',
-      'button[aria-label*="Send" i]',
       'button[data-testid="send-button"]',
-      'button[data-testid*="send" i]',
-      'div[role="button"][aria-label*="Send" i]',
-      'div[role="button"][data-testid*="send" i]',
-      'button[type="submit"]',
-      'form button[type="submit"]',
-      'form [type="submit"]',
-    ]
-
-    for (const selector of selectors) {
-      const candidate = document.querySelector(selector)
-      if (isButtonEnabledAndVisible(candidate)) {
-        try {
-          candidate.click()
-          return true
-        } catch {
-          continue
-        }
-      }
-    }
-
-    const form = (target as HTMLElement | null)?.closest('form')
-    if (form) {
-      const withinForm = Array.from(form.querySelectorAll('button, [type="submit"]')) as HTMLElement[]
-      const btn = withinForm.find((el) => el.tagName === 'BUTTON' && isButtonEnabledAndVisible(el)) as HTMLButtonElement | undefined
-      if (btn) {
-        try {
-          btn.click()
-          return true
-        } catch {
-          void 0
-        }
-      }
-      try {
-        const htmlForm = form as HTMLFormElement
-        if (typeof htmlForm.requestSubmit === 'function') {
-          htmlForm.requestSubmit()
-          return true
-        }
-      } catch {
-        // ignore
-      }
+    ])
+    if (!candidate) return false
+    try {
+      candidate.click()
+      return true
+    } catch {
+      // ignore
     }
 
     return false
