@@ -38,6 +38,10 @@ Individual commands are available when narrowing a failure:
 
 The manifest validator checks packaging; it cannot prove that a site's DOM selectors still work. Use a test conversation for live checks and send only text or attachments you intend to transmit.
 
+With the Vite server running, open `/tests/fixtures/composer.html` to check real textarea and contenteditable behavior. The fixture reports `PASS: 14/14` when multiline insertion, Windows line endings, and paragraph append work. Its send controls are local stubs; it never sends to an AI provider.
+
+Queues and chains require an established conversation. Start a conversation with a manual message before running a sequence. Automatic execution stops if the conversation URL changes. Appending into a rich editor preserves visible text and line breaks while converting its existing formatting to plain text.
+
 For execution changes, check ordinary insertion, queueing while a response runs, chain completion, cancellation, and a draft typed while execution waits. Confirm that failures stop later prompts and that recovery controls explain what remains in the composer. For interface changes, inspect the popup and injected UI at desktop size, use the controls with the keyboard, and check the console for errors.
 
 ## Diagnose extension failures
