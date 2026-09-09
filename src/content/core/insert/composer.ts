@@ -49,25 +49,6 @@ function setContentEditableValue(el: HTMLElement, value: string) {
   dispatchFrameworkInput(el, value, inputType)
 }
 
-function appendToContentEditable(el: HTMLElement, value: string) {
-  el.focus()
-  const selection = window.getSelection()
-  const range = document.createRange()
-  range.selectNodeContents(el)
-  range.collapse(false)
-  const needsNewline = (el.textContent || '').length > 0
-  const textToInsert = `${needsNewline ? '\n' : ''}${value}`
-  const inputType = inferInputType(textToInsert)
-  dispatchFrameworkBeforeInput(el, textToInsert, inputType)
-  range.insertNode(buildLineBreakFragment(textToInsert))
-  const after = document.createRange()
-  after.selectNodeContents(el)
-  after.collapse(false)
-  selection?.removeAllRanges()
-  selection?.addRange(after)
-  dispatchFrameworkInput(el, textToInsert, inputType)
-}
-
 function buildLineBreakFragment(value: string): DocumentFragment {
   const fragment = document.createDocumentFragment()
   const lines = value.split(/\r\n|\r|\n/)
@@ -81,7 +62,7 @@ function buildLineBreakFragment(value: string): DocumentFragment {
 export function getInputText(el: InputElement | null): string {
   if (!el) return ''
   if (el instanceof HTMLTextAreaElement) return el.value || ''
-  return el.textContent || ''
+  return el.innerText || ''
 }
 
 export function setInputText(el: InputElement, value: string) {
@@ -104,7 +85,8 @@ export function appendInputText(el: InputElement, value: string) {
       void 0
     }
   } else {
-    appendToContentEditable(el, value)
+    const existing = getInputText(el)
+    setContentEditableValue(el, existing ? `${existing}\n${value}` : value)
   }
 }
 

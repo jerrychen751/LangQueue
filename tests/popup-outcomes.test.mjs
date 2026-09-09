@@ -197,3 +197,41 @@ test('chain deletion waits for storage, prevents duplicate work, and reports fai
   assert.equal(popup.find(popup.render(), node => node.props.title === 'Delete chain?').props.open, true);
   assert.equal(popup.toasts[0].variant, 'error');
 });
+
+test('pending combined send blocks duplicate sends and overlapping insertion', async () => {
+  let resolveSend;
+  let sends = 0;
+  let inserts = 0;
+  const pending = new Promise(resolve => { resolveSend = resolve; });
+  const popup = createPopup('App', {
+    insertAndSendPromptToTab: () => { sends++; return pending; },
+    sendPromptToTab: async () => { inserts++; },
+  });
+  const card = popup.find(popup.render(), node => node.type === 'PromptCard');
+  const first = card.props.onSend(popup.prompt);
+  await card.props.onSend(popup.prompt);
+  await card.props.onInsert(popup.prompt);
+  assert.equal(sends, 1);
+  assert.equal(inserts, 0);
+  resolveSend();
+  await first;
+  assert.equal(popup.getCloses(), 1);
+});
+
+test('pending insertion blocks sends until usage refresh finishes', async () => {
+  let resolveUsage;
+  let sends = 0;
+  const pending = new Promise(resolve => { resolveUsage = resolve; });
+  const popup = createPopup('App', {
+    logUsage: () => pending,
+    insertAndSendPromptToTab: async () => { sends++; },
+  });
+  const card = popup.find(popup.render(), node => node.type === 'PromptCard');
+  const first = card.props.onInsert(popup.prompt);
+  await Promise.resolve();
+  await card.props.onSend(popup.prompt);
+  assert.equal(sends, 0);
+  resolveUsage();
+  await first;
+  assert.equal(popup.getCloses(), 1);
+});

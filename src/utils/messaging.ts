@@ -6,7 +6,8 @@ import type {
   RunChainMessage,
   CancelChainMessage,
   ChainStep,
-  ClickSendMessage,
+  InsertAndSendPromptMessage,
+  InsertAndSendPromptResultMessage,
 } from '../types/messages'
 import type { AttachmentRef, Platform } from '../types'
 
@@ -39,12 +40,12 @@ export async function sendPromptToTab(promptContent: string, attachments: Attach
   try {
     const res = (await chrome.tabs.sendMessage(tab.id, {
       type: 'INJECT_PROMPT',
-      payload: { content: promptContent, attachments },
+      payload: { content: promptContent, attachments, expectedHref: tab.url },
     } as InjectPromptMessage)) as
       | InjectPromptResultMessage
       | undefined
     if (!res || res.type !== 'INJECT_PROMPT_RESULT' || !res.payload.ok) {
-      throw new Error('Failed to inject prompt')
+      throw new Error(res?.payload?.reason || 'Failed to inject prompt')
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Injection failed'
@@ -52,18 +53,22 @@ export async function sendPromptToTab(promptContent: string, attachments: Attach
   }
 }
 
-export async function clickSendOnTab(): Promise<void> {
+export async function insertAndSendPromptToTab(content: string, attachments: AttachmentRef[] = []): Promise<void> {
   const tab = await getActiveTab()
   if (!tab?.id || !tab.url) throw new Error('No active tab')
   const platform = detectPlatformFromUrl(tab.url)
   if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) throw new Error('Not on a compatible AI chat page')
+  let response: InsertAndSendPromptResultMessage | undefined
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, { type: 'CLICK_SEND' } as ClickSendMessage)
-    if (!response?.ok) throw new Error(response?.reason || 'Send failed')
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Click send failed'
-    throw new Error(message)
+    response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'INSERT_AND_SEND_PROMPT',
+      payload: { content, attachments, expectedHref: tab.url },
+    } as InsertAndSendPromptMessage)
+  } catch {
+    throw new Error('Sending could not be confirmed. Check the original conversation before trying again; the prompt may have been sent.')
   }
+  if (!response || response.type !== 'INSERT_AND_SEND_PROMPT_RESULT') throw new Error('Sending could not be confirmed. Check the original conversation before trying again.')
+  if (!response.payload.ok) throw new Error((response.payload.reason || 'Sending failed.') + (response.payload.sendAttempted ? ' The prompt may have been sent. Check the conversation before trying again.' : ''))
 }
 
 export function detectPlatformFromUrl(url: string): Platform {

@@ -5,7 +5,7 @@ import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
 import type { Prompt, PromptChain } from '../types'
 import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, deleteChain, getPrompt, exportLibrary } from '../utils/storage'
-import { sendPromptToTab, detectActivePlatform, clickSendOnTab, runChainOnTab } from '../utils/messaging'
+import { sendPromptToTab, detectActivePlatform, insertAndSendPromptToTab, runChainOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
 import { checkTabCompatibility } from '../utils/messaging'
 import FilterBar, { type SortOption } from '../components/FilterBar'
@@ -353,14 +353,17 @@ export default function App() {
                 onDelete={handleDelete}
                 onInsert={handleInsert}
                 onSend={async (prompt) => {
+                  if (insertingRef.current) return
+                  insertingRef.current = true
                   try {
-                    await sendPromptToTab(prompt.content, prompt.attachments || [])
-                    await clickSendOnTab()
-                    showToast({ variant: 'success', message: 'Sent' })
+                    await insertAndSendPromptToTab(prompt.content, prompt.attachments || [])
+                    showToast({ variant: 'success', message: 'Send requested' })
                     window.close()
                   } catch (err: unknown) {
                     const message = err instanceof Error ? err.message : 'Failed to send'
                     showToast({ variant: 'error', message })
+                  } finally {
+                    insertingRef.current = false
                   }
                 }}
                 canInsert={compatible}

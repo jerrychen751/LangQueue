@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Composer regression fixture</title>
+  <style>
+    body { font: 16px system-ui; margin: 24px; }
+    [contenteditable], textarea { display: block; white-space: pre-wrap; border: 1px solid #999; margin: 4px; padding: 4px; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Composer regression fixture</h1>
+  <p>Run through the local Vite server. All sends use a local stub.</p>
+  <pre id="results">Running...</pre>
+  <script type="module">
+    import { getInputText, appendInputText } from '/src/content/core/insert/composer.ts'
+    import { insertComposerPrompt } from '/src/content/core/insert/manual.ts'
+    import { createExecutionCoordinator } from '/src/content/core/queue/execution.ts'
+
+    const results = []
+    for (const tag of ['textarea', 'div']) {
+      for (const value of ['single\n', 'first\nsecond\n', 'first\n\nthird', 'first\r\nsecond\r\n', 'first\rsecond']) {
+        const input = document.createElement(tag)
+        if (tag === 'div') input.contentEditable = 'true'
+        document.body.append(input)
+        let sends = 0
+        const adapter = { getInputElement: () => input, isGenerating: () => false, clickSend: () => { sends++; return true } }
+        const result = await insertComposerPrompt(adapter, createExecutionCoordinator(), value, [], 'overwrite', true, location.href)
+        const expected = value.replace(/\r\n|\r/g, '\n')
+        const read = getInputText(input)
+        results.push({ pass: result.ok && sends === 1 && read === expected, tag, value, read, expected, result, sends })
+      }
+    }
+    for (const [html, expectedBefore] of [
+      ['<p>first</p><p>second</p>', 'first\n\nsecond'],
+      ['<div>first</div><div>second</div>', 'first\nsecond'],
+      ['first<br><br>third', 'first\n\nthird'],
+      ['<p>first<br></p>', 'first\n'],
+    ]) {
+      const input = document.createElement('div')
+      input.contentEditable = 'true'
+      input.innerHTML = html
+      document.body.append(input)
+      const before = getInputText(input)
+      appendInputText(input, 'appended\nlast')
+      const after = getInputText(input)
+      const expectedAppend = before + '\nappended\nlast'
+      results.push({ pass: before === expectedBefore && after === expectedAppend, html, before, expectedBefore, after, expectedAppend })
+    }
+    const failures = results.filter(result => !result.pass)
+    document.querySelector('#results').textContent = `${failures.length ? 'FAIL' : 'PASS'}: ${results.length - failures.length}/${results.length}\n` + JSON.stringify(results, null, 2)
+    document.documentElement.dataset.result = failures.length ? 'fail' : 'pass'
+    if (failures.length) throw new Error('Composer regression fixture failed')
+  </script>
+</body>
+</html>

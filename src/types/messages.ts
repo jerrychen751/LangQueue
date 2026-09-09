@@ -15,7 +15,7 @@ export interface ChainData {
 
 export type InjectPromptMessage = {
   type: 'INJECT_PROMPT'
-  payload: { content: string; attachments?: AttachmentRef[] }
+  payload: { content: string; attachments?: AttachmentRef[]; expectedHref: string }
 }
 
 export type TextareaReadyMessage = {
@@ -30,7 +30,8 @@ export type CompatCheckMessage = { type: 'COMPAT_CHECK' }
 export type CompatStatusMessage = { type: 'COMPAT_STATUS'; payload: { ready: boolean } }
 export type InjectPromptResultMessage = { type: 'INJECT_PROMPT_RESULT'; payload: { ok: boolean; reason?: string } }
 export type InjectPromptErrorMessage = { type: 'INJECT_PROMPT_ERROR'; payload: { reason: 'TEXTAREA_NOT_FOUND' | 'UNKNOWN' } }
-export type ClickSendMessage = { type: 'CLICK_SEND' }
+export type InsertAndSendPromptMessage = { type: 'INSERT_AND_SEND_PROMPT'; payload: { content: string; attachments?: AttachmentRef[]; expectedHref: string } }
+export type InsertAndSendPromptResultMessage = { type: 'INSERT_AND_SEND_PROMPT_RESULT'; payload: { ok: boolean; sendAttempted: boolean; reason?: string } }
 
 export type GetSettingsMessage = { type: 'GET_SETTINGS' }
 export type SettingsResultMessage = { type: 'SETTINGS_RESULT'; payload: { settings: AppSettings } }
@@ -117,7 +118,8 @@ export type KnownMessage =
   | RunChainMessage
   | ChainProgressMessage
   | CancelChainMessage
-  | ClickSendMessage
+  | InsertAndSendPromptMessage
+  | InsertAndSendPromptResultMessage
   | GetSettingsMessage
   | SettingsResultMessage
   | PromptSearchMessage

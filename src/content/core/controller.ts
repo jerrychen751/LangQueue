@@ -1,8 +1,9 @@
 import type { Adapter } from '../adapters/adapter'
-import type { AppSettings, AttachmentRef, Platform } from '../../types'
+import type { AppSettings, Platform } from '../../types'
 import type { ChainStep, KnownMessage } from '../../types/messages'
 import { detectSlashContext } from './detect/slash'
-import { appendInputText, getInputText, setInputText } from './insert/composer'
+import { getInputText, setInputText } from './insert/composer'
+import { insertComposerPrompt } from './insert/manual'
 import { createEditor } from './editor/editor'
 import { createOverlay } from './overlay/overlay'
 import { createQueue } from './queue/queue'
@@ -10,7 +11,7 @@ import { createExecutionCoordinator, getConversationHref, isConversationReady } 
 import { createQueuePanel } from './queue/panel'
 import { createChainExecutor } from './queue/chain_executor'
 import { applyTweaks } from './page_tweaks/tweaks'
-import { createPrompt, deletePrompt, fetchAttachmentFiles, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './messaging'
+import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './messaging'
 
 type InputElement = HTMLTextAreaElement | HTMLElement
 
@@ -24,21 +25,6 @@ export function initController(adapter: Adapter) {
   let pendingSearchToken = 0
   let readySent = false
   let conversationHref = getConversationHref()
-
-  async function attachToComposer(attachments: AttachmentRef[]): Promise<void> {
-    if (settings.multimodalEnabled === false) return
-    if (!attachments.length) return
-    const href = getConversationHref()
-    const files = await fetchAttachmentFiles(attachments)
-    if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
-    const result = await adapter.attachFiles(files)
-    if (!result.ok) {
-      throw new Error(result.error || 'ATTACHMENT_UPLOAD_FAILED')
-    }
-    const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: 250 })
-    if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
-    if (!uploaded) throw new Error('ATTACHMENT_UPLOAD_TIMEOUT')
-  }
 
   const editor = createEditor({
     onSave: async (draft) => {
@@ -54,29 +40,15 @@ export function initController(adapter: Adapter) {
         const input = adapter.getInputElement()
         if (!input) return
         if (item.kind === 'prompt') {
-          if (!coordinator.tryAcquire('manual')) {
-            executionPanel.showMessage('Finish or cancel the current queue or chain before inserting another prompt.')
+          const result = await insertComposerPrompt(adapter, coordinator, item.content,
+            settings.multimodalEnabled === false ? [] : item.attachments || [], 'overwrite', false, getConversationHref())
+          if (!result.ok) {
+            // Stop text insertion when the attachment or composer check fails
+            executionPanel.showMessage(result.reason || 'Prompt insertion failed. Check the composer before trying again.')
             return
           }
-          const href = getConversationHref()
-          try {
-            await attachToComposer(item.attachments || [])
-            if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
-          } catch (cause) {
-            if (cause instanceof Error && cause.message === 'CONVERSATION_CHANGED') {
-              executionPanel.showMessage('The conversation changed. Prompt insertion was stopped.')
-              coordinator.release()
-              return
-            }
-            // continue with text insertion even when upload fails
-          }
-          try {
-            setInputText(input, item.content)
-            overlay.hide()
-            void logUsage(item.id, mapPlatform(adapter.id))
-          } finally {
-            coordinator.release()
-          }
+          overlay.hide()
+          void logUsage(item.id, mapPlatform(adapter.id))
           return
         }
         overlay.hide()
@@ -272,55 +244,24 @@ export function initController(adapter: Adapter) {
       sendResponse({ type: 'COMPAT_STATUS', payload: { ready } })
       return
     }
-    if (msg.type === 'CLICK_SEND') {
-      if (!coordinator.tryAcquire('manual')) {
-        sendResponse({ ok: false, reason: 'COMPOSER_BUSY' })
-        return
-      }
-      try {
-        sendResponse({ ok: adapter.clickSend(adapter.getInputElement()) })
-      } finally {
-        coordinator.release()
-      }
-      return
-    }
-    if (msg.type === 'INJECT_PROMPT') {
+    if (msg.type === 'INJECT_PROMPT' || msg.type === 'INSERT_AND_SEND_PROMPT') {
       const content = msg.payload?.content
       const attachments = Array.isArray(msg.payload?.attachments) ? msg.payload.attachments : []
+      const shouldSend = msg.type === 'INSERT_AND_SEND_PROMPT'
+      const resultType = shouldSend ? 'INSERT_AND_SEND_PROMPT_RESULT' : 'INJECT_PROMPT_RESULT'
       if (!content && attachments.length === 0) {
-        sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'NO_CONTENT' } })
+        sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'No prompt text or attachments were provided.' } })
         return
       }
-      const input = adapter.getInputElement()
-      if (!input) {
-        sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'INPUT_NOT_FOUND' } })
-        return
-      }
-      if (!coordinator.tryAcquire('manual')) {
-        sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'COMPOSER_BUSY' } })
+      if (typeof msg.payload.expectedHref !== 'string') {
+        sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'The target conversation is missing. Reload the extension and try again.' } })
         return
       }
       const mode = settings.insertionMode || 'overwrite'
-      const href = getConversationHref()
-      void (async () => {
-        try {
-          await attachToComposer(attachments)
-          if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
-          if (content) {
-            const contentWithNL = content.endsWith('\n') ? content : `${content}\n`
-            if (mode === 'append') {
-              appendInputText(input, contentWithNL)
-            } else {
-              setInputText(input, contentWithNL)
-            }
-          }
-          sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: true } })
-        } catch {
-          sendResponse({ type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'INJECTION_FAILED' } })
-        } finally {
-          coordinator.release()
-        }
-      })()
+      const contentWithNL = !content || content.endsWith('\n') ? content || '' : content + '\n'
+      void insertComposerPrompt(adapter, coordinator, contentWithNL,
+        settings.multimodalEnabled === false ? [] : attachments, mode, shouldSend, msg.payload.expectedHref)
+        .then(result => sendResponse({ type: resultType, payload: result }))
       return true
     }
     if (msg.type === 'RUN_CHAIN') {
