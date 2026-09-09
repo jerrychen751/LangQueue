@@ -44,12 +44,11 @@ export async function insertComposerPrompt(
     }
     assertComposerUnchanged()
     input.removeEventListener('input', handleDraftChange)
-    if (content) {
-      if (mode === 'append') appendInputText(input, content)
-      else setInputText(input, content)
-    }
+    if (mode === 'append') {
+      if (content) appendInputText(input, content)
+    } else setInputText(input, content)
     if (shouldSend) {
-      const expectedText = !content ? initialText : mode === 'append' && initialText ? `${initialText}\n${content}` : content
+      const expectedText = mode === 'append' ? !content ? initialText : initialText ? `${initialText}\n${content}` : content : content
       const expectedInputText = expectedText.replace(/\r\n|\r/g, '\n')
       await sendPromptWhenReady(adapter, input, expectedInputText, expectedHref, () => { sendAttempted = true })
     }

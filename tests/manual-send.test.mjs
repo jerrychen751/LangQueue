@@ -163,6 +163,29 @@ test('an exception during click preserves the uncertain send outcome', async () 
   assert.equal(fixture.adapter.sends, 1)
 })
 
+
+for (const mode of ['overwrite', 'append']) {
+  test(`file-only ${mode} applies its text mode after accepted upload`, async () => {
+    const fixture = createFixture()
+    fixture.adapter.input.value = '$files'
+    const result = await insertComposerPrompt(fixture.adapter, fixture.coordinator, '', attachments, mode, true, location.href)
+    assert.deepEqual(result, { ok: true, sendAttempted: true })
+    assert.equal(fixture.adapter.input.value, mode === 'overwrite' ? '' : '$files')
+    assert.equal(fixture.adapter.uploads, 1)
+    assert.equal(fixture.adapter.sends, 1)
+  })
+}
+
+test('failed file-only upload preserves the shortcut and never sends', async () => {
+  const fixture = createFixture()
+  fixture.adapter.input.value = '$files'
+  fixture.adapter.waitForUploadsComplete = async () => false
+  const result = await insertComposerPrompt(fixture.adapter, fixture.coordinator, '', attachments, 'overwrite', true, location.href)
+  assert.equal(result.ok, false)
+  assert.equal(fixture.adapter.input.value, '$files')
+  assert.equal(fixture.adapter.sends, 0)
+})
+
 test('popup send queries one tab and sends one combined request to that tab', async () => {
   let queries = 0
   const requests = []
