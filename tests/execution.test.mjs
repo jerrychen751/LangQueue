@@ -36,7 +36,8 @@ function runStep(adapter, signal = new AbortController().signal) {
   return executeStep(adapter, () => adapter.input, { content: 'prompt' }, 'overwrite', signal, () => {}, () => {}, timing)
 }
 
-test('waits for delayed generation before completing', async () => {
+test('waits for delayed generation before completing', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] })
   const adapter = createAdapter()
   adapter.clickSend = () => {
     adapter.sends++
@@ -44,9 +45,17 @@ test('waits for delayed generation before completing', async () => {
     setTimeout(() => { adapter.generating = false }, 15)
     return true
   }
-  const start = Date.now()
-  await runStep(adapter)
-  assert.ok(Date.now() - start >= 12)
+  let completed = false
+  const pending = runStep(adapter).then(() => { completed = true })
+  for (let elapsed = 1; elapsed <= 16; elapsed++) {
+    context.mock.timers.tick(1)
+    await Promise.resolve()
+    await Promise.resolve()
+    if (elapsed < 15) assert.equal(completed, false)
+    if (elapsed === 6) assert.equal(adapter.generating, true)
+  }
+  await pending
+  assert.equal(completed, true)
   assert.equal(adapter.sends, 1)
 })
 
