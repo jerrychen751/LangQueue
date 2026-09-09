@@ -215,26 +215,36 @@ export async function exportAttachmentRecords(ids: string[]): Promise<Attachment
     })
 }
 
-export async function importAttachmentRecords(records: AttachmentExportRecord[]): Promise<number> {
-  let imported = 0
-  for (const record of records) {
-    if (!record || typeof record !== 'object') continue
-    if (!record.id || !record.name || !record.mimeType || typeof record.size !== 'number') continue
-    const bytes = base64ToArrayBuffer(record.dataBase64 || '')
-    if (bytes.byteLength === 0 && record.size > 0) continue
-    const normalized: StoredAttachmentRecord = {
-      id: record.id,
-      name: record.name,
-      mimeType: record.mimeType,
-      size: bytes.byteLength,
-      kind: record.kind || inferAttachmentKind(record.mimeType),
-      createdAt: typeof record.createdAt === 'number' ? record.createdAt : Date.now(),
-      bytes,
+export function prepareAttachmentImports(records: unknown): { ref: AttachmentRef; file: File }[] {
+  if (!Array.isArray(records)) throw new Error('Invalid attachment list in backup.')
+  const ids = new Set<string>()
+  return records.map((raw) => {
+    if (!raw || typeof raw !== 'object') throw new Error('Invalid attachment record in backup.')
+    const record = raw as Partial<AttachmentExportRecord>
+    if (typeof record.id !== 'string' || !record.id || ids.has(record.id) || typeof record.name !== 'string' || !record.name || typeof record.mimeType !== 'string' || !record.mimeType || typeof record.dataBase64 !== 'string' || typeof record.size !== 'number' || !Number.isSafeInteger(record.size) || (record.size ?? 0) <= 0) {
+      throw new Error('Invalid or duplicate attachment record in backup.')
     }
-    await putRecord(normalized)
-    imported += 1
-  }
-  return imported
+    ids.add(record.id)
+    if (record.size > MAX_ATTACHMENT_BYTES || record.dataBase64.length > Math.ceil(MAX_ATTACHMENT_BYTES / 3) * 4) throw new Error('Backup attachment exceeds 25 MB limit.')
+    let bytes: ArrayBuffer
+    try {
+      bytes = base64ToArrayBuffer(record.dataBase64)
+    } catch {
+      throw new Error('Invalid base64 for attachment: ' + record.name)
+    }
+    if (bytes.byteLength !== record.size) throw new Error('Attachment size does not match its contents: ' + record.name)
+    if (record.kind !== undefined && record.kind !== 'image' && record.kind !== 'file') throw new Error('Invalid attachment kind: ' + record.name)
+    const file = new File([bytes], record.name, { type: record.mimeType })
+    if (file.type !== record.mimeType) throw new Error('Attachment MIME type must use its canonical lowercase form: ' + record.name)
+    const kind = inferAttachmentKind(file.type)
+    if (record.kind !== undefined && record.kind !== kind) throw new Error('Attachment kind does not match its MIME type: ' + record.name)
+    const validation = validateAttachmentFile(file)
+    if (validation) throw new Error(record.name + ': ' + validation)
+    return {
+      ref: { id: record.id, name: record.name, mimeType: record.mimeType, size: bytes.byteLength, kind, createdAt: typeof record.createdAt === 'number' && Number.isFinite(record.createdAt) ? record.createdAt : Date.now() },
+      file,
+    }
+  })
 }
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {

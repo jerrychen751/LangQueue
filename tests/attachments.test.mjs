@@ -51,7 +51,7 @@ function createAttachmentStorage() {
       return request;
     },
   };
-  vm.runInNewContext(source, { exports, indexedDB, crypto, atob, btoa });
+  vm.runInNewContext(source, { exports, indexedDB, crypto, atob, btoa, File });
   return { api: exports, getTransaction: () => transaction, getOpenCount: () => openCount, getOperation: () => operation };
 }
 
@@ -96,4 +96,22 @@ test('cleanup enumerates attachment keys without loading binary records', async 
   const { api, getOperation } = createAttachmentStorage();
   assert.equal(JSON.stringify(await api.listAttachmentIds()), JSON.stringify(['a1', 'a2']));
   assert.equal(getOperation(), 'getAllKeys');
+});
+
+test('attachment preflight rejects invalid size, excessive payloads, and duplicates without opening storage', () => {
+  const { api, getOpenCount } = createAttachmentStorage();
+  const record = { id: 'a1', name: 'file.txt', mimeType: 'text/plain', size: 1, dataBase64: 'YQ==', kind: 'file', createdAt: 1 };
+  assert.throws(() => api.prepareAttachmentImports([{ ...record, size: 2 }]), /size does not match/);
+  assert.throws(() => api.prepareAttachmentImports([{ ...record, size: 26 * 1024 * 1024 }]), /25 MB limit/);
+  assert.throws(() => api.prepareAttachmentImports([record, record]), /duplicate attachment/);
+  assert.equal(getOpenCount(), 0);
+});
+
+test('attachment preflight rejects metadata that file storage would normalize differently', () => {
+  const { api, getOpenCount } = createAttachmentStorage();
+  const record = { id: 'a1', name: 'file.txt', mimeType: 'text/plain', size: 1, dataBase64: 'YQ==', kind: 'file', createdAt: 1 };
+  assert.throws(() => api.prepareAttachmentImports([{ ...record, kind: 'image' }]), /kind does not match/);
+  assert.throws(() => api.prepareAttachmentImports([{ ...record, mimeType: 'TEXT/PLAIN' }]), /canonical lowercase form/);
+  assert.throws(() => api.prepareAttachmentImports([{ ...record, mimeType: '' }]), /Invalid/);
+  assert.equal(getOpenCount(), 0);
 });

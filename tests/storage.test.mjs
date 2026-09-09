@@ -11,10 +11,17 @@ const source = ts.transpileModule(readFileSync(resolve('src/utils/storage.ts'), 
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
+const attachmentExports = {};
+vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/utils/attachments.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText, { exports: attachmentExports, File, crypto, atob, btoa });
+
 function createStorageContexts(initial = {}) {
   const records = structuredClone(initial);
   let pending = Promise.resolve();
   let shouldFailWrite = false;
+  let shouldFailCleanup = false;
+  const writes = [];
   const attachments = new Map();
   const chrome = {
     storage: {
@@ -30,6 +37,7 @@ function createStorageContexts(initial = {}) {
             shouldFailWrite = false;
             throw new Error('Storage write failed');
           }
+          writes.push(structuredClone(values));
           Object.assign(records, structuredClone(values));
         },
         async remove(keys) {
@@ -54,21 +62,24 @@ function createStorageContexts(initial = {}) {
       exports,
       chrome,
       navigator,
+      File,
+      crypto,
       require(path) {
         if (path === '../types') return { CURRENT_SCHEMA_VERSION: 3, CURRENT_CHAINS_SCHEMA_VERSION: 2 };
         if (path === './attachments') return {
           inferAttachmentKind: () => 'file',
-          listAttachmentIds: async () => [...attachments.keys()],
+          listAttachmentIds: async () => { if (shouldFailCleanup) throw new Error("Cleanup failed"); return [...attachments.keys()]; },
+          getAttachmentMeta: async (id) => attachments.get(id) ?? null,
+          prepareAttachmentImports: attachmentExports.prepareAttachmentImports,
           saveAttachmentFile: async (file, id) => {
             const bytes = await file.arrayBuffer();
-            attachments.set(id, { id, bytes });
+            attachments.set(id, { id, bytes, name: file.name, mimeType: file.type, size: file.size, kind: 'file', createdAt: 1 });
           },
           deleteAttachment: async (id) => { attachments.delete(id); },
-          exportAttachmentRecords: async () => [],
-          importAttachmentRecords: async (items) => {
-            for (const item of items) attachments.set(item.id, item);
-            return items.length;
-          },
+          exportAttachmentRecords: async (ids) => ids.map((id) => {
+            const { bytes, ...ref } = attachments.get(id);
+            return { ...ref, dataBase64: Buffer.from(bytes).toString('base64') };
+          }),
         };
         throw new Error(`Unexpected import: ${path}`);
       },
@@ -80,6 +91,8 @@ function createStorageContexts(initial = {}) {
     background: loadStorage(),
     records,
     attachments,
+    writes,
+    failCleanup() { shouldFailCleanup = true; },
     failNextWrite() { shouldFailWrite = true; },
   };
 }
@@ -195,4 +208,159 @@ test('binary failure leaves chain metadata unchanged and removes earlier new fil
   await assert.rejects(popup.saveChain({ id: 'new', title: 'new', steps: [], createdAt: 1, updatedAt: 1 }, pending), /Binary failed/);
   assert.equal(attachments.size, 0);
   assert.equal((await popup.getAllChains()).length, 0);
+});
+
+function createBackupAttachment(id = 'a1', contents = 'new') {
+  return { id, name: 'file.txt', mimeType: 'text/plain', size: Buffer.byteLength(contents), kind: 'file', createdAt: 1, dataBase64: Buffer.from(contents).toString('base64') };
+}
+
+test('corrupt binary imports leave all previous metadata and files unchanged', async () => {
+  const { popup, records, attachments, writes } = createStorageContexts(createLibrary());
+  const before = structuredClone(records);
+  const file = { ...createBackupAttachment(), dataBase64: '%%%' };
+  await assert.rejects(popup.importLibrary({ version: 3, prompts: [{ ...createPrompt(), content: 'replacement', attachments: [file] }], chains: [], attachments: [file] }), /Invalid base64/);
+  assert.deepEqual(records, before);
+  assert.equal(attachments.size, 0);
+  assert.equal(writes.length, 0);
+});
+
+test('metadata write failure rolls back staged imports without changing the existing library', async () => {
+  const { popup, records, attachments, failNextWrite } = createStorageContexts(createLibrary());
+  const before = structuredClone(records);
+  const file = createBackupAttachment();
+  failNextWrite();
+  await assert.rejects(popup.importLibrary({ version: 3, prompts: [{ ...createPrompt(), content: 'replacement', attachments: [file] }], chains: [], attachments: [file] }), /Storage write failed/);
+  assert.deepEqual(records, before);
+  assert.equal(attachments.size, 0);
+});
+
+test('attachment ID collisions preserve old bytes and publish remapped metadata in one write', async () => {
+  const initial = createLibrary();
+  const old = createBackupAttachment('shared', 'old');
+  initial.langqueue_prompts.promptsById.p1.attachments = [old];
+  const { popup, records, attachments, writes } = createStorageContexts(initial);
+  attachments.set(old.id, { ...old, bytes: new TextEncoder().encode('old').buffer });
+  const incoming = createBackupAttachment('shared', 'new');
+  await popup.importLibrary({ version: 3, prompts: [{ ...createPrompt('p2'), attachments: [incoming] }], chains: [{ id: 'c1', title: 'chain', steps: [{ content: ' step\n', attachments: [incoming] }], createdAt: 1, updatedAt: 1 }], attachments: [incoming] });
+  const remapped = records.langqueue_prompts.promptsById.p2.attachments[0].id;
+  assert.notEqual(remapped, 'shared');
+  assert.equal(records.langqueue_chains.items[0].steps[0].attachments[0].id, remapped);
+  assert.equal(new TextDecoder().decode(attachments.get('shared').bytes), 'old');
+  assert.equal(new TextDecoder().decode(attachments.get(remapped).bytes), 'new');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(Object.keys(writes[0]).sort(), ['langqueue_chains', 'langqueue_prompts']);
+});
+
+test('unsupported backup versions are rejected before any write', async () => {
+  const { popup, writes } = createStorageContexts();
+  for (const backup of [{ version: 999, prompts: [createPrompt()] }, { version: 2, prompts: [], chains: [] }, { version: 0, chains: [] }]) {
+    await assert.rejects(popup.importLibrary(backup), /Unsupported backup version/);
+  }
+  assert.equal(writes.length, 0);
+});
+
+test('metadata-only backups reject missing files and retain verified existing references', async () => {
+  const { popup, writes, attachments, records } = createStorageContexts(createLibrary());
+  const file = createBackupAttachment();
+  const backup = { version: 2, prompts: [{ ...createPrompt('p2'), attachments: [file] }] };
+  await assert.rejects(popup.importLibrary(backup), /Export again with attachment files included/);
+  assert.equal(writes.length, 0);
+  attachments.set(file.id, { ...file, bytes: new TextEncoder().encode('new').buffer });
+  await popup.importLibrary(backup);
+  assert.equal(records.langqueue_prompts.promptsById.p2.attachments[0].id, file.id);
+  assert.equal(attachments.size, 1);
+});
+
+test('legacy prompt and chain imports preserve exact text and string steps', async () => {
+  const { popup } = createStorageContexts(createLibrary());
+  await popup.importLibrary({ version: 1, prompts: [{ id: 'legacy', title: 'legacy', content: '  exact\n\ntext\t' }] });
+  await popup.importLibrary({ version: 1, chains: [{ id: 'legacy-chain', title: 'legacy', steps: ['  step one\n', 'step two\t'] }] });
+  assert.equal((await popup.getPrompt('legacy')).content, '  exact\n\ntext\t');
+  assert.equal((await popup.getAllChains())[0].steps[0].content, '  step one\n');
+});
+
+test('prompt import duplicate strategies keep their skip, replace, duplicate, and replace-library behavior', async () => {
+  for (const strategy of ['skip', 'replace', 'duplicate']) {
+    const { popup } = createStorageContexts(createLibrary());
+    const counts = await popup.importPrompts({ version: 2, prompts: [{ ...createPrompt(), content: 'replacement' }] }, { mode: 'merge', duplicateStrategy: strategy });
+    assert.equal(counts[strategy === 'skip' ? 'skipped' : strategy === 'replace' ? 'replaced' : 'duplicated'], 1);
+    assert.equal((await popup.getPrompt('p1')).content, strategy === 'replace' ? 'replacement' : 'original');
+    assert.equal((await popup.getAllPrompts()).length, strategy === 'duplicate' ? 2 : 1);
+  }
+  const { popup } = createStorageContexts(createLibrary());
+  await popup.importPrompts({ version: 2, prompts: [createPrompt('new')] }, { mode: 'replace', duplicateStrategy: 'skip' });
+  assert.equal(await popup.getPrompt('p1'), null);
+  assert.equal((await popup.getAllPrompts()).length, 1);
+});
+
+test('cleanup failure after successful deletion does not report a failed delete', async () => {
+  const initial = createLibrary();
+  initial.langqueue_chains.items = [{ id: 'c1', title: 'chain', steps: [], createdAt: 1, updatedAt: 1 }];
+  const { popup, failCleanup } = createStorageContexts(initial);
+  failCleanup();
+  await popup.deletePrompt('p1');
+  await popup.deleteChain('c1');
+  assert.equal(await popup.getPrompt('p1'), null);
+  assert.equal((await popup.getAllChains()).length, 0);
+});
+
+test('import directly into legacy stored schemas preserves old records and publishes migrated envelopes once', async () => {
+  for (const storedPrompts of [[{ id: 'old', title: 'old', content: ' old text\n' }], { meta: { schemaVersion: 1, createdAt: 1 }, prompts: [{ id: 'old', title: 'old', content: ' old text\n' }] }]) {
+    const initial = { langqueue_prompts: storedPrompts, langqueue_chains: [{ id: 'old-chain', title: 'old', steps: [' old step\n'] }] };
+    const { popup, records, writes } = createStorageContexts(initial);
+    await popup.importLibrary({ version: 1, prompts: [{ id: 'new', title: 'new', content: ' new text\n' }] });
+    assert.equal(records.langqueue_prompts.meta.schemaVersion, 3);
+    assert.equal((await popup.getPrompt('old')).content, ' old text\n');
+    assert.equal((await popup.getPrompt('new')).content, ' new text\n');
+    assert.equal((await popup.getAllChains())[0].steps[0].content, ' old step\n');
+    assert.equal(writes.length, 1);
+  }
+});
+
+test('corrupt imports do not migrate or modify a legacy stored library', async () => {
+  const initial = { langqueue_prompts: { prompts: [{ id: 'old', title: 'old', content: 'old' }] }, langqueue_chains: [] };
+  const { popup, records, writes } = createStorageContexts(initial);
+  const bad = { ...createBackupAttachment(), dataBase64: '%%%' };
+  await assert.rejects(popup.importLibrary({ version: 3, prompts: [createPrompt()], chains: [], attachments: [bad] }), /Invalid base64/);
+  assert.deepEqual(records, initial);
+  assert.equal(writes.length, 0);
+});
+
+test('skipped prompt and chain duplicates do not require obsolete attachment files', async () => {
+  const initial = createLibrary();
+  initial.langqueue_chains.items = [{ id: 'c1', title: 'original', steps: [], createdAt: 1, updatedAt: 1 }];
+  const { popup } = createStorageContexts(initial);
+  const missing = createBackupAttachment('missing');
+  const promptCounts = await popup.importPrompts({ version: 2, prompts: [{ ...createPrompt(), attachments: [missing] }] }, { mode: 'merge', duplicateStrategy: 'skip' });
+  const chainCounts = await popup.importChains({ version: 2, chains: [{ id: 'c1', title: 'replacement', steps: [{ content: 'unused', attachments: [missing] }], createdAt: 1, updatedAt: 1 }] }, { mode: 'merge', duplicateStrategy: 'skip' });
+  assert.equal(promptCounts.skipped, 1);
+  assert.equal(chainCounts.skipped, 1);
+  assert.equal((await popup.getPrompt('p1')).attachments.length, 0);
+  assert.equal((await popup.getAllChains())[0].title, 'original');
+});
+
+test('accepted attachment metadata and bytes survive export and import into a fresh library', async () => {
+  const first = createStorageContexts(createLibrary());
+  const file = createBackupAttachment('source', 'round trip');
+  await first.popup.importLibrary({ version: 3, prompts: [{ ...createPrompt('imported'), attachments: [file] }], chains: [], attachments: [file] });
+  const exported = await first.popup.exportLibrary({ includeBinaries: true });
+  const firstRef = exported.prompts.find((prompt) => prompt.id === 'imported').attachments[0];
+  assert.equal(firstRef.mimeType, exported.attachments[0].mimeType);
+  assert.equal(firstRef.kind, exported.attachments[0].kind);
+  const second = createStorageContexts(createLibrary());
+  await second.popup.importLibrary(exported);
+  const secondRef = (await second.popup.getPrompt('imported')).attachments[0];
+  assert.equal(secondRef.mimeType, 'text/plain');
+  assert.equal(secondRef.kind, 'file');
+  assert.equal(new TextDecoder().decode(second.attachments.get(secondRef.id).bytes), 'round trip');
+});
+
+test('inconsistent binary kinds and MIME casing reject imports without changing the library', async () => {
+  const { popup, records, writes } = createStorageContexts(createLibrary());
+  const before = structuredClone(records);
+  for (const file of [{ ...createBackupAttachment(), kind: 'image' }, { ...createBackupAttachment(), mimeType: 'TEXT/PLAIN' }]) {
+    await assert.rejects(popup.importLibrary({ version: 3, prompts: [{ ...createPrompt(), attachments: [file] }], chains: [], attachments: [file] }), /kind does not match|canonical lowercase form/);
+  }
+  assert.deepEqual(records, before);
+  assert.equal(writes.length, 0);
 });

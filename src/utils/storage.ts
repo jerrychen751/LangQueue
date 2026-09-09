@@ -1,5 +1,4 @@
 import type {
-  AttachmentExportRecord,
   AttachmentRef,
   AppSettings,
   ChainExportFile,
@@ -19,7 +18,8 @@ import { CURRENT_CHAINS_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION } from '../types'
 import {
   deleteAttachment,
   exportAttachmentRecords,
-  importAttachmentRecords,
+  prepareAttachmentImports,
+  getAttachmentMeta,
   inferAttachmentKind,
   listAttachmentIds,
   saveAttachmentFile,
@@ -451,30 +451,19 @@ async function exportPromptsUnlocked(): Promise<PromptExportFile> {
   };
 }
 
-async function importPromptsUnlocked(
-  data: unknown,
-  options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<{ imported: number; skipped: number; replaced: number; duplicated: number }> {
-  if (!data || typeof data !== 'object') throw new Error('Invalid import data');
-  const file = data as Partial<PromptExportFile>;
-  if (typeof file.version !== 'number' || !Array.isArray(file.prompts)) throw new Error('Invalid prompt export format');
-
-  const db = await getPrompts();
+function mergeImportedPrompts(prompts: Prompt[], options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }, db: PromptsSchema): ImportCounts {
+  db.promptsById = Object.assign(Object.create(null), db.promptsById);
   let imported = 0;
   let skipped = 0;
   let replaced = 0;
   let duplicated = 0;
 
   if (options.mode === 'replace') {
-    db.promptsById = {};
+    db.promptsById = Object.create(null);
   }
 
-  for (const raw of file.prompts) {
-    const p = normalizePrompt(raw);
-    if (!p) {
-      skipped += 1;
-      continue;
-    }
-    const exists = Boolean(db.promptsById[p.id]);
+  for (const p of prompts) {
+    const exists = Object.hasOwn(db.promptsById, p.id);
     if (exists) {
       if (options.duplicateStrategy === 'skip') {
         skipped += 1;
@@ -486,7 +475,7 @@ async function importPromptsUnlocked(
         continue;
       }
       if (options.duplicateStrategy === 'duplicate') {
-        const newId = `${p.id}_copy_${Date.now()}`;
+        const newId = generateId(p.id + '_copy');
         const copy = { ...p, id: newId, createdAt: Date.now(), updatedAt: Date.now() };
         db.promptsById[newId] = copy;
         duplicated += 1;
@@ -497,7 +486,6 @@ async function importPromptsUnlocked(
     imported += 1;
   }
 
-  await savePrompts(db);
   return { imported, skipped, replaced, duplicated };
 }
 
@@ -568,14 +556,7 @@ async function exportChainsUnlocked(): Promise<ChainExportFile> {
   };
 }
 
-async function importChainsUnlocked(
-  data: unknown,
-  options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<{ imported: number; skipped: number; replaced: number; duplicated: number }> {
-  if (!data || typeof data !== 'object') throw new Error('Invalid import data');
-  const file = data as Partial<ChainExportFile>;
-  if (typeof file.version !== 'number' || !Array.isArray(file.chains)) throw new Error('Invalid chain export format');
-
-  const envelope = await getChainsEnvelope();
+function mergeImportedChains(chains: PromptChain[], options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }, envelope: ChainsEnvelope): ImportCounts {
   let list = envelope.items;
   let imported = 0;
   let skipped = 0;
@@ -586,13 +567,7 @@ async function importChainsUnlocked(
     list = [];
   }
 
-  for (const raw of file.chains) {
-    const c = normalizeChain(raw);
-    if (!c) {
-      skipped += 1;
-      continue;
-    }
-
+  for (const c of chains) {
     const idx = list.findIndex((x) => x.id === c.id);
     if (idx >= 0) {
       if (options.duplicateStrategy === 'skip') {
@@ -605,7 +580,7 @@ async function importChainsUnlocked(
         continue;
       }
       if (options.duplicateStrategy === 'duplicate') {
-        const copy = { ...c, id: `${c.id}_copy_${Date.now()}`, createdAt: Date.now(), updatedAt: Date.now() };
+        const copy = { ...c, id: generateId(c.id + '_copy'), createdAt: Date.now(), updatedAt: Date.now() };
         list.unshift(copy);
         duplicated += 1;
         continue;
@@ -616,7 +591,7 @@ async function importChainsUnlocked(
     }
   }
 
-  await saveChainsEnvelope({ ...envelope, items: list });
+  envelope.items = list;
   return { imported, skipped, replaced, duplicated };
 }
 
@@ -649,84 +624,152 @@ async function exportLibraryUnlocked(
 
 type ImportCounts = { imported: number; skipped: number; replaced: number; duplicated: number };
 
-function isLibraryExportFile(input: unknown): input is LibraryExportFile {
-  return (
-    !!input &&
-    typeof input === 'object' &&
-    typeof (input as { version?: number }).version === 'number' &&
-    Array.isArray((input as { prompts?: unknown[] }).prompts) &&
-    Array.isArray((input as { chains?: unknown[] }).chains)
-  );
+function validateImportedAttachments(raw: unknown): AttachmentRef[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) throw new Error('Invalid attachment references in backup.');
+  if (raw.some((entry) => entry && typeof entry === 'object' && entry.kind !== undefined && entry.kind !== 'image' && entry.kind !== 'file')) throw new Error('Invalid attachment kind in backup.');
+  const refs = normalizeAttachmentRefs(raw);
+  if (refs.length !== raw.length || refs.some((ref) => !ref.id || !ref.name || !Number.isSafeInteger(ref.size))) throw new Error('Invalid attachment references in backup.');
+  return refs;
 }
 
-function isPromptExportFile(input: unknown): input is PromptExportFile {
-  return (
-    !!input &&
-    typeof input === 'object' &&
-    typeof (input as { version?: number }).version === 'number' &&
-    Array.isArray((input as { prompts?: unknown[] }).prompts)
-  );
-}
-
-function isChainExportFile(input: unknown): input is ChainExportFile {
-  return (
-    !!input &&
-    typeof input === 'object' &&
-    typeof (input as { version?: number }).version === 'number' &&
-    Array.isArray((input as { chains?: unknown[] }).chains)
-  );
-}
-
-async function importLibraryUnlocked(
-  data: unknown): Promise<{ prompts?: ImportCounts; chains?: ImportCounts; attachments?: { imported: number } }> {
+async function importDataUnlocked(
+  data: unknown,
+  options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }
+): Promise<{ prompts?: ImportCounts; chains?: ImportCounts; attachments?: { imported: number } }> {
   const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-  const importOptions = { mode: 'merge' as ImportMode, duplicateStrategy: 'replace' as DuplicateStrategy };
-
-  if (isLibraryExportFile(parsed)) {
-    const promptResult = await importPromptsUnlocked(
-      { version: parsed.version, exportedAt: parsed.exportedAt, prompts: parsed.prompts },
-      importOptions
-    );
-    const chainResult = await importChainsUnlocked(
-      { version: parsed.version, exportedAt: parsed.exportedAt, chains: parsed.chains },
-      importOptions
-    );
-
-    let attachmentsImported = 0;
-    const attachments = Array.isArray(parsed.attachments) ? parsed.attachments as AttachmentExportRecord[] : [];
-    if (attachments.length > 0) {
-      attachmentsImported = await importAttachmentRecords(attachments);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid backup. Expected a JSON object.');
+  const file = parsed as Partial<LibraryExportFile>;
+  const hasPrompts = Object.hasOwn(file, 'prompts');
+  const hasChains = Object.hasOwn(file, 'chains');
+  if ((!hasPrompts && !hasChains) || (hasPrompts && !Array.isArray(file.prompts)) || (hasChains && !Array.isArray(file.chains))) throw new Error('Invalid backup. Expected prompts or chains.');
+  if (hasPrompts && hasChains ? file.version !== 3 : file.version !== 1 && file.version !== 2) throw new Error('Unsupported backup version. Export a supported backup from LangQueue.');
+  const prompts = (file.prompts ?? []).map((raw) => {
+    const prompt = normalizePrompt(raw);
+    if (!prompt || !prompt.id || !prompt.title.trim()) throw new Error('Invalid prompt in backup.');
+    prompt.attachments = validateImportedAttachments(raw.attachments);
+    return prompt;
+  });
+  const chains = (file.chains ?? []).map((raw) => {
+    const chain = normalizeChain(raw);
+    if (!chain || !chain.id || !chain.title.trim() || !Array.isArray(raw.steps)) throw new Error('Invalid chain in backup.');
+    chain.steps = raw.steps.map((step) => {
+      if (typeof step === 'string') return normalizeChainStep(step);
+      if (!step || typeof step !== 'object' || typeof step.content !== 'string') throw new Error('Invalid chain step in backup.');
+      return { content: step.content, attachments: validateImportedAttachments(step.attachments) };
+    });
+    return chain;
+  });
+  const binaries = prepareAttachmentImports(Object.hasOwn(file, 'attachments') ? file.attachments : []);
+  const storedPrompts = await getFromLocalStorage<unknown>(PROMPTS_KEY);
+  let db: PromptsSchema;
+  if (storedPrompts === undefined) {
+    db = createEmptyPrompts();
+  } else {
+    if (!storedPrompts || typeof storedPrompts !== 'object') throw new Error('Stored prompt library is invalid. Export your existing data before importing.');
+    const current = storedPrompts as { meta?: Partial<PromptsSchema['meta']>; prompts?: unknown; promptsById?: unknown };
+    const version = current.meta?.schemaVersion;
+    if (version !== undefined && (typeof version !== 'number' || !Number.isInteger(version) || version < 1 || version > CURRENT_SCHEMA_VERSION)) throw new Error('Unsupported stored prompt schema.');
+    const records = Array.isArray(storedPrompts) ? storedPrompts : Array.isArray(current.prompts) ? current.prompts : current.promptsById && typeof current.promptsById === 'object' && !Array.isArray(current.promptsById) ? Object.values(current.promptsById) : null;
+    if (!records) throw new Error('Stored prompt library is invalid.');
+    const promptsById: Record<string, Prompt> = Object.create(null);
+    for (const raw of records) {
+      const prompt = normalizePrompt(raw);
+      if (!prompt || Object.hasOwn(promptsById, prompt.id)) throw new Error('Stored prompt library contains invalid or duplicate records.');
+      prompt.attachments = validateImportedAttachments((raw as Partial<Prompt>).attachments);
+      promptsById[prompt.id] = prompt;
     }
-
-    return {
-      prompts: promptResult,
-      chains: chainResult,
-      attachments: { imported: attachmentsImported },
-    };
+    db = { meta: { schemaVersion: CURRENT_SCHEMA_VERSION, createdAt: safeNumber(current.meta?.createdAt, Date.now()), updatedAt: safeNumber(current.meta?.updatedAt, Date.now()) }, promptsById };
   }
-
-  if (isPromptExportFile(parsed)) {
-    const prompts = await importPromptsUnlocked(parsed, importOptions);
-    return { prompts };
+  const storedChains = await getFromLocalStorage<unknown>(CHAINS_KEY);
+  let envelope: ChainsEnvelope;
+  if (storedChains === undefined) {
+    envelope = createEmptyChainsEnvelope();
+  } else {
+    if (!storedChains || typeof storedChains !== 'object') throw new Error('Stored chain library is invalid.');
+    const current = storedChains as { version?: unknown; updatedAt?: unknown; items?: unknown };
+    if (current.version !== undefined && (typeof current.version !== 'number' || !Number.isInteger(current.version) || current.version < 1 || current.version > CURRENT_CHAINS_SCHEMA_VERSION)) throw new Error('Unsupported stored chain schema.');
+    const records = Array.isArray(storedChains) ? storedChains : Array.isArray(current.items) ? current.items : null;
+    if (!records) throw new Error('Stored chain library is invalid.');
+    const items = records.map((raw) => {
+      const chain = normalizeChain(raw);
+      if (!chain || !Array.isArray(raw.steps)) throw new Error('Stored chain library contains invalid records.');
+      chain.steps = raw.steps.map((step: unknown) => {
+        if (typeof step === 'string') return normalizeChainStep(step);
+        if (!step || typeof step !== 'object' || typeof (step as Partial<PromptStep>).content !== 'string') throw new Error('Stored chain contains an invalid step.');
+        const candidate = step as PromptStep;
+        return { content: candidate.content, attachments: validateImportedAttachments(candidate.attachments) };
+      });
+      return chain;
+    });
+    envelope = { version: CURRENT_CHAINS_SCHEMA_VERSION, updatedAt: safeNumber(current.updatedAt, Date.now()), items };
   }
-
-  if (isChainExportFile(parsed)) {
-    const chains = await importChainsUnlocked(parsed, importOptions);
-    return { chains };
+  const result: { prompts?: ImportCounts; chains?: ImportCounts; attachments?: { imported: number } } = {};
+  if (hasPrompts) {
+    result.prompts = mergeImportedPrompts(prompts, options, db);
+    db.meta.updatedAt = Date.now();
   }
+  if (hasChains) {
+    result.chains = mergeImportedChains(chains, options, envelope);
+    envelope.updatedAt = Date.now();
+  }
+  const selectedRefs = new Set([...Object.values(db.promptsById).map((prompt) => prompt.attachments), ...envelope.items.flatMap((chain) => chain.steps.map((step) => step.attachments))]);
+  const binaryById = new Map(binaries.map((binary) => [binary.ref.id, binary]));
+  const existingById = new Map<string, AttachmentRef>();
+  const remappedById = new Map<string, AttachmentRef>();
+  const pendingAttachments = new Map<string, File>();
+  for (const refs of [...prompts.map((prompt) => prompt.attachments), ...chains.flatMap((chain) => chain.steps.map((step) => step.attachments))]) {
+    if (!selectedRefs.has(refs)) continue;
+    for (let index = 0; index < refs.length; index++) {
+      const ref = refs[index];
+      const binary = binaryById.get(ref.id);
+      let stored = binary?.ref ?? existingById.get(ref.id);
+      if (!stored) {
+        stored = (await getAttachmentMeta(ref.id)) ?? undefined;
+        if (stored) existingById.set(ref.id, stored);
+      }
+      if (!stored) throw new Error('Missing attachment "' + ref.name + '". Export again with attachment files included, then import that backup.');
+      if (stored.size !== ref.size || stored.mimeType !== ref.mimeType || stored.name !== ref.name || stored.kind !== ref.kind) throw new Error('Attachment metadata does not match its file: ' + ref.name);
+      if (binary) {
+        let remapped = remappedById.get(ref.id);
+        if (!remapped) {
+          remapped = { ...stored, id: 'a_' + crypto.randomUUID() };
+          remappedById.set(ref.id, remapped);
+          pendingAttachments.set(remapped.id, binary.file);
+        }
+        refs[index] = { ...remapped };
+      }
+    }
+  }
+  const updates = { [PROMPTS_KEY]: db, [CHAINS_KEY]: envelope };
+  const referenced = collectReferencedAttachmentIds(db, envelope.items);
+  for (const id of pendingAttachments.keys()) {
+    if (!referenced.has(id)) pendingAttachments.delete(id);
+  }
+  await saveWithAttachments(pendingAttachments, () => chrome.storage.local.set(updates));
+  await cleanupUnusedAttachments().catch(() => {});
+  if (hasPrompts && hasChains) result.attachments = { imported: pendingAttachments.size };
+  return result;
+}
 
-  throw new Error('Unrecognized export format. Expected prompts, chains, or combined library export.');
+async function importPromptsUnlocked(data: unknown, options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<ImportCounts> {
+  if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'prompts') || Object.hasOwn(data, 'chains')) throw new Error('Invalid prompt export format');
+  return (await importDataUnlocked(data, options)).prompts!;
+}
+
+async function importChainsUnlocked(data: unknown, options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<ImportCounts> {
+  if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'chains') || Object.hasOwn(data, 'prompts')) throw new Error('Invalid chain export format');
+  return (await importDataUnlocked(data, options)).chains!;
+}
+
+async function importLibraryUnlocked(data: unknown) {
+  return importDataUnlocked(data, { mode: 'merge', duplicateStrategy: 'replace' });
 }
 
 function serializeStorageOperation<Args extends unknown[], Result>(
-  operation: (...args: Args) => Promise<Result>,
-  shouldCleanup = false
+  operation: (...args: Args) => Promise<Result>
 ): (...args: Args) => Promise<Result> {
-  return async (...args) => await navigator.locks.request('langqueue-storage', async () => {
-    const result = await operation(...args);
-    if (shouldCleanup) await cleanupUnusedAttachments();
-    return result;
-  });
+  return async (...args) => await navigator.locks.request('langqueue-storage', () => operation(...args));
 }
 
 export const savePrompt = serializeStorageOperation(savePromptUnlocked);
@@ -742,12 +785,12 @@ export const getSettings = serializeStorageOperation(getSettingsUnlocked);
 export const saveSettings = serializeStorageOperation(saveSettingsUnlocked);
 export const clearAllData = serializeStorageOperation(clearAllDataUnlocked);
 export const exportPrompts = serializeStorageOperation(exportPromptsUnlocked);
-export const importPrompts = serializeStorageOperation(importPromptsUnlocked, true);
+export const importPrompts = serializeStorageOperation(importPromptsUnlocked);
 export const getAllChains = serializeStorageOperation(getAllChainsUnlocked);
 export const saveChain = serializeStorageOperation(saveChainUnlocked);
 export const deleteChain = serializeStorageOperation(deleteChainUnlocked);
 export const searchChains = serializeStorageOperation(searchChainsUnlocked);
 export const exportChains = serializeStorageOperation(exportChainsUnlocked);
-export const importChains = serializeStorageOperation(importChainsUnlocked, true);
+export const importChains = serializeStorageOperation(importChainsUnlocked);
 export const exportLibrary = serializeStorageOperation(exportLibraryUnlocked);
-export const importLibrary = serializeStorageOperation(importLibraryUnlocked, true);
+export const importLibrary = serializeStorageOperation(importLibraryUnlocked);
