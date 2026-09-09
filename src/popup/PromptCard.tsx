@@ -2,13 +2,13 @@ import { Pencil, Trash2, Send } from 'lucide-react'
 import type { Prompt } from '../types'
 import { useToast } from '../components/useToast'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 type PromptCardProps = {
   index: number
   prompt: Prompt
   onEdit: (prompt: Prompt) => void
-  onDelete: (prompt: Prompt) => void
+  onDelete: (prompt: Prompt) => Promise<void>
   onInsert: (prompt: Prompt) => void
   onSend?: (prompt: Prompt) => void
   canInsert?: boolean
@@ -25,6 +25,8 @@ export function PromptCard({
 }: PromptCardProps) {
   const { showToast } = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const deletingRef = useRef(false)
   const promptNumber = String(index + 1).padStart(2, '0')
 
   return (
@@ -98,14 +100,25 @@ export function PromptCard({
       </article>
       <DeleteConfirmModal
         open={confirmOpen}
+        busy={deleting}
         title="Delete this prompt?"
         description="This action cannot be undone."
-        confirmLabel="Delete"
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          setConfirmOpen(false)
-          onDelete(prompt)
-          showToast({ variant: 'success', message: 'Prompt deleted' })
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        onCancel={() => { if (!deletingRef.current) setConfirmOpen(false) }}
+        onConfirm={async () => {
+          if (deletingRef.current) return
+          deletingRef.current = true
+          setDeleting(true)
+          try {
+            await onDelete(prompt)
+            setConfirmOpen(false)
+            showToast({ variant: 'success', message: 'Prompt deleted' })
+          } catch (error) {
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete prompt. Try again.' })
+          } finally {
+            deletingRef.current = false
+            setDeleting(false)
+          }
         }}
       />
     </>

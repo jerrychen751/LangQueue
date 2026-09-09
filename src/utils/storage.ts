@@ -320,7 +320,7 @@ async function deletePromptUnlocked(id: string): Promise<void> {
   if (db.promptsById[id]) {
     delete db.promptsById[id];
     await savePrompts(db);
-    await cleanupUnusedAttachments();
+    await cleanupUnusedAttachments().catch(() => {});
   }
 }
 
@@ -528,7 +528,7 @@ async function deleteChainUnlocked(id: string): Promise<void> {
   const envelope = await getChainsEnvelope();
   const next = envelope.items.filter((c) => c.id !== id);
   await saveChainsEnvelope({ ...envelope, items: next });
-  await cleanupUnusedAttachments();
+  await cleanupUnusedAttachments().catch(() => {});
 }
 
 async function searchChainsUnlocked(query: string): Promise<PromptChain[]> {

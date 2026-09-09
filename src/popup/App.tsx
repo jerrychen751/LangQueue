@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Settings as SettingsIcon, Download, Workflow } from 'lucide-react'
 import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
@@ -37,6 +37,9 @@ export default function App() {
   const [chainOpen, setChainOpen] = useState(false)
   const [chains, setChains] = useState<PromptChain[]>([])
   const [deleteChainTarget, setDeleteChainTarget] = useState<PromptChain | null>(null)
+  const deletingChainRef = useRef(false)
+  const [deletingChain, setDeletingChain] = useState(false)
+  const insertingRef = useRef(false)
   const { showToast } = useToast()
   const [focusSearchSignal, setFocusSearchSignal] = useState(0)
   const [exporting, setExporting] = useState(false)
@@ -211,20 +214,37 @@ export default function App() {
 
   async function handleDelete(p: Prompt) {
     await deletePrompt(p.id)
-    await handleRefresh()
+    setPrompts((items) => items.filter((item) => item.id !== p.id))
+    try {
+      await handleRefresh()
+    } catch {
+      showToast({ variant: 'info', message: 'Prompt deleted, but library counts could not refresh. Reopen the popup to refresh them.' })
+    }
   }
 
   async function handleInsert(p: Prompt) {
+    if (insertingRef.current) return
+    insertingRef.current = true
     try {
-      await sendPromptToTab(p.content, p.attachments || [])
-      showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` })
-    } catch {
-      await navigator.clipboard.writeText(p.content)
-      showToast({ variant: 'info', message: 'Copied to clipboard' })
+      try {
+        await sendPromptToTab(p.content, p.attachments || [])
+        showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Insertion failed'
+        showToast({ variant: 'error', message: `${message}. Check the chat composer and finish or cancel any active queue before trying again.` })
+        return
+      }
+      try {
+        await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id })
+        await handleRefresh()
+      } catch {
+        showToast({ variant: 'info', message: 'Prompt inserted, but usage counts could not refresh. Check the composer before inserting again.' })
+        return
+      }
+      window.close()
+    } finally {
+      insertingRef.current = false
     }
-    await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id })
-    await handleRefresh()
-    window.close()
   }
 
   async function handleExport() {
@@ -458,15 +478,31 @@ export default function App() {
       />
       <DeleteConfirmModal
         open={Boolean(deleteChainTarget)}
+        busy={deletingChain}
         title="Delete chain?"
         description={deleteChainTarget ? `"${deleteChainTarget.title}" will be removed from your library.` : 'This action cannot be undone.'}
-        confirmLabel="Delete chain"
-        onCancel={() => setDeleteChainTarget(null)}
+        confirmLabel={deletingChain ? 'Deleting…' : 'Delete chain'}
+        onCancel={() => { if (!deletingChainRef.current) setDeleteChainTarget(null) }}
         onConfirm={async () => {
-          if (!deleteChainTarget) return
-          await deleteChain(deleteChainTarget.id)
-          await handleRefresh()
-          setDeleteChainTarget(null)
+          if (!deleteChainTarget || deletingChainRef.current) return
+          deletingChainRef.current = true
+          setDeletingChain(true)
+          try {
+            await deleteChain(deleteChainTarget.id)
+            setChains((items) => items.filter((item) => item.id !== deleteChainTarget.id))
+            setDeleteChainTarget(null)
+            showToast({ variant: 'success', message: 'Chain deleted' })
+            try {
+              await handleRefresh()
+            } catch {
+              showToast({ variant: 'info', message: 'Chain deleted, but library counts could not refresh. Reopen the popup to refresh them.' })
+            }
+          } catch (error) {
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete chain. Try again.' })
+          } finally {
+            deletingChainRef.current = false
+            setDeletingChain(false)
+          }
         }}
       />
     </div>
