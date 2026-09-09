@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -65,4 +65,27 @@ test('rejects resource paths outside the build directory', () => {
   const result = runValidation(manifest => { manifest.icons[16] = '../outside.png' })
   assert.equal(result.status, 1)
   assert.match(result.stderr, /Invalid resource path/)
+})
+
+test('rejects Finder metadata and directory placeholders anywhere in the package', () => {
+  for (const file of ['.DS_Store', 'icons/.gitkeep']) {
+    const result = runValidation((manifest, directory) => writeFileSync(join(directory, file), 'unwanted'))
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /Unexpected build artifact/)
+  }
+})
+
+test('package cleanup removes metadata while retaining emitted assets', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'langqueue-package-'))
+  try {
+    mkdirSync(join(directory, 'dist/icons'), { recursive: true })
+    for (const file of ['.DS_Store', 'icons/.gitkeep', 'icons/icon.png']) writeFileSync(join(directory, 'dist', file), 'fixture')
+    const result = spawnSync(process.execPath, [resolve('scripts/clean-build.mjs')], { cwd: directory, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(existsSync(join(directory, 'dist/.DS_Store')), false)
+    assert.equal(existsSync(join(directory, 'dist/icons/.gitkeep')), false)
+    assert.equal(readFileSync(join(directory, 'dist/icons/icon.png'), 'utf8'), 'fixture')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })

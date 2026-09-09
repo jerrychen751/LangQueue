@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
-import { globSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { globSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 
 try {
   const directory = realpathSync(resolve(process.argv[2] || 'dist'))
+  for (const entry of readdirSync(directory, { recursive: true, withFileTypes: true })) {
+    assert.ok(!['.DS_Store', '.gitkeep'].includes(entry.name), `Unexpected build artifact: ${entry.name}`)
+  }
   const source = JSON.parse(readFileSync(resolve(process.argv[3] || 'manifest.json'), 'utf8'))
   const manifest = JSON.parse(readFileSync(resolve(directory, 'manifest.json'), 'utf8'))
   assert.equal(manifest.manifest_version, 3, 'Build must use Manifest V3')
