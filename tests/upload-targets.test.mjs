@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createChatGPTAdapter } from '../src/content/adapters/chatgpt.ts'
 import { createClaudeAdapter } from '../src/content/adapters/claude.ts'
 import { createGeminiAdapter } from '../src/content/adapters/gemini.ts'
-import { waitForSelectorsToDisappear } from '../src/content/adapters/utils.ts'
+import { findEnabledFileInput, waitForSelectorsToDisappear } from '../src/content/adapters/utils.ts'
 
 class FakeFileInput {
   type = 'file'
@@ -14,6 +14,7 @@ class FakeFileInput {
   dispatchEvent() { this.events++ }
 }
 globalThis.HTMLInputElement = FakeFileInput
+globalThis.location = { href: 'https://chatgpt.com/c/upload-test' }
 globalThis.DataTransfer = class {
   files = []
   items = { add: file => this.files.push(file) }
@@ -69,11 +70,10 @@ for (const [name, createAdapter, recognized] of [
     assert.equal((await adapter.attachFiles([new File(['text'], 'sample.txt')])).ok, false)
     assert.equal(first.events + second.events, 0)
   })
-  test(`${name}: immediate parent uploader works without a form`, async () => {
+  test(`${name}: immediate parent uploader can be located without a form`, () => {
     const local = new FakeFileInput()
     const adapter = createFixture(createAdapter, [local], [], false)
-    assert.equal((await adapter.attachFiles([new File(['text'], 'sample.txt')])).ok, true)
-    assert.equal(local.files.length, 1)
+    assert.equal(findEnabledFileInput(adapter.getInputElement(), []), local)
   })
   if (recognized) {
     test(`${name}: one explicitly recognized external uploader is allowed`, async () => {
@@ -101,6 +101,16 @@ for (const [name, createAdapter, recognized] of [
     })
   }
 }
+
+test('ChatGPT rejects a recognized uploader without an acceptance context before assigning files', async () => {
+  const external = new FakeFileInput({ id: 'upload-files' })
+  const adapter = createFixture(createChatGPTAdapter, [], [external], false)
+  const result = await adapter.attachFiles([new File(['text'], 'sample.txt')])
+  assert.equal(result.ok, false)
+  assert.match(result.error, /acceptance cannot be checked/)
+  assert.equal(external.files.length, 0)
+  assert.equal(external.events, 0)
+})
 
 test('hidden first progress indicator cannot mask a later visible indicator', async context => {
   context.mock.timers.enable({ apis: ['Date', 'setTimeout'] })

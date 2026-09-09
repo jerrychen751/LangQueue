@@ -34,5 +34,5 @@ export abstract class Adapter {
   }
 
   abstract attachFiles(files: File[]): Promise<{ ok: boolean; error?: string }>
-  abstract waitForUploadsComplete(options?: { timeoutMs?: number; pollMs?: number }): Promise<boolean>
+  abstract waitForUploadsComplete(options?: { timeoutMs?: number; pollMs?: number; files?: File[] }): Promise<boolean>
 }

@@ -133,7 +133,7 @@ export async function executeStep(
     assertExecutionContext(signal, href)
     const attached = await adapter.attachFiles(files)
     if (!attached.ok) throw new Error(attached.error || 'ATTACHMENT_UPLOAD_FAILED')
-    const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: timing.pollMs })
+    const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: timing.pollMs, files })
     assertExecutionContext(signal, href)
     if (!uploaded) throw new Error('ATTACHMENT_UPLOAD_TIMEOUT')
   }

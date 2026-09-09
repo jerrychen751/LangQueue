@@ -4,11 +4,11 @@ import {
   findComposerSendButton,
   isVisible,
   setFilesOnInput,
-  waitForSelectorsToDisappear,
 } from './utils'
 
 class ChatGPTAdapter extends Adapter {
   id = 'chatgpt' as const
+  private uploadAttempt: { input: HTMLTextAreaElement; form: Element; href: string; files: File[]; counts: Map<string, number> } | null = null
 
   matchesAdapterDomain(): boolean {
     return /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname)
@@ -82,18 +82,63 @@ class ChatGPTAdapter extends Adapter {
   }
 
   async attachFiles(files: File[]) {
+    this.uploadAttempt = null
     if (!Array.isArray(files) || files.length === 0) return { ok: true }
-    const input = findEnabledFileInput(this.getInputElement(), ['input#upload-files[type="file"]'])
+    const composer = this.getInputElement()
+    const input = findEnabledFileInput(composer, ['input#upload-files[type="file"]'])
     if (!input) return { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' }
-    return setFilesOnInput(input, files)
+    const form = composer?.closest('form[data-type="unified-composer"]')
+    if (!composer || !form) return { ok: false, error: 'Attachment acceptance cannot be checked in this chat layout. Attach the files manually in the chat composer.' }
+    const counts = new Map<string, number>()
+    for (const tile of form.querySelectorAll('[role="group"][aria-label]')) {
+      const name = tile.getAttribute('aria-label')!
+      counts.set(name, (counts.get(name) || 0) + 1)
+    }
+    this.uploadAttempt = { input: composer, form, href: location.href, files: [...files], counts }
+    const result = setFilesOnInput(input, files)
+    if (!result.ok) this.uploadAttempt = null
+    return result
   }
 
-  async waitForUploadsComplete(options?: { timeoutMs?: number; pollMs?: number }): Promise<boolean> {
-    return waitForSelectorsToDisappear([
-      '[aria-label*="Uploading" i]',
-      '[data-testid*="upload" i][aria-busy="true"]',
-      '[class*="upload" i][class*="progress" i]',
-    ], options)
+  async waitForUploadsComplete(options?: { timeoutMs?: number; pollMs?: number; files?: File[] }): Promise<boolean> {
+    const attempt = this.uploadAttempt
+    const files = options?.files
+    if (!attempt || !files?.length || files.length !== attempt.files.length || files.some((file, index) => file !== attempt.files[index])) return false
+    const expected = new Map(attempt.counts)
+    for (const file of files) expected.set(file.name, (expected.get(file.name) || 0) + 1)
+    const started = Date.now()
+    while (Date.now() - started < (options?.timeoutMs ?? 60000)) {
+      if (this.uploadAttempt !== attempt || location.href !== attempt.href || !attempt.form.isConnected || !attempt.input.isConnected || this.getInputElement() !== attempt.input || attempt.input.closest('form[data-type="unified-composer"]') !== attempt.form) {
+        if (this.uploadAttempt === attempt) this.uploadAttempt = null
+        return false
+      }
+      const accepted = new Map<string, number>()
+      for (const tile of attempt.form.querySelectorAll('[role="group"][aria-label]')) {
+        if (!tile.getClientRects().length) continue
+        const hasDocument = Array.from(tile.querySelectorAll('[data-testid="library-file-icon"]')).some(icon => icon.getClientRects().length > 0)
+        const hasImage = Array.from(tile.querySelectorAll<HTMLImageElement>('button[aria-label="Open image: User uploaded image"] img')).some(image => {
+          if (!image.getClientRects().length || !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) return false
+          try {
+            const url = new URL(image.currentSrc || image.src, attempt.href)
+            return url.origin === new URL(attempt.href).origin && url.pathname === '/backend-api/estuary/content'
+          } catch {
+            return false
+          }
+        })
+        if (!hasDocument && !hasImage) continue
+        const name = tile.getAttribute('aria-label')!
+        accepted.set(name, (accepted.get(name) || 0) + 1)
+      }
+      const busy = Array.from(attempt.form.querySelectorAll('[aria-busy="true"], [aria-label*="Uploading" i], [class*="animate-spin"], [class*="upload" i][class*="progress" i]')).some(node => node.getClientRects().length > 0)
+      const send = findComposerSendButton(attempt.input, ['button#composer-submit-button'])
+      if (files.every(file => (accepted.get(file.name) || 0) >= expected.get(file.name)!) && !busy && send) {
+        this.uploadAttempt = null
+        return true
+      }
+      await new Promise(resolve => setTimeout(resolve, options?.pollMs ?? 200))
+    }
+    if (this.uploadAttempt === attempt) this.uploadAttempt = null
+    return false
   }
 
 }
