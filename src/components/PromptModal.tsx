@@ -252,8 +252,9 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
             ) : null}
 
             <div>
-              <label className="field-label">Title</label>
+              <label htmlFor="prompt-title" className="field-label">Title</label>
               <input
+                id="prompt-title"
                 ref={titleRef}
                 value={title}
                 onChange={(e) => { if (!savingRef.current) setTitle(e.target.value) }}
@@ -263,8 +264,9 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
             </div>
 
             <div>
-              <label className="field-label">Prompt content</label>
+              <label htmlFor="prompt-content" className="field-label">Prompt content</label>
               <textarea
+                id="prompt-content"
                 ref={contentRef}
                 value={content}
                 onChange={(e) => { if (!savingRef.current) setContent(e.target.value) }}
