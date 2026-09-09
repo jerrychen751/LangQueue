@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { getSettings, searchPrompts, searchChains, logUsage, updatePrompt, deletePrompt, savePrompt } from '../utils/storage'
+import { getSettings, saveSettings, searchPrompts, searchChains, logUsage, updatePrompt, deletePrompt, savePrompt } from '../utils/storage'
 import { getAttachmentChunkBase64, getAttachmentMeta } from '../utils/attachments'
 import type { Platform } from '../types'
 import type { PromptData, ChainData } from '../types/messages'
@@ -114,6 +114,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // swallow
     }
     return
+  }
+  if (message?.type === 'SAVE_SETTINGS') {
+    const settings = message.payload?.settings
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      sendResponse({ type: 'SAVE_SETTINGS_RESULT', payload: { ok: false, error: 'Invalid settings payload' } })
+      return
+    }
+    saveSettings(settings)
+      .then(() => sendResponse({ type: 'SAVE_SETTINGS_RESULT', payload: { ok: true } }))
+      .catch((error) => sendResponse({ type: 'SAVE_SETTINGS_RESULT', payload: { ok: false, error: error instanceof Error ? error.message : 'Settings save failed' } }))
+    return true
   }
   if (message?.type === 'GET_SETTINGS') {
     getSettings()

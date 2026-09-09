@@ -34,6 +34,8 @@ export type InsertAndSendPromptMessage = { type: 'INSERT_AND_SEND_PROMPT'; paylo
 export type InsertAndSendPromptResultMessage = { type: 'INSERT_AND_SEND_PROMPT_RESULT'; payload: { ok: boolean; sendAttempted: boolean; reason?: string } }
 
 export type GetSettingsMessage = { type: 'GET_SETTINGS' }
+export type SaveSettingsMessage = { type: 'SAVE_SETTINGS'; payload: { settings: AppSettings } }
+export type SaveSettingsResultMessage = { type: 'SAVE_SETTINGS_RESULT'; payload: { ok: boolean; error?: string } }
 export type SettingsResultMessage = { type: 'SETTINGS_RESULT'; payload: { settings: AppSettings } }
 
 export type PromptSearchMessage = { type: 'PROMPT_SEARCH'; payload: { query: string; limit?: number } }
@@ -121,6 +123,8 @@ export type KnownMessage =
   | InsertAndSendPromptMessage
   | InsertAndSendPromptResultMessage
   | GetSettingsMessage
+  | SaveSettingsMessage
+  | SaveSettingsResultMessage
   | SettingsResultMessage
   | PromptSearchMessage
   | PromptSearchResultMessage
