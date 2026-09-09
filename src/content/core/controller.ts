@@ -127,11 +127,12 @@ export function initController(adapter: Adapter) {
         if (settingsErrorShown) executionPanel.showMessage('')
         settingsErrorShown = false
         return true
-      } catch {
+      } catch (error) {
         if (version === settingsVersion) {
           settingsLoaded = false
           settingsErrorShown = true
-          executionPanel.showMessage('Settings are unavailable. Your draft was kept. Try the action again to reload settings; if it still fails, reload the extension.')
+          const detail = error instanceof Error ? ` Details: ${error.message}` : ''
+          executionPanel.showMessage(`Settings are unavailable. Your draft was kept. Try the action again to reload settings; if it still fails, reload the extension.${detail}`)
         }
         return false
       } finally {
@@ -185,11 +186,12 @@ export function initController(adapter: Adapter) {
       overlay.show(overlayPositionFromRect(context.rect), items, label)
       if (searchErrorShown) executionPanel.showMessage('')
       searchErrorShown = false
-    } catch {
+    } catch (error) {
       if (token !== pendingSearchToken) return
       overlay.hide()
       searchErrorShown = true
-      executionPanel.showMessage('The prompt library could not be loaded. Type your shortcut again to retry; if it still fails, reload the extension.')
+      const detail = error instanceof Error ? ` Details: ${error.message}` : ''
+      executionPanel.showMessage(`The prompt library could not be loaded. Type your shortcut again to retry; if it still fails, reload the extension.${detail}`)
     }
   }
 

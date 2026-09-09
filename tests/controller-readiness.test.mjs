@@ -44,7 +44,7 @@ function createController() {
   vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/core/controller.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, {
-    exports, document: { documentElement: {}, addEventListener(name, callback) { events[name] = callback } },
+    exports, Error, document: { documentElement: {}, addEventListener(name, callback) { events[name] = callback } },
     window: { addEventListener() {} }, MutationObserver: class { observe() {} },
     chrome: { runtime: { sendMessage: async () => {}, onMessage: { addListener(fn) { receiver = fn } } }, storage: { onChanged: { addListener(fn) { changeSettings = fn } } } },
     require: name => dependencies[name] || {},
@@ -68,6 +68,7 @@ test('failed settings keep the draft and require another explicit action before 
   const failed = fixture.receive()
   fixture.loads[1].reject(new Error('unavailable'))
   assert.equal((await failed).payload.ok, false)
+  assert.match(fixture.notices.at(-1), /Details: unavailable/)
   assert.equal(fixture.input.value, 'My draft')
   assert.equal(fixture.inserted.length, 0)
   const retried = fixture.receive()
@@ -111,6 +112,7 @@ test('search failure displays an error while successful empty search remains emp
   await settle()
   assert.equal(fixture.shown.length, 0)
   assert.match(fixture.notices.at(-1), /library could not be loaded/)
+  assert.match(fixture.notices.at(-1), /Details: read failed/)
   fixture.search(false)
   await settle()
   assert.equal(fixture.shown.length, 1)
