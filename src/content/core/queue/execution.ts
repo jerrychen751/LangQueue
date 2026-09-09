@@ -66,6 +66,42 @@ export async function waitForExecutionDelay(ms: number, signal: AbortSignal) {
   })
 }
 
+export async function sendPromptWhenReady(
+  adapter: Adapter,
+  input: HTMLTextAreaElement | HTMLElement,
+  expectedText: string,
+  href: string,
+  onSend: () => void,
+  signal = new AbortController().signal,
+  timing = { timeoutMs: 5000, pollMs: 200 },
+) {
+  const startedAt = Date.now()
+  function assertSendContext() {
+    signal.throwIfAborted()
+    if (getConversationHref() !== href) throw new Error('CONVERSATION_CHANGED')
+    if (!input.isConnected || adapter.getInputElement() !== input) throw new Error('COMPOSER_CHANGED: the chat input changed. Check your draft before retrying.')
+    if (getInputText(input) !== expectedText) throw new Error('COMPOSER_CHANGED: save or clear your draft, then retry.')
+    if (adapter.isGenerating()) throw new Error('The model started generating a response. Check the conversation before sending again.')
+  }
+  while (true) {
+    assertSendContext()
+    if (adapter.getSendButton(input as HTMLTextAreaElement)) {
+      assertSendContext()
+      onSend()
+      let sent: boolean
+      try {
+        sent = adapter.clickSend(input as HTMLTextAreaElement)
+      } catch (cause) {
+        throw new Error(`SEND_UNCERTAIN: the prompt may have been sent. Check the conversation before sending again. ${cause instanceof Error ? cause.message : ''}`)
+      }
+      if (!sent) throw new Error('SEND_FAILED')
+      return
+    }
+    if (Date.now() - startedAt >= timing.timeoutMs) throw new Error('SEND_FAILED')
+    await waitForExecutionDelay(timing.pollMs, signal)
+  }
+}
+
 export async function executeStep(
   adapter: Adapter,
   getInput: () => HTMLTextAreaElement | HTMLElement | null,
@@ -110,10 +146,10 @@ export async function executeStep(
   }
   if (mode === 'append') appendInputText(input, item.content)
   else setInputText(input, item.content)
+  const expectedText = (mode === 'append' && currentText ? `${currentText}\n${item.content}` : item.content).replace(/\r\n|\r/g, '\n')
   assertExecutionContext(signal, href)
   onStatus('sending')
-  onSend()
-  if (!adapter.clickSend(input as HTMLTextAreaElement)) throw new Error('SEND_FAILED')
+  await sendPromptWhenReady(adapter, input, expectedText, href, onSend, signal, { timeoutMs: Math.min(5000, timing.startTimeoutMs), pollMs: timing.pollMs })
   onStatus('awaiting_response')
   startedAt = Date.now()
   while (!adapter.isGenerating()) {

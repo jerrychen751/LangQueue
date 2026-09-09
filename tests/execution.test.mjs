@@ -5,6 +5,7 @@ import { createChainExecutor } from '../src/content/core/queue/chain_executor.ts
 import { createQueue } from '../src/content/core/queue/queue.ts'
 
 class FakeTextarea {
+  isConnected = true
   storedValue = ''
   get value() { return this.storedValue }
   set value(value) { this.storedValue = value }
@@ -24,6 +25,7 @@ function createAdapter() {
     generating: false,
     getInputElement() { return input },
     isGenerating() { return this.generating },
+    getSendButton() { return {} },
     clickSend() { this.sends++; return true },
     attachFiles: async () => ({ ok: true }),
     waitForUploadsComplete: async () => true,
@@ -47,7 +49,9 @@ test('waits for delayed generation before completing', async context => {
   }
   let completed = false
   const pending = runStep(adapter).then(() => { completed = true })
+  await Promise.resolve()
   for (let elapsed = 1; elapsed <= 16; elapsed++) {
+    await new Promise(resolve => setImmediate(resolve))
     context.mock.timers.tick(1)
     await Promise.resolve()
     await Promise.resolve()
@@ -159,6 +163,7 @@ test('chain timeout stops before the next step and publishes a settled terminal 
   let terminalRunning
   chain.subscribe(snapshot => { if (snapshot.status === 'error') terminalRunning = chain.isRunning() })
   const pending = chain.run([{ content: 'first' }, { content: 'second' }], {})
+  await new Promise(resolve => setImmediate(resolve))
   context.mock.timers.tick(120001)
   assert.equal(await pending, false)
   assert.match(chain.getSnapshot().error, /RESPONSE_TIMEOUT/)
@@ -173,6 +178,7 @@ test('queue response timeout keeps the sent item and stops later work', async co
   const queue = createQueue(adapter, () => adapter.input)
   queue.enqueue({ content: 'first' })
   queue.enqueue({ content: 'second' })
+  await new Promise(resolve => setImmediate(resolve))
   context.mock.timers.tick(1800001)
   await Promise.resolve()
   await Promise.resolve()
@@ -204,6 +210,7 @@ test('queue preserves a draft typed while waiting for the model', async context 
   queue.enqueue({ content: 'queued prompt' })
   adapter.input.value = 'new draft'
   adapter.generating = false
+  await new Promise(resolve => setImmediate(resolve))
   context.mock.timers.tick(200)
   await Promise.resolve()
   await Promise.resolve()
@@ -244,15 +251,18 @@ test('queue still waits after two minutes before sending or completing', async c
   adapter.generating = true
   const queue = createQueue(adapter, () => adapter.input)
   queue.enqueue({ content: 'prompt' })
+  await new Promise(resolve => setImmediate(resolve))
   context.mock.timers.tick(120001)
   await Promise.resolve()
   await Promise.resolve()
   assert.equal(queue.getSnapshot().status, 'waiting')
   adapter.generating = false
   adapter.clickSend = () => { adapter.generating = true; adapter.sends++; return true }
+  await new Promise(resolve => setImmediate(resolve))
   context.mock.timers.tick(200)
   await Promise.resolve()
   await Promise.resolve()
+  await new Promise(resolve => setImmediate(resolve))
   context.mock.timers.tick(120001)
   await Promise.resolve()
   await Promise.resolve()
@@ -324,6 +334,7 @@ test('queue preserves its item and never sends into a different conversation', a
     queue.enqueue({ content: 'original conversation prompt' })
     globalThis.location.href = 'https://chatgpt.com/c/different'
     adapter.generating = false
+    await new Promise(resolve => setImmediate(resolve))
     context.mock.timers.tick(200)
     await Promise.resolve()
     await Promise.resolve()
@@ -365,6 +376,7 @@ test('chain preserves drafts entered between steps', async context => {
   chain.subscribe(progress => { if (progress.status === 'delayed') adapter.input.value = 'my new draft' })
   const pending = chain.run([{ content: 'first' }, { content: 'second' }], {})
   await Promise.resolve()
+  await new Promise(resolve => setImmediate(resolve))
   context.mock.timers.tick(1500)
   assert.equal(await pending, false)
   assert.equal(adapter.input.value, 'my new draft')
@@ -385,6 +397,7 @@ test('chain stops on navigation during its inter-step delay', async context => {
     chain.subscribe(progress => { if (progress.status === 'delayed') globalThis.location.href = 'https://chatgpt.com/c/different' })
     const pending = chain.run([{ content: 'first' }, { content: 'second' }], {})
     await Promise.resolve()
+    await new Promise(resolve => setImmediate(resolve))
     context.mock.timers.tick(1500)
     assert.equal(await pending, false)
     assert.equal(adapter.sends, 1)
@@ -485,6 +498,48 @@ test('adding new work does not reset an existing failed queue item', async () =>
   assert.equal(queue.getSnapshot().status, 'failed')
   assert.equal(queue.getSnapshot().error, 'SEND_FAILED')
   assert.equal(queue.size(), 2)
+  assert.equal(adapter.sends, 1)
+  queue.cancel()
+})
+
+test('readiness timeout leaves the queue retryable and retry sends prepared text once', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] })
+  const adapter = createAdapter()
+  adapter.getSendButton = () => null
+  const queue = createQueue(adapter, () => adapter.input)
+  queue.enqueue({ content: 'prepared prompt' })
+  context.mock.timers.tick(5000)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(queue.getSnapshot().error, 'SEND_FAILED')
+  assert.equal(queue.getSnapshot().canRetry, true)
+  assert.equal(adapter.sends, 0)
+  assert.equal(adapter.input.value, 'prepared prompt')
+  let generationReads = 0
+  adapter.isGenerating = () => generationReads-- > 0
+  adapter.getSendButton = () => ({})
+  adapter.clickSend = () => {
+    assert.equal(adapter.input.value, 'prepared prompt')
+    adapter.sends++
+    adapter.input.value = ''
+    generationReads = 1
+    return true
+  }
+  queue.retry()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(adapter.sends, 1)
+  assert.equal(queue.size(), 0)
+})
+
+test('a thrown SEND_FAILED never enables queue retry after an attempted click', async () => {
+  const adapter = createAdapter()
+  adapter.clickSend = () => { adapter.sends++; throw new Error('SEND_FAILED') }
+  const queue = createQueue(adapter, () => adapter.input)
+  queue.enqueue({ content: 'prompt' })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.match(queue.getSnapshot().error, /SEND_UNCERTAIN/)
+  assert.equal(queue.getSnapshot().canRetry, false)
+  queue.retry()
+  await new Promise(resolve => setImmediate(resolve))
   assert.equal(adapter.sends, 1)
   queue.cancel()
 })

@@ -13,6 +13,8 @@ export abstract class Adapter {
   /** Check whether the model is currently generating an output */
   abstract isGenerating(): boolean
 
+  abstract getSendButton(input?: HTMLTextAreaElement | null): HTMLButtonElement | null
+
   /** Automate the action of clicking send button for a prompt input. */
   abstract clickSend(input?: HTMLTextAreaElement | null): boolean
 

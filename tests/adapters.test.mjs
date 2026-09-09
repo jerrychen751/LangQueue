@@ -173,3 +173,25 @@ for (const [name, createAdapter] of [['ChatGPT', createChatGPTAdapter], ['Claude
     assert.equal(unrelated.clicks, 0)
   })
 }
+
+for (const [name, createAdapter] of [['ChatGPT', createChatGPTAdapter], ['Claude', createClaudeAdapter], ['Gemini', createGeminiAdapter]]) {
+  test(`${name}: readiness discovers an enabled button without clicking`, () => {
+    const { form, input } = createFixture()
+    const send = new FakeButton({ 'aria-label': 'Send message' })
+    send.disabled = true
+    form.append(send)
+    const adapter = createAdapter()
+    assert.equal(adapter.getSendButton(input), null)
+    send.disabled = false
+    assert.equal(adapter.getSendButton(input), send)
+    assert.equal(send.clicks, 0)
+  })
+  test(`${name}: thrown clicks remain uncertain instead of returning false`, () => {
+    const { form, input } = createFixture()
+    const send = new FakeButton({ 'aria-label': 'Send message' })
+    send.click = () => { send.clicks++; throw new Error('SEND_FAILED') }
+    form.append(send)
+    assert.throws(() => createAdapter().clickSend(input), /may have been attempted/)
+    assert.equal(send.clicks, 1)
+  })
+}

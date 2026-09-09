@@ -27,6 +27,7 @@ function createFixture() {
     input: new FakeTextarea(), sends: 0, uploads: 0, generating: false,
     getInputElement() { return this.input },
     isGenerating() { return this.generating },
+    getSendButton() { return {} },
     clickSend() { this.sends++; return true },
     async attachFiles() { this.uploads++; return { ok: true } },
     async waitForUploadsComplete() { return true },
@@ -224,4 +225,47 @@ test('empty effective operations never insert or send an existing draft', async 
       assert.equal(fixture.coordinator.getOwner(), null)
     }
   }
+})
+
+test('manual insertion-only never queries Send readiness', async () => {
+  const fixture = createFixture()
+  fixture.adapter.getSendButton = () => { throw new Error('Unexpected readiness query') }
+  assert.equal((await insert(fixture, [], false)).ok, true)
+  assert.equal(fixture.adapter.sends, 0)
+})
+
+test('manual send waits for readiness and keeps a draft edited during the wait', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] })
+  const fixture = createFixture()
+  fixture.adapter.getSendButton = () => null
+  const pending = insert(fixture)
+  fixture.adapter.input.value = 'New draft'
+  context.mock.timers.tick(200)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.sendAttempted, false)
+  assert.equal(fixture.adapter.sends, 0)
+  assert.equal(fixture.adapter.input.value, 'New draft')
+})
+
+test('manual send waits for a delayed button and sends only once', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] })
+  const fixture = createFixture()
+  fixture.adapter.getSendButton = () => null
+  const pending = insert(fixture)
+  assert.equal(fixture.adapter.sends, 0)
+  fixture.adapter.getSendButton = () => ({})
+  context.mock.timers.tick(200)
+  assert.equal((await pending).ok, true)
+  assert.equal(fixture.adapter.sends, 1)
+})
+
+test('manual send preserves uncertainty when a click throws SEND_FAILED', async () => {
+  const fixture = createFixture()
+  fixture.adapter.clickSend = () => { fixture.adapter.sends++; throw new Error('SEND_FAILED') }
+  const result = await insert(fixture)
+  assert.equal(result.ok, false)
+  assert.equal(result.sendAttempted, true)
+  assert.match(result.reason, /SEND_UNCERTAIN/)
+  assert.equal(fixture.adapter.sends, 1)
 })

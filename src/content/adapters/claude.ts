@@ -59,24 +59,27 @@ class ClaudeAdapter extends Adapter {
     return false
   }
 
-  clickSend(input?: HTMLTextAreaElement | null): boolean {
+  getSendButton(input?: HTMLTextAreaElement | null): HTMLButtonElement | null {
     const target = input || this.getInputElement()
-    if (!target) return false
+    if (!target) return null
 
-    const candidate = findComposerSendButton(target, [
+    return findComposerSendButton(target, [
       'button[aria-label="Send message"]',
       'button[aria-label="Send"]',
       'button[data-testid="send-button"]',
     ])
+  }
+
+  clickSend(input?: HTMLTextAreaElement | null): boolean {
+    const candidate = this.getSendButton(input)
     if (!candidate) return false
     try {
       candidate.click()
       return true
     } catch {
-      // ignore
+      // Preserve uncertainty after an attempted click
+      throw new Error('The send click may have been attempted. Check the conversation before sending again.')
     }
-
-    return false
   }
 
   async attachFiles(files: File[]) {

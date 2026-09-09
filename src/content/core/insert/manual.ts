@@ -1,7 +1,7 @@
 import type { Adapter } from '../../adapters/adapter'
 import type { AttachmentRef } from '../../../types'
 import type { InsertAndSendPromptResultMessage } from '../../../types/messages'
-import { createExecutionCoordinator, getConversationHref } from '../queue/execution'
+import { createExecutionCoordinator, getConversationHref, sendPromptWhenReady } from '../queue/execution'
 import { fetchAttachmentFiles } from '../messaging'
 import { appendInputText, getInputText, setInputText } from './composer'
 
@@ -49,19 +49,15 @@ export async function insertComposerPrompt(
       else setInputText(input, content)
     }
     if (shouldSend) {
-      if (getConversationHref() !== expectedHref || !input.isConnected || adapter.getInputElement() !== input) throw new Error('The conversation or chat input changed. Sending was stopped.')
       const expectedText = !content ? initialText : mode === 'append' && initialText ? `${initialText}\n${content}` : content
       const expectedInputText = expectedText.replace(/\r\n|\r/g, '\n')
-      if (getInputText(input) !== expectedInputText) throw new Error('The composer changed during insertion. Check your draft before sending.')
-      if (adapter.isGenerating()) throw new Error('The model started generating a response. Check the composer before sending again.')
-      sendAttempted = true
-      if (!adapter.clickSend(input)) {
-        sendAttempted = false
-        throw new Error('The send button is unavailable. Your prompt remains in the composer.')
-      }
+      await sendPromptWhenReady(adapter, input, expectedInputText, expectedHref, () => { sendAttempted = true })
     }
     return { ok: true, sendAttempted }
   } catch (cause) {
+    if (cause instanceof Error && cause.message === 'SEND_FAILED') {
+      return { ok: false, sendAttempted: false, reason: 'The send button is unavailable. Your prompt remains in the composer.' }
+    }
     return { ok: false, sendAttempted, reason: cause instanceof Error ? cause.message : 'Prompt insertion failed. Check the composer before trying again.' }
   } finally {
     input?.removeEventListener('input', handleDraftChange)
