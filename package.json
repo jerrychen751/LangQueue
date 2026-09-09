@@ -3,13 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "vite",
     "icons": "node scripts/generate-icons.mjs",
     "build": "npm run icons && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "validate:build": "node scripts/validate-build.mjs",
+    "verify": "npm run test && npm run lint && npm run build && npm run validate:build"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
