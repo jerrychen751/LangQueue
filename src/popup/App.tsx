@@ -4,8 +4,8 @@ import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
 import type { Prompt, PromptChain } from '../types'
-import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, saveChain, deleteChain, getPrompt, exportLibrary } from '../utils/storage'
-import { sendPromptToTab, detectActivePlatform, clickSendOnTab } from '../utils/messaging'
+import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, deleteChain, getPrompt, exportLibrary } from '../utils/storage'
+import { sendPromptToTab, detectActivePlatform, clickSendOnTab, runChainOnTab } from '../utils/messaging'
 import { useToast } from '../components/useToast'
 import { checkTabCompatibility } from '../utils/messaging'
 import FilterBar, { type SortOption } from '../components/FilterBar'
@@ -40,6 +40,9 @@ export default function App() {
   const deletingChainRef = useRef(false)
   const [deletingChain, setDeletingChain] = useState(false)
   const insertingRef = useRef(false)
+  const [editingChain, setEditingChain] = useState<PromptChain | undefined>(undefined)
+  const startingChainRef = useRef(false)
+  const [startingChain, setStartingChain] = useState<string | null>(null)
   const { showToast } = useToast()
   const [focusSearchSignal, setFocusSearchSignal] = useState(0)
   const [exporting, setExporting] = useState(false)
@@ -317,7 +320,7 @@ export default function App() {
         {!loading && prompts.length === 0 ? (
           <div className="empty-panel">
             <div>
-              <div className="popup-kicker text-[#527d8c]">Library empty</div>
+              <div className="popup-kicker text-[#527d8c]">No saved prompts</div>
               <div className="mt-2 text-lg font-semibold">Save your first reusable prompt.</div>
               <div className="mt-2 text-xs leading-5 text-[#6f7c82]">Create it once, then insert it into any supported chat.</div>
               <button
@@ -337,83 +340,103 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 gap-3">
-              {visiblePrompts.map((p, index) => (
-                <PromptCard
-                  key={p.id}
-                  index={index}
-                  prompt={p}
-                  onEdit={() => {
-                    setEditing(p)
-                    setModalOpen(true)
-                  }}
-                  onDelete={handleDelete}
-                  onInsert={handleInsert}
-                  onSend={async (prompt) => {
-                    try {
-                      await sendPromptToTab(prompt.content, prompt.attachments || [])
-                      await clickSendOnTab()
-                      showToast({ variant: 'success', message: 'Sent' })
-                      window.close()
-                    } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : 'Failed to send'
-                      showToast({ variant: 'error', message })
-                    }
-                  }}
-                  canInsert={compatible}
-                />
-              ))}
+          <div className="grid grid-cols-1 gap-3">
+            {visiblePrompts.map((p, index) => (
+              <PromptCard
+                key={p.id}
+                index={index}
+                prompt={p}
+                onEdit={() => {
+                  setEditing(p)
+                  setModalOpen(true)
+                }}
+                onDelete={handleDelete}
+                onInsert={handleInsert}
+                onSend={async (prompt) => {
+                  try {
+                    await sendPromptToTab(prompt.content, prompt.attachments || [])
+                    await clickSendOnTab()
+                    showToast({ variant: 'success', message: 'Sent' })
+                    window.close()
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : 'Failed to send'
+                    showToast({ variant: 'error', message })
+                  }
+                }}
+                canInsert={compatible}
+              />
+            ))}
+          </div>
+        )}
+        {!loading && (
+          <section className="mt-6">
+            <div className="section-label">
+              <span>Prompt chains</span>
+              <span className="section-count">{chains.length}</span>
             </div>
-
-            <section className="mt-6">
-              <div className="section-label">
-                <span>Prompt chains</span>
-                <span className="section-count">{chains.length}</span>
+            {chains.length === 0 ? (
+              <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-4 text-xs text-[#6f7c82]">
+                No saved chains yet. Choose New chain to build a sequence.
               </div>
-              {chains.length === 0 ? (
-                <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-4 text-xs text-[#6f7c82]">
-                  Link prompts into a repeatable sequence.
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {chains.map((c, index) => (
-                    <li key={c.id} className="chain-card">
-                      <div className="chain-number">{String(index + 1).padStart(2, '0')}</div>
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-semibold text-[#1c272c]">{c.title}</div>
-                        <div className="mt-1 text-[10px] text-[#6f7c82]">
-                          {c.steps.length} step{c.steps.length === 1 ? '' : 's'}
-                        </div>
+            ) : (
+              <ul className="space-y-2">
+                {chains.map((c, index) => (
+                  <li key={c.id} className="chain-card">
+                    <div className="chain-number">{String(index + 1).padStart(2, '0')}</div>
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-[#1c272c]">{c.title}</div>
+                      <div className="mt-1 text-[10px] text-[#6f7c82]">
+                        {c.steps.length} step{c.steps.length === 1 ? '' : 's'}
                       </div>
-                      <div className="ml-auto flex items-center gap-1.5">
-                        <button
-                          className="compact-button"
-                          onClick={async () => {
-                            const nextTitle = prompt('Rename chain', c.title)?.trim()
-                            if (!nextTitle) return
-                            const updated: PromptChain = { ...c, title: nextTitle, updatedAt: Date.now() }
-                            await saveChain(updated)
-                            await handleRefresh()
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="compact-button"
-                          onClick={async () => {
-                            setDeleteChainTarget(c)
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </>
+                    </div>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <button
+                        className="compact-button"
+                        aria-label={`Run chain ${c.title}`}
+                        disabled={!compatible || Boolean(startingChain) || !c.steps.length}
+                        title={!compatible ? 'Open a supported chat to run this chain' : !c.steps.length ? 'Add steps before running this chain' : 'Run this chain in the active chat'}
+                        onClick={async () => {
+                          if (!compatible || !c.steps.length || startingChainRef.current) return
+                          startingChainRef.current = true
+                          setStartingChain(c.id)
+                          try {
+                            await runChainOnTab(c.steps)
+                            showToast({ variant: 'success', message: 'Chain started. Follow its progress in the chat.' })
+                          } catch (error) {
+                            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not start chain. Check the active chat and try again.' })
+                          } finally {
+                            startingChainRef.current = false
+                            setStartingChain(null)
+                          }
+                        }}
+                      >
+                        {startingChain === c.id ? 'Starting…' : 'Run'}
+                      </button>
+                      <button
+                        className="compact-button"
+                        aria-label={`Edit chain ${c.title}`}
+                        onClick={() => {
+                          setEditingChain(c)
+                          setChainOpen(true)
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="compact-button"
+                        aria-label={`Delete chain ${c.title}`}
+                        onClick={async () => {
+                          setDeleteChainTarget(c)
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         )}
       </main>
 
@@ -437,7 +460,7 @@ export default function App() {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => setChainOpen(true)}
+            onClick={() => { setEditingChain(undefined); setChainOpen(true) }}
             className="secondary-button"
           >
             <Workflow size={15} /> New chain
@@ -474,7 +497,9 @@ export default function App() {
 
       <ChainBuilder
         open={chainOpen}
+        initialChain={editingChain}
         onClose={() => setChainOpen(false)}
+        onSaved={handleRefresh}
       />
       <DeleteConfirmModal
         open={Boolean(deleteChainTarget)}

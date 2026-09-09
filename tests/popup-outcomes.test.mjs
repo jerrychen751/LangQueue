@@ -8,7 +8,7 @@ import vm from 'node:vm';
 const require = createRequire(resolve('package.json'));
 const ts = require('typescript');
 
-function createPopup(name, overrides = {}) {
+function createPopup(name, overrides = {}, library = {}) {
   const hooks = [];
   let cursor = 0;
   const toasts = [];
@@ -19,7 +19,7 @@ function createPopup(name, overrides = {}) {
   const react = {
     useState(initial) {
       const index = cursor++;
-      if (!(index in hooks)) hooks[index] = name === 'App' && index === 0 ? [prompt] : name === 'App' && index === 3 ? false : initial;
+      if (!(index in hooks)) hooks[index] = name === 'App' && index === 0 ? library.prompts ?? [prompt] : name === 'App' && index === 3 ? false : name === 'App' && index === 6 ? library.compatible ?? initial : name === 'App' && index === 12 ? library.chains ?? initial : initial;
       return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }];
     },
     useRef(initial) { const index = cursor++; hooks[index] ??= { current: initial }; return hooks[index]; },
@@ -32,7 +32,7 @@ function createPopup(name, overrides = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   vm.runInNewContext(source, {
-    exports, console, Date,
+    exports, console, Date, Error,
     window: { close() { closes++; } },
     navigator: { clipboard: { async writeText() { copies++; } } },
     require(path) {
@@ -75,6 +75,44 @@ test('failed insertion keeps the popup open without copying or logging usage', a
   assert.equal(popup.toasts.length, 1);
   assert.equal(popup.toasts[0].variant, 'error');
   assert.match(popup.toasts[0].message, /Check the chat composer/);
+});
+
+test('a chain-only library keeps its edit and run actions visible', () => {
+  const chain = { id: 'c1', title: 'Only chain', steps: [{ content: 'step', attachments: [] }] };
+  const popup = createPopup('App', {}, { prompts: [], chains: [chain], compatible: true });
+  const tree = popup.render();
+  assert.ok(popup.find(tree, node => node.props['aria-label'] === 'Run chain Only chain'));
+  popup.find(tree, node => node.props['aria-label'] === 'Edit chain Only chain').props.onClick();
+  const builder = popup.find(popup.render(), node => node.type === '../components/ChainBuilder');
+  assert.equal(builder.props.initialChain.id, 'c1');
+  assert.equal(builder.props.open, true);
+});
+
+test('chain run reports acceptance only after the request resolves and blocks duplicate starts', async () => {
+  const chain = { id: 'c1', title: 'Saved', steps: [{ content: 'step', attachments: [] }] };
+  let finishStart;
+  let starts = 0;
+  const pending = new Promise(resolve => { finishStart = resolve; });
+  const popup = createPopup('App', { runChainOnTab: () => { starts++; return pending; } }, { chains: [chain], compatible: true });
+  const run = popup.find(popup.render(), node => node.props['aria-label'] === 'Run chain Saved');
+  const starting = run.props.onClick();
+  await run.props.onClick();
+  assert.equal(starts, 1);
+  assert.equal(popup.toasts.length, 0);
+  finishStart();
+  await starting;
+  assert.match(popup.toasts[0].message, /Chain started/);
+  assert.equal(popup.getCloses(), 0);
+});
+
+test('chain run rejection stays actionable and never reports completion', async () => {
+  const chain = { id: 'c1', title: 'Saved', steps: [{ content: 'step', attachments: [] }] };
+  const popup = createPopup('App', { runChainOnTab: async () => { throw new Error('Start a conversation first'); } }, { chains: [chain], compatible: true });
+  await popup.find(popup.render(), node => node.props['aria-label'] === 'Run chain Saved').props.onClick();
+  assert.equal(popup.toasts.length, 1);
+  assert.equal(popup.toasts[0].variant, 'error');
+  assert.match(popup.toasts[0].message, /Start a conversation first/);
+  assert.equal(popup.getCloses(), 0);
 });
 
 test('successful insertion closes only after recording usage', async () => {

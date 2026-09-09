@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Trash2, X, Save, Plus, Paperclip } from 'lucide-react'
 import { saveChain } from '../utils/storage'
 import { useToast } from './useToast'
-import type { AttachmentRef } from '../types'
+import type { AttachmentRef, PromptChain } from '../types'
 import { createAttachmentDraft } from '../utils/attachments'
 
 type ChainBuilderProps = {
   open: boolean
+  initialChain?: PromptChain
   onClose: () => void
+  onSaved?: () => void | Promise<void>
 }
 
 type ChainItem = {
@@ -30,10 +32,11 @@ function createDefaultItems(): ChainItem[] {
   return Array.from({ length: DEFAULT_STEP_COUNT }, () => createEmptyItem())
 }
 
-export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
+export default function ChainBuilder({ open, initialChain, onClose, onSaved }: ChainBuilderProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const lastActiveRef = useRef<HTMLElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const titleRef = useRef<HTMLInputElement | null>(null)
   const pendingAttachments = useRef(new Map<string, File>())
   const savingRef = useRef(false)
   const draftGeneration = useRef(0)
@@ -63,16 +66,20 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
     lastActiveRef.current = (document.activeElement as HTMLElement) ?? null
     // reset transient states when opened
     setSaving(false)
-    setTitle('')
-    const defaults = createDefaultItems()
+    setTitle(initialChain?.title || '')
+    const defaults = initialChain ? initialChain.steps.map((step) => ({
+      ...createEmptyItem(), content: step.content, attachments: step.attachments.map((attachment) => ({ ...attachment })),
+    })) : createDefaultItems()
     setItems(defaults)
     setEditingId(null)
     setPendingAttachmentStepId(null)
+    const focusTimer = window.setTimeout(() => titleRef.current?.focus(), 0)
     return () => {
+      window.clearTimeout(focusTimer)
       draftGeneration.current += 1
       drafts.clear()
     }
-  }, [open])
+  }, [open, initialChain])
 
   useEffect(() => {
     if (!open) return
@@ -191,15 +198,23 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
     try {
       const now = Date.now()
       await saveChain({
-        id: '',
+        ...initialChain,
+        id: initialChain?.id || '',
         title: title.trim(),
-        steps: items.map((it) => ({ content: it.content.trim(), attachments: it.attachments })),
-        createdAt: now,
+        steps: items.map((it) => ({ content: it.content, attachments: it.attachments })),
+        createdAt: initialChain?.createdAt ?? now,
         updatedAt: now,
       }, new Map(pendingAttachments.current))
       if (draftGeneration.current !== generation) return
+      pendingAttachments.current.clear()
+      showToast({ variant: 'success', message: initialChain ? 'Chain updated' : 'Chain saved to library' })
+      try {
+        await onSaved?.()
+      } catch {
+        if (draftGeneration.current === generation) showToast({ variant: 'info', message: 'Chain saved, but the library could not refresh. Reopen the popup to refresh it.' })
+      }
+      if (draftGeneration.current !== generation) return
       savingRef.current = false
-      showToast({ variant: 'success', message: 'Chain saved to library' })
       setTitle('')
       handleClose()
     } catch (err) {
@@ -245,7 +260,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
             <div>
               <div className="popup-kicker">Sequential workflow</div>
               <div id="chain-builder-title" className="modal-title mt-1">
-                Build prompt chain
+                {initialChain ? 'Edit prompt chain' : 'Build prompt chain'}
               </div>
             </div>
             <button className="icon-button" onClick={handleClose} aria-label="Close">
@@ -272,6 +287,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                                 <textarea
                                   value={it.content}
                                   placeholder={`Step ${idx + 1} prompt`}
+                                  aria-label={`Step ${idx + 1} prompt`}
                                   onChange={(e) => updateItem(it.id, e.target.value)}
                                   onFocus={() => { if (!savingRef.current) setEditingId(it.id) }}
                                   onBlur={() => {
@@ -337,6 +353,7 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
                                     type="button"
                                     className="rounded-[2px] p-0.5 hover:bg-[#e7ecee]"
                                     onClick={() => removeAttachment(it.id, attachment.id)}
+                                    aria-label={`Remove attachment ${attachment.name}`}
                                   >
                                     <X size={10} />
                                   </button>
@@ -361,24 +378,28 @@ export default function ChainBuilder({ open, onClose }: ChainBuilderProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="space-y-3">
               <input
+                ref={titleRef}
                 type="text"
                 value={title}
                 placeholder="Chain title"
+                aria-label="Chain title"
                 onChange={(e) => { if (!savingRef.current) setTitle(e.target.value) }}
-                className="form-input min-w-0 flex-1 rounded-[4px] px-3 py-2.5 text-xs"
+                className="form-input w-full rounded-[4px] px-3 py-2.5 text-xs"
               />
-              <button
-                className="primary-button min-h-10 disabled:opacity-50"
-                onClick={handleSaveChain}
-                disabled={!canSave}
-              >
-                <Save size={15} /> Save chain
-              </button>
-              <button className="secondary-button min-h-10" onClick={handleClose} disabled={saving}>
-                Cancel
-              </button>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  className="primary-button min-h-10 disabled:opacity-50"
+                  onClick={handleSaveChain}
+                  disabled={!canSave}
+                >
+                  <Save size={15} /> {saving ? 'Saving…' : initialChain ? 'Save changes' : 'Save chain'}
+                </button>
+                <button className="secondary-button min-h-10" onClick={handleClose} disabled={saving}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </fieldset>

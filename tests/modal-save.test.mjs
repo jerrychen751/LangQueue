@@ -16,8 +16,9 @@ function createModal(name) {
   let resolveSave;
   let saveCalls = 0;
   let closeCalls = 0;
+  const savedValues = [];
   const saving = new Promise((resolve) => { resolveSave = resolve; });
-  const save = () => { saveCalls++; return saving; };
+  const save = (...values) => { saveCalls++; savedValues.push(values); return saving; };
   const react = {
     useRef(value) { const index = cursor++; hooks[index] ??= { current: value }; return hooks[index]; },
     useState(value) {
@@ -40,7 +41,7 @@ function createModal(name) {
   vm.runInNewContext(source, {
     exports, Map, setTimeout: () => 0,
     navigator: { platform: 'Mac' }, document: { activeElement: null },
-    window: { addEventListener: (name, handler) => handlers.set(name, handler), removeEventListener: (name) => handlers.delete(name) },
+    window: { setTimeout: () => 0, clearTimeout() {}, addEventListener: (name, handler) => handlers.set(name, handler), removeEventListener: (name) => handlers.delete(name) },
     require(path) {
       if (path === 'react') return react;
       if (path === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
@@ -68,7 +69,7 @@ function createModal(name) {
     }
     return null;
   }
-  return { render, find, handlers, resolveSave, hooks, getProps: () => props, getSaveCalls: () => saveCalls, getCloseCalls: () => closeCalls };
+  return { render, find, handlers, resolveSave, hooks, savedValues, getProps: () => props, getSaveCalls: () => saveCalls, getCloseCalls: () => closeCalls };
 }
 
 test('prompt save blocks duplicate starts and every close path until it settles', async () => {
@@ -86,6 +87,58 @@ test('prompt save blocks duplicate starts and every close path until it settles'
   modal.resolveSave();
   await first;
   assert.equal(modal.getCloseCalls(), 1);
+});
+
+test('editing a saved chain preserves its identity, raw text, and reordered attachments', async () => {
+  const modal = createModal('ChainBuilder');
+  const attachment = { id: 'saved-file', name: 'saved.txt', size: 1, mimeType: 'text/plain', kind: 'file', createdAt: 1 };
+  const initialChain = { id: 'saved-chain', title: 'Saved chain', description: 'Keep this description', createdAt: 12, updatedAt: 20, steps: [
+    { content: '  first\n', attachments: [attachment] },
+    { content: '\nsecond  ', attachments: [] },
+  ] };
+  let refreshed = 0;
+  modal.render({ ...modal.getProps(), initialChain, onSaved: () => { refreshed++; } });
+  let tree = modal.render();
+  assert.equal(modal.find(tree, node => node.props['aria-label'] === 'Chain title').props.value, 'Saved chain');
+  modal.find(tree, node => node.props['aria-label'] === 'Move down').props.onClick();
+  tree = modal.render();
+  const saving = modal.find(tree, node => node.props.onClick?.name === 'handleSaveChain').props.onClick();
+  const saved = modal.savedValues[0][0];
+  assert.equal(saved.id, 'saved-chain');
+  assert.equal(saved.createdAt, 12);
+  assert.equal(saved.description, 'Keep this description');
+  assert.equal(saved.steps[0].content, '\nsecond  ');
+  assert.equal(saved.steps[1].content, '  first\n');
+  assert.equal(saved.steps[1].attachments[0].id, 'saved-file');
+  assert.equal(modal.savedValues[0][1].size, 0);
+  assert.equal(initialChain.steps[0].content, '  first\n');
+  modal.resolveSave();
+  await saving;
+  assert.equal(refreshed, 1);
+  assert.equal(modal.getCloseCalls(), 1);
+});
+
+test('cancelling a saved chain edit does not persist a change', () => {
+  const modal = createModal('ChainBuilder');
+  const initialChain = { id: 'saved-chain', title: 'Saved', createdAt: 12, updatedAt: 20, steps: [{ content: 'step', attachments: [] }] };
+  modal.render({ ...modal.getProps(), initialChain });
+  const tree = modal.render();
+  modal.find(tree, node => node.props['aria-label'] === 'Chain title').props.onChange({ target: { value: 'Changed' } });
+  modal.find(tree, node => node.props['aria-label'] === 'Close').props.onClick();
+  assert.equal(modal.getSaveCalls(), 0);
+  assert.equal(initialChain.title, 'Saved');
+});
+
+test('an old chain save cannot close a replacement chain draft', async () => {
+  const modal = createModal('ChainBuilder');
+  const initialChain = { id: 'first', title: 'First', createdAt: 12, updatedAt: 20, steps: [{ content: 'step', attachments: [] }] };
+  modal.render({ ...modal.getProps(), initialChain });
+  const saving = modal.find(modal.render(), node => node.props.onClick?.name === 'handleSaveChain').props.onClick();
+  modal.render({ ...modal.getProps(), initialChain: { ...initialChain, id: 'second', title: 'Second' } });
+  modal.resolveSave();
+  await saving;
+  assert.equal(modal.getCloseCalls(), 0);
+  assert.equal(modal.find(modal.render(), node => node.props['aria-label'] === 'Chain title').props.value, 'Second');
 });
 
 test('an old prompt save cannot clear or close a replacement draft', async () => {
