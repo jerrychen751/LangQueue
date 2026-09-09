@@ -21,7 +21,8 @@ import {
   exportAttachmentRecords,
   importAttachmentRecords,
   inferAttachmentKind,
-  listAttachmentMetas,
+  listAttachmentIds,
+  saveAttachmentFile,
 } from './attachments';
 
 // Chrome local storage API
@@ -254,21 +255,38 @@ function collectReferencedAttachmentIds(db: PromptsSchema, chains: PromptChain[]
 }
 
 async function cleanupUnusedAttachments(): Promise<void> {
-  const [db, chains, metas] = await Promise.all([
+  const [db, chains, ids] = await Promise.all([
     getPrompts(),
     getAllChainsUnlocked(),
-    listAttachmentMetas(),
+    listAttachmentIds(),
   ]);
   const referenced = collectReferencedAttachmentIds(db, chains);
-  await Promise.all(
-    metas
-      .filter((meta) => !referenced.has(meta.id))
-      .map((meta) => deleteAttachment(meta.id))
+  const results = await Promise.allSettled(
+    ids
+      .filter((id) => !referenced.has(id))
+      .map((id) => deleteAttachment(id))
   );
+  for (const result of results) {
+    if (result.status === 'rejected') throw result.reason;
+  }
+}
+
+async function saveWithAttachments(pendingAttachments: ReadonlyMap<string, File>, save: () => Promise<void>): Promise<void> {
+  const written: string[] = [];
+  try {
+    for (const [id, file] of pendingAttachments) {
+      await saveAttachmentFile(file, id);
+      written.push(id);
+    }
+    await save();
+  } catch (error) {
+    await Promise.allSettled(written.map((id) => deleteAttachment(id)));
+    throw error;
+  }
 }
 
 // Prompt operations
-async function savePromptUnlocked(prompt: Prompt): Promise<void> {
+async function savePromptUnlocked(prompt: Prompt, pendingAttachments: ReadonlyMap<string, File> = new Map()): Promise<void> {
   const db = await getPrompts();
   const existing = db.promptsById[prompt.id];
   const normalizedTitle = assertUniqueTitle(db, prompt.title, prompt.id);
@@ -283,8 +301,8 @@ async function savePromptUnlocked(prompt: Prompt): Promise<void> {
     updatedAt: ts,
   };
   db.promptsById[normalized.id] = normalized;
-  await savePrompts(db);
-  await cleanupUnusedAttachments();
+  await saveWithAttachments(pendingAttachments, () => savePrompts(db));
+  await cleanupUnusedAttachments().catch(() => {});
 }
 
 async function getPromptUnlocked(id: string): Promise<Prompt | null> {
@@ -308,7 +326,8 @@ async function deletePromptUnlocked(id: string): Promise<void> {
 
 async function updatePromptUnlocked(
   id: string,
-  updates: Partial<Prompt>): Promise<void> {
+  updates: Partial<Prompt>,
+  pendingAttachments: ReadonlyMap<string, File> = new Map()): Promise<void> {
   const db = await getPrompts();
   const existing = db.promptsById[id];
   if (!existing) throw new Error(`Prompt not found: ${id}`);
@@ -322,8 +341,8 @@ async function updatePromptUnlocked(
     attachments: updates.attachments ? normalizeAttachmentRefs(updates.attachments) : existing.attachments,
     updatedAt: ts,
   };
-  await savePrompts(db);
-  await cleanupUnusedAttachments();
+  await saveWithAttachments(pendingAttachments, () => savePrompts(db));
+  await cleanupUnusedAttachments().catch(() => {});
 }
 
 async function searchPromptsUnlocked(query: string): Promise<Prompt[]> {
@@ -417,8 +436,8 @@ async function clearAllDataUnlocked(): Promise<void> {
   await setInLocalStorage(CHAINS_KEY, createEmptyChainsEnvelope());
   await setInLocalStorage(USAGE_KEY, createEmptyUsage());
   await removeFromLocalStorage(SETTINGS_KEY);
-  const metas = await listAttachmentMetas();
-  await Promise.all(metas.map((meta) => deleteAttachment(meta.id)));
+  const ids = await listAttachmentIds();
+  await Promise.all(ids.map((id) => deleteAttachment(id)));
 }
 
 // Export / Import
@@ -487,7 +506,7 @@ async function getAllChainsUnlocked(): Promise<PromptChain[]> {
   return envelope.items;
 }
 
-async function saveChainUnlocked(chain: PromptChain): Promise<void> {
+async function saveChainUnlocked(chain: PromptChain, pendingAttachments: ReadonlyMap<string, File> = new Map()): Promise<void> {
   const envelope = await getChainsEnvelope();
   const list = envelope.items;
   const idx = list.findIndex((c) => c.id === chain.id);
@@ -501,8 +520,8 @@ async function saveChainUnlocked(chain: PromptChain): Promise<void> {
   };
   if (idx >= 0) list[idx] = normalized;
   else list.unshift(normalized);
-  await saveChainsEnvelope({ ...envelope, items: list });
-  await cleanupUnusedAttachments();
+  await saveWithAttachments(pendingAttachments, () => saveChainsEnvelope({ ...envelope, items: list }));
+  await cleanupUnusedAttachments().catch(() => {});
 }
 
 async function deleteChainUnlocked(id: string): Promise<void> {

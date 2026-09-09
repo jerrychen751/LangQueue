@@ -101,11 +101,19 @@ function txRequest<T>(req: IDBRequest<T>): Promise<T> {
   })
 }
 
+function waitForTransaction(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onabort = () => reject(tx.error || new Error('Attachment transaction aborted'))
+  })
+}
+
 async function putRecord(record: StoredAttachmentRecord): Promise<void> {
   const db = await openDB()
   const tx = db.transaction(ATTACHMENTS_STORE_NAME, 'readwrite')
-  const store = tx.objectStore(ATTACHMENTS_STORE_NAME)
-  await txRequest(store.put(record))
+  const completed = waitForTransaction(tx)
+  tx.objectStore(ATTACHMENTS_STORE_NAME).put(record)
+  await completed
 }
 
 async function getRecord(id: string): Promise<StoredAttachmentRecord | null> {
@@ -116,13 +124,20 @@ async function getRecord(id: string): Promise<StoredAttachmentRecord | null> {
   return (result as StoredAttachmentRecord | undefined) ?? null
 }
 
-export async function saveAttachmentFile(file: File): Promise<AttachmentRef> {
+export function createAttachmentDraft(file: File): AttachmentRef {
+  const validation = validateAttachmentFile(file)
+  if (validation) throw new Error(file.name + ': ' + validation)
+  const mimeType = file.type || 'application/octet-stream'
+  return { id: makeId(), name: file.name || 'attachment', mimeType, size: file.size, kind: inferAttachmentKind(mimeType), createdAt: Date.now() }
+}
+
+export async function saveAttachmentFile(file: File, id = makeId()): Promise<AttachmentRef> {
   const validation = validateAttachmentFile(file)
   if (validation) throw new Error(validation)
   const bytes = await file.arrayBuffer()
   const mimeType = file.type || 'application/octet-stream'
   const ref: AttachmentRef = {
-    id: makeId(),
+    id,
     name: file.name || 'attachment',
     mimeType,
     size: bytes.byteLength,
@@ -146,26 +161,18 @@ export async function getAttachmentMeta(id: string): Promise<AttachmentRef | nul
   }
 }
 
-export async function listAttachmentMetas(): Promise<AttachmentRef[]> {
+export async function listAttachmentIds(): Promise<string[]> {
   const db = await openDB()
   const tx = db.transaction(ATTACHMENTS_STORE_NAME, 'readonly')
-  const store = tx.objectStore(ATTACHMENTS_STORE_NAME)
-  const all = (await txRequest(store.getAll())) as StoredAttachmentRecord[]
-  return all.map((record) => ({
-    id: record.id,
-    name: record.name,
-    mimeType: record.mimeType,
-    size: record.size,
-    kind: record.kind,
-    createdAt: record.createdAt,
-  }))
+  return await txRequest(tx.objectStore(ATTACHMENTS_STORE_NAME).getAllKeys()) as string[]
 }
 
 export async function deleteAttachment(id: string): Promise<void> {
   const db = await openDB()
   const tx = db.transaction(ATTACHMENTS_STORE_NAME, 'readwrite')
-  const store = tx.objectStore(ATTACHMENTS_STORE_NAME)
-  await txRequest(store.delete(id))
+  const completed = waitForTransaction(tx)
+  tx.objectStore(ATTACHMENTS_STORE_NAME).delete(id)
+  await completed
 }
 
 export async function getAttachmentChunkBase64(

@@ -3,7 +3,7 @@ import { X, Loader2, Paperclip, Trash2 } from 'lucide-react'
 import type { AttachmentRef, Prompt } from '../types'
 import { savePrompt, updatePrompt } from '../utils/storage'
 import { useToast } from './useToast'
-import { saveAttachmentFile, validateAttachmentFile } from '../utils/attachments'
+import { createAttachmentDraft } from '../utils/attachments'
 
 type PromptModalProps = {
   open: boolean
@@ -23,7 +23,10 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
   const lastActiveRef = useRef<HTMLElement | null>(null)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const pendingAttachments = useRef(new Map<string, File>())
   const savingRef = useRef(false)
+  const draftGeneration = useRef(0)
+  const filePickerGeneration = useRef<number | null>(null)
   const handleSaveRef = useRef<() => Promise<void>>(async () => {})
   const { showToast } = useToast()
 
@@ -34,6 +37,12 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
   const [attachments, setAttachments] = useState<AttachmentRef[]>(initialPrompt?.attachments ?? [])
 
   useEffect(() => {
+    draftGeneration.current += 1
+    filePickerGeneration.current = null
+    savingRef.current = false
+    setSaving(false)
+    const drafts = pendingAttachments.current
+    drafts.clear()
     if (!open) return
     lastActiveRef.current = (document.activeElement as HTMLElement) ?? null
     // Reset fields when opening for a different prompt
@@ -43,29 +52,31 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
     setError(null)
     // Focus the title
     setTimeout(() => titleRef.current?.focus(), 0)
+    return () => {
+      draftGeneration.current += 1
+      drafts.clear()
+    }
   }, [open, initialPrompt])
 
-  useEffect(() => {
-    savingRef.current = saving
-  }, [saving])
-
   function close() {
+    if (savingRef.current) return
+    pendingAttachments.current.clear()
     onClose()
     // Restore focus
     setTimeout(() => lastActiveRef.current?.focus(), 0)
   }
 
-  async function handleFilesPicked(files: FileList | null) {
+  function handleFilesPicked(files: FileList | null) {
+    if (savingRef.current || filePickerGeneration.current !== draftGeneration.current) return
+    filePickerGeneration.current = null
     if (!files || files.length === 0) return
     setSaving(true)
     try {
-      const next: AttachmentRef[] = []
-      for (const file of Array.from(files)) {
-        const validation = validateAttachmentFile(file)
-        if (validation) throw new Error(`${file.name}: ${validation}`)
-        const saved = await saveAttachmentFile(file)
-        next.push(saved)
-      }
+      const selected = Array.from(files).map((file) => ({ file, ref: createAttachmentDraft(file) }))
+      const next = selected.map(({ file, ref }) => {
+        pendingAttachments.current.set(ref.id, file)
+        return ref
+      })
       setAttachments((prev) => [...prev, ...next])
       showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` })
     } catch (err) {
@@ -77,10 +88,13 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
   }
 
   function removeAttachment(id: string) {
+    if (savingRef.current) return
+    pendingAttachments.current.delete(id)
     setAttachments((prev) => prev.filter((item) => item.id !== id))
   }
 
   async function handleSave() {
+    if (savingRef.current) return
     // Read latest values from DOM refs to avoid stale state when saving via hotkeys
     const t = (titleRef.current?.value ?? title).trim()
     const rawContent = contentRef.current?.value ?? content
@@ -100,6 +114,8 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
       contentRef.current?.focus()
       return
     }
+    const generation = draftGeneration.current
+    savingRef.current = true
     setSaving(true)
     setError(null)
     try {
@@ -108,7 +124,9 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
           title: t,
           content: rawContent,
           attachments,
-        })
+        }, new Map(pendingAttachments.current))
+        if (draftGeneration.current !== generation) return
+        pendingAttachments.current.clear()
         const saved: Prompt = {
           ...initialPrompt,
           title: t,
@@ -117,6 +135,7 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
           updatedAt: Date.now(),
         }
         onSaved?.(saved)
+        savingRef.current = false
         close()
       } else {
         const now = Date.now()
@@ -129,16 +148,23 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
           createdAt: now,
           updatedAt: now,
         }
-        await savePrompt(newPrompt)
+        await savePrompt(newPrompt, new Map(pendingAttachments.current))
+        if (draftGeneration.current !== generation) return
+        pendingAttachments.current.clear()
         onSaved?.(newPrompt)
         showToast({ variant: 'success', message: 'Prompt saved' })
+        savingRef.current = false
         close()
       }
     } catch (err: unknown) {
+      if (draftGeneration.current !== generation) return
       const message = err instanceof Error ? err.message : 'Failed to save prompt.'
       setError(message)
     } finally {
-      setSaving(false)
+      if (draftGeneration.current === generation) {
+        savingRef.current = false
+        setSaving(false)
+      }
     }
   }
 
@@ -149,6 +175,8 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.stopPropagation()
+        if (savingRef.current) return
+        pendingAttachments.current.clear()
         onClose()
       }
       // Global save shortcut: Cmd/Ctrl + Shift + Enter
@@ -163,10 +191,13 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
       }
       if (e.key === 'Tab' && dialogRef.current) {
         // Simple focus trap
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-        if (focusable.length === 0) return
+        )).filter((element) => !element.matches(':disabled'))
+        if (focusable.length === 0) {
+          e.preventDefault()
+          return
+        }
         const first = focusable[0]
         const last = focusable[focusable.length - 1]
         if (e.shiftKey && document.activeElement === first) {
@@ -200,112 +231,118 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
         aria-labelledby="prompt-modal-title"
         className="modal-surface outline-none"
       >
-        <div className="modal-header">
-          <div>
-            <div className="popup-kicker">{isEditing ? 'Revise library item' : 'Add library item'}</div>
-            <div id="prompt-modal-title" className="modal-title mt-1">
-              {isEditing ? 'Edit prompt' : 'New prompt'}
+        <fieldset disabled={saving} className="contents">
+          <div className="modal-header">
+            <div>
+              <div className="popup-kicker">{isEditing ? 'Revise library item' : 'Add library item'}</div>
+              <div id="prompt-modal-title" className="modal-title mt-1">
+                {isEditing ? 'Edit prompt' : 'New prompt'}
+              </div>
             </div>
+            <button className="icon-button" onClick={close} aria-label="Close">
+              <X size={16} />
+            </button>
           </div>
-          <button className="icon-button" onClick={close} aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
 
-        <div className="space-y-4 p-4">
-          {error ? (
-            <div className="rounded-[4px] border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">
-              {error}
+          <div className="space-y-4 p-4">
+            {error ? (
+              <div className="rounded-[4px] border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">
+                {error}
+              </div>
+            ) : null}
+
+            <div>
+              <label className="field-label">Title</label>
+              <input
+                ref={titleRef}
+                value={title}
+                onChange={(e) => { if (!savingRef.current) setTitle(e.target.value) }}
+                className="form-input w-full rounded-[4px] px-3 py-2.5 text-sm"
+                placeholder="Enter a clear, descriptive title"
+              />
             </div>
-          ) : null}
 
-          <div>
-            <label className="field-label">Title</label>
-            <input
-              ref={titleRef}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="form-input w-full rounded-[4px] px-3 py-2.5 text-sm"
-              placeholder="Enter a clear, descriptive title"
-            />
-          </div>
-
-          <div>
-            <label className="field-label">Prompt content</label>
-            <textarea
-              ref={contentRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="form-input min-h-[120px] w-full resize-none rounded-[4px] px-3 py-2.5 text-sm leading-6"
-              rows={4}
-              placeholder="Write the prompt that you want to reuse."
-            />
-          </div>
-
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                void handleFilesPicked(e.target.files)
-              }}
-            />
-            <div className="mb-2 flex items-center justify-between">
-              <label className="field-label mb-0">Attachments</label>
-              <button
-                type="button"
-                className="compact-button inline-flex items-center gap-1.5"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={saving}
-              >
-                <Paperclip size={12} />
-                Add files
-              </button>
+            <div>
+              <label className="field-label">Prompt content</label>
+              <textarea
+                ref={contentRef}
+                value={content}
+                onChange={(e) => { if (!savingRef.current) setContent(e.target.value) }}
+                className="form-input min-h-[120px] w-full resize-none rounded-[4px] px-3 py-2.5 text-sm leading-6"
+                rows={4}
+                placeholder="Write the prompt that you want to reuse."
+              />
             </div>
-            {attachments.length === 0 ? (
-              <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-3 text-[11px] text-[#6f7c82]">No attachments selected.</div>
-            ) : (
-              <ul className="max-h-24 space-y-1.5 overflow-auto">
-                {attachments.map((attachment) => (
-                  <li key={attachment.id} className="flex items-center justify-between gap-2 rounded-[4px] border border-[#cfd6d8] bg-[#f8f9f9] px-3 py-2 text-[11px]">
-                    <div className="min-w-0">
-                      <div className="truncate">{attachment.name}</div>
-                      <div className="mt-0.5 text-[9px] text-[#6f7c82]">{Math.ceil(attachment.size / 1024)} KB</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="icon-button h-7 w-7"
-                      onClick={() => removeAttachment(attachment.id)}
-                      aria-label={`Remove ${attachment.name}`}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  void handleFilesPicked(e.target.files)
+                }}
+              />
+              <div className="mb-2 flex items-center justify-between">
+                <label className="field-label mb-0">Attachments</label>
+                <button
+                  type="button"
+                  className="compact-button inline-flex items-center gap-1.5"
+                  onClick={() => {
+                    if (savingRef.current) return
+                    filePickerGeneration.current = draftGeneration.current
+                    fileInputRef.current?.click()
+                  }}
+                  disabled={saving}
+                >
+                  <Paperclip size={12} />
+                  Add files
+                </button>
+              </div>
+              {attachments.length === 0 ? (
+                <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-3 text-[11px] text-[#6f7c82]">No attachments selected.</div>
+              ) : (
+                <ul className="max-h-24 space-y-1.5 overflow-auto">
+                  {attachments.map((attachment) => (
+                    <li key={attachment.id} className="flex items-center justify-between gap-2 rounded-[4px] border border-[#cfd6d8] bg-[#f8f9f9] px-3 py-2 text-[11px]">
+                      <div className="min-w-0">
+                        <div className="truncate">{attachment.name}</div>
+                        <div className="mt-0.5 text-[9px] text-[#6f7c82]">{Math.ceil(attachment.size / 1024)} KB</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="icon-button h-7 w-7"
+                        onClick={() => removeAttachment(attachment.id)}
+                        aria-label={`Remove ${attachment.name}`}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
           </div>
 
-        </div>
-
-        <div className="flex items-center gap-2 border-t border-[#d9dfe1] p-4">
-          <div className="mr-auto text-[10px] text-[#6f7c82]">
-            <span className="font-mono">{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Enter</span>
+          <div className="flex items-center gap-2 border-t border-[#d9dfe1] p-4">
+            <div className="mr-auto text-[10px] text-[#6f7c82]">
+              <span className="font-mono">{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Enter</span>
+            </div>
+            <button className="secondary-button min-h-10" onClick={close} disabled={saving}>
+              Cancel
+            </button>
+            <button
+              className="primary-button min-h-10"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : null}
+              Save
+            </button>
           </div>
-          <button className="secondary-button min-h-10" onClick={close} disabled={saving}>
-            Cancel
-          </button>
-          <button
-            className="primary-button min-h-10"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : null}
-            Save
-          </button>
-        </div>
+        </fieldset>
       </div>
     </div>
   )

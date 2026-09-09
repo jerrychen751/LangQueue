@@ -58,7 +58,11 @@ function createStorageContexts(initial = {}) {
         if (path === '../types') return { CURRENT_SCHEMA_VERSION: 3, CURRENT_CHAINS_SCHEMA_VERSION: 2 };
         if (path === './attachments') return {
           inferAttachmentKind: () => 'file',
-          listAttachmentMetas: async () => [...attachments.values()],
+          listAttachmentIds: async () => [...attachments.keys()],
+          saveAttachmentFile: async (file, id) => {
+            const bytes = await file.arrayBuffer();
+            attachments.set(id, { id, bytes });
+          },
           deleteAttachment: async (id) => { attachments.delete(id); },
           exportAttachmentRecords: async () => [],
           importAttachmentRecords: async (items) => {
@@ -154,4 +158,41 @@ test('simultaneous chain saves preserve both chains', async () => {
     background.saveChain({ id: 'c2', title: 'second', steps: [], createdAt: 1, updatedAt: 1 }),
   ]);
   assert.equal((await popup.getAllChains()).length, 2);
+});
+
+test('unrelated edits cannot collect files held by an unsaved draft', async () => {
+  const { popup, background, attachments } = createStorageContexts(createLibrary());
+  const file = new File(['draft contents'], 'draft.txt', { type: 'text/plain' });
+  const ref = { id: 'draft', name: file.name, mimeType: file.type, size: file.size, kind: 'file', createdAt: 1 };
+  const pending = new Map([[ref.id, file]]);
+  await background.updatePrompt('p1', { content: 'unrelated change' });
+  assert.equal(attachments.size, 0);
+  await popup.savePrompt({ ...createPrompt('draft-prompt'), attachments: [ref] }, pending);
+  assert.equal(new TextDecoder().decode(attachments.get(ref.id).bytes), 'draft contents');
+  assert.equal((await popup.getPrompt('draft-prompt')).attachments[0].id, ref.id);
+});
+
+test('failed metadata saves remove newly written binaries and retain pending files for retry', async () => {
+  const { popup, attachments, failNextWrite } = createStorageContexts(createLibrary());
+  const file = new File(['draft'], 'draft.txt', { type: 'text/plain' });
+  const ref = { id: 'draft', name: file.name, mimeType: file.type, size: file.size, kind: 'file', createdAt: 1 };
+  const pending = new Map([[ref.id, file]]);
+  failNextWrite();
+  await assert.rejects(popup.updatePrompt('p1', { attachments: [ref] }, pending), /Storage write failed/);
+  assert.equal(attachments.size, 0);
+  assert.equal((await popup.getPrompt('p1')).attachments.length, 0);
+  assert.equal(pending.size, 1);
+  await popup.updatePrompt('p1', { attachments: [ref] }, pending);
+  assert.equal(attachments.size, 1);
+});
+
+test('binary failure leaves chain metadata unchanged and removes earlier new files', async () => {
+  const { popup, attachments } = createStorageContexts(createLibrary());
+  const pending = new Map([
+    ['first', new File(['first'], 'first.txt', { type: 'text/plain' })],
+    ['second', { arrayBuffer: async () => { throw new Error('Binary failed'); } }],
+  ]);
+  await assert.rejects(popup.saveChain({ id: 'new', title: 'new', steps: [], createdAt: 1, updatedAt: 1 }, pending), /Binary failed/);
+  assert.equal(attachments.size, 0);
+  assert.equal((await popup.getAllChains()).length, 0);
 });
