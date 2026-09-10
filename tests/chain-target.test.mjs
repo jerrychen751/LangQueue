@@ -17,7 +17,7 @@ function createReceiver() {
     './editor/editor': { createEditor: () => ({}) },
     './overlay/overlay': { createOverlay: () => ({}) },
     './queue/queue': { createQueue: () => ({}) },
-    './queue/chain_executor': { createChainExecutor: () => ({ run() { starts++ } }) },
+    './queue/chain_executor': { createChainExecutor: () => ({ run() { starts++ }, getCancellationVersion: () => 0 }) },
     './queue/panel': { createQueuePanel: () => ({}) },
     './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
     './messaging': { getSettings: async () => ({}) },
@@ -61,7 +61,7 @@ test('chain caller pins the original tab and URL across readiness checks', async
 })
 
 test('chain caller explains settings and changed draft failures', async () => {
-  for (const [reason, expected] of [['SETTINGS_UNAVAILABLE', /Settings are unavailable.*reload settings/], ['COMPOSER_CHANGED', /draft changed.*Start the chain again/]]) {
+  for (const [reason, expected] of [['SETTINGS_UNAVAILABLE', /Settings are unavailable.*reload settings/], ['COMPOSER_CHANGED', /draft changed.*Start the chain again/], ['CANCELLED', /cancelled before it started.*draft was kept/]]) {
     globalThis.chrome = { tabs: {
       query(options, callback) { callback([{ id: 12, url: 'https://chatgpt.com/c/original' }]) },
       async sendMessage(id, message) { return message.type === 'COMPAT_CHECK' ? { type: 'COMPAT_STATUS', payload: { ready: true } } : { ok: false, reason } },

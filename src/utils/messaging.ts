@@ -112,7 +112,9 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
           ? 'The draft changed while settings loaded. Start the chain again when ready.'
           : response?.reason === 'CONVERSATION_CHANGED'
             ? 'The conversation changed before the chain started. Return to the intended conversation and try again.'
-            : response?.reason || 'Failed to start chain')
+            : response?.reason === 'CANCELLED'
+              ? 'The chain was cancelled before it started. Your draft was kept.'
+              : response?.reason || 'Failed to start chain')
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to start chain'
     throw new Error(message)

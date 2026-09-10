@@ -41,11 +41,13 @@ export function initController(adapter: Adapter) {
 
   const overlay = createOverlay({
     onSelect: (item) => {
+      const chainVersion = item.kind === 'chain' ? chainExecutor.getCancellationVersion() : null
       void (async () => {
         const expectedHref = getConversationHref()
         const expectedInput = adapter.getInputElement()
         const expectedText = expectedInput ? getInputText(expectedInput) : null
         if (!await ensureSettingsLoaded()) return
+        if (chainVersion !== null && chainVersion !== chainExecutor.getCancellationVersion()) return
         if (expectedHref !== getConversationHref()) {
           executionPanel.showMessage('The conversation changed while settings loaded. Select the prompt again in the intended conversation.')
           return
@@ -238,8 +240,10 @@ export function initController(adapter: Adapter) {
       if (!text.trim()) return
       event.preventDefault()
       const expectedHref = getConversationHref()
+      const queueVersion = queue.getCancellationVersion()
       void ensureSettingsLoaded().then((ready) => {
         if (!ready) return
+        if (queueVersion !== queue.getCancellationVersion()) return
         if (getConversationHref() !== expectedHref || adapter.getInputElement() !== input || getInputText(input) !== text) {
           executionPanel.showMessage('The composer changed while settings loaded. Your draft was kept; queue it again when ready.')
           return
@@ -341,6 +345,7 @@ export function initController(adapter: Adapter) {
       return true
     }
     if (msg.type === 'RUN_CHAIN') {
+      const chainVersion = chainExecutor.getCancellationVersion()
       const payload = msg.payload
       if (!payload || !Array.isArray(payload.steps) || payload.steps.length === 0) {
         sendResponse({ ok: false, reason: 'NO_STEPS' })
@@ -355,6 +360,10 @@ export function initController(adapter: Adapter) {
       void (async () => {
         if (!await ensureSettingsLoaded()) {
           sendResponse({ ok: false, reason: 'SETTINGS_UNAVAILABLE' })
+          return
+        }
+        if (chainVersion !== chainExecutor.getCancellationVersion()) {
+          sendResponse({ ok: false, reason: 'CANCELLED' })
           return
         }
         if (payload.expectedHref !== getConversationHref()) {

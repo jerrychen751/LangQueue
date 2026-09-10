@@ -9,6 +9,7 @@ const STEP_DELAY_MS = 1500
 
 export function createChainExecutor(adapter: Adapter, getInput: () => InputElement | null, coordinator = createExecutionCoordinator()) {
   let running = false
+  let cancellationVersion = 0
   let controller: AbortController | null = null
   let snapshot: ChainProgressMessage['payload'] = { stepIndex: 0, totalSteps: 0, status: 'completed' }
   const listeners = new Set<(snapshot: ChainProgressMessage['payload']) => void>()
@@ -20,6 +21,7 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
   }
 
   function cancel() {
+    cancellationVersion += 1
     controller?.abort()
   }
 
@@ -74,6 +76,7 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
   }
 
   function stopForNavigation() {
+    cancellationVersion += 1
     controller?.abort(new Error('CONVERSATION_CHANGED'))
   }
 
@@ -83,5 +86,5 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
     return () => { listeners.delete(listener) }
   }
 
-  return { run, cancel, isRunning: () => running, getSnapshot: () => ({ ...snapshot }), subscribe, stopForNavigation }
+  return { run, cancel, isRunning: () => running, getCancellationVersion: () => cancellationVersion, getSnapshot: () => ({ ...snapshot }), subscribe, stopForNavigation }
 }

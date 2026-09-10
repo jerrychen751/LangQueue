@@ -13,6 +13,7 @@ export type QueueItem = {
 export function createQueue(adapter: Adapter, getInput: () => InputElement | null, coordinator = createExecutionCoordinator()) {
   const items: (QueueItem & { id: string; sent: boolean; attachmentAttempted: boolean; preparedContent: string; href: string })[] = []
   let running = false
+  let cancellationVersion = 0
   let status: ExecutionStatus | 'idle' | 'failed' | 'cancelled' = 'idle'
   let error: string | null = null
   let controller: AbortController | null = null
@@ -99,6 +100,7 @@ export function createQueue(adapter: Adapter, getInput: () => InputElement | nul
   }
 
   function cancel() {
+    cancellationVersion += 1
     controller?.abort()
     if (running) items.splice(1)
     else items.splice(0)
@@ -108,6 +110,7 @@ export function createQueue(adapter: Adapter, getInput: () => InputElement | nul
   }
 
   function stopForNavigation() {
+    cancellationVersion += 1
     controller?.abort(new Error('CONVERSATION_CHANGED'))
     if (items.length) { status = 'failed'; error = 'CONVERSATION_CHANGED' }
     publish()
@@ -127,5 +130,5 @@ export function createQueue(adapter: Adapter, getInput: () => InputElement | nul
   }
 
   coordinator.subscribe(() => { void flush() })
-  return { enqueue, flush, size: () => items.length, getSnapshot, subscribe, remove, retry, cancel, stopForNavigation, clearError }
+  return { enqueue, flush, size: () => items.length, getSnapshot, getCancellationVersion: () => cancellationVersion, subscribe, remove, retry, cancel, stopForNavigation, clearError }
 }

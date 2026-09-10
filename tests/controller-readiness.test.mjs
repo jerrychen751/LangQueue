@@ -22,13 +22,16 @@ function createController() {
   let changeSettings
   let selection
   let searchFailed = false
+  let chainVersion = 0
+  let queueVersion = 0
+  let cancelQueue
   const dependencies = {
     './editor/editor': { createEditor: () => ({}) },
     './overlay/overlay': { createOverlay(callbacks) { selection = callbacks.onSelect; return { isOpen: () => false, hide() {}, show(...args) { shown.push(args) } } } },
-    './queue/queue': { createQueue: () => ({ enqueue(item) { queued.push(item); return true } }) },
-    './queue/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args) } }) },
-    './queue/panel': { createQueuePanel: () => ({ showMessage(message) { notices.push(message) } }) },
-    './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/current', createExecutionCoordinator: () => ({}) },
+    './queue/queue': { createQueue: () => ({ enqueue(item) { queued.push(item); return true }, cancel() { queueVersion++ }, getCancellationVersion: () => queueVersion }) },
+    './queue/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args) }, cancel() { chainVersion++ }, getCancellationVersion: () => chainVersion }) },
+    './queue/panel': { createQueuePanel(queue) { cancelQueue = queue.cancel; return { showMessage(message) { notices.push(message) } } } },
+    './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
     './messaging': {
       getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })),
       searchPrompts: async () => { if (searchFailed) throw new Error('read failed'); return [] },
@@ -53,8 +56,11 @@ function createController() {
   return {
     loads, notices, inserted, queued, shown, input, chains,
     runChain() { return new Promise(resolve => receiver({ type: 'RUN_CHAIN', payload: { steps: [{ content: 'Private' }], expectedHref: 'https://chatgpt.com/c/current' } }, {}, resolve)) },
+    cancelChain() { return new Promise(resolve => receiver({ type: 'CANCEL_CHAIN' }, {}, resolve)) },
+    cancelQueue() { cancelQueue() },
     receive() { return new Promise(resolve => receiver({ type: 'INJECT_PROMPT', payload: { content: 'Private', attachments: [{ id: 'file' }], expectedHref: 'https://chatgpt.com/c/current' } }, {}, resolve)) },
     select() { selection({ kind: 'prompt', id: 'p', content: 'Private', attachments: [{ id: 'file' }] }) },
+    selectChain() { selection({ kind: 'chain', steps: [{ content: 'Private' }] }) },
     enter() { events.keydown({ isTrusted: true, key: 'Enter', target: input, preventDefault() {} }) },
     search(failed) { searchFailed = failed; events.input({ isTrusted: true, target: input }) },
     invalidate() { changeSettings({ langqueue_settings: {} }, 'local') },
@@ -148,4 +154,46 @@ test('chain start refuses a draft changed during settings loading', async () => 
   assert.equal((await pending).reason, 'COMPOSER_CHANGED')
   assert.equal(fixture.chains.length, 0)
   assert.equal(fixture.input.value, 'New draft')
+})
+
+test('cancel prevents pending chain starts after settings resolve but allows a new request', async () => {
+  const fixture = createController()
+  const pending = [fixture.runChain(), fixture.runChain()]
+  assert.equal((await fixture.cancelChain()).ok, true)
+  fixture.loads[0].resolve({})
+  for (const result of await Promise.all(pending)) {
+    assert.equal(result.ok, false)
+    assert.equal(result.reason, 'CANCELLED')
+  }
+  assert.equal(fixture.chains.length, 0)
+  assert.equal(fixture.input.value, 'My draft')
+  assert.equal((await fixture.runChain()).ok, true)
+  assert.equal(fixture.chains.length, 1)
+})
+
+test('queue cancellation preserves a draft awaiting settings and allows a later Enter', async () => {
+  const fixture = createController()
+  fixture.enter()
+  fixture.cancelQueue()
+  fixture.loads[0].resolve({})
+  await settle()
+  assert.equal(fixture.queued.length, 0)
+  assert.equal(fixture.input.value, 'My draft')
+  fixture.enter()
+  await settle()
+  assert.equal(fixture.queued.length, 1)
+  assert.equal(fixture.input.value, '')
+})
+
+test('chain cancellation invalidates an overlay selection awaiting settings', async () => {
+  const fixture = createController()
+  fixture.selectChain()
+  await fixture.cancelChain()
+  fixture.loads[0].resolve({})
+  await settle()
+  assert.equal(fixture.chains.length, 0)
+  assert.equal(fixture.input.value, 'My draft')
+  fixture.selectChain()
+  await settle()
+  assert.equal(fixture.chains.length, 1)
 })
