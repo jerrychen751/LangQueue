@@ -62,7 +62,10 @@ function buildLineBreakFragment(value: string): DocumentFragment {
 export function getInputText(el: InputElement | null): string {
   if (!el) return ''
   if (el instanceof HTMLTextAreaElement) return el.value || ''
-  return el.innerText || ''
+  const text = el.innerText || ''
+  const paragraph = el.firstElementChild
+  if (text === '\n' && el.childNodes.length === 1 && paragraph?.tagName === 'P' && paragraph.childNodes.length === 1 && paragraph.firstElementChild?.tagName === 'BR') return ''
+  return text
 }
 
 export function setInputText(el: InputElement, value: string) {

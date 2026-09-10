@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { sendPromptWhenReady } from '../src/content/core/queue/execution.ts'
+import { getInputText } from '../src/content/core/insert/composer.ts'
 
 class FakeTextarea {
   isConnected = true
@@ -89,4 +90,37 @@ test('a click throwing SEND_FAILED retains uncertainty and is never repeated', a
   await assert.rejects(fixture.send(), /SEND_UNCERTAIN/)
   assert.equal(fixture.adapter.sends, 1)
   assert.equal(fixture.getAttempts(), 1)
+})
+
+test('file-only send accepts an empty paragraph placeholder and still detects a new draft', async () => {
+  for (const changed of [false, true]) {
+    const br = { tagName: 'BR' }
+    const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br }
+    const input = { isConnected: true, innerText: '\n', childNodes: [paragraph], firstElementChild: paragraph }
+    let sends = 0
+    const adapter = {
+      getInputElement: () => input,
+      isGenerating: () => false,
+      getSendButton() { if (changed) input.innerText = 'New draft'; return {} },
+      clickSend() { sends++; return true },
+    }
+    const pending = sendPromptWhenReady(adapter, input, '', globalThis.location.href, () => {})
+    if (changed) await assert.rejects(pending, /COMPOSER_CHANGED/)
+    else await pending
+    assert.equal(sends, changed ? 0 : 1)
+  }
+})
+
+test('empty placeholder normalization preserves whitespace and multiple paragraphs', () => {
+  const br = { tagName: 'BR' }
+  const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br }
+  for (const text of [' ', '\t', '\n\n', 'prompt\n']) {
+    assert.equal(getInputText({ innerText: text, childNodes: [paragraph], firstElementChild: paragraph }), text)
+  }
+  assert.equal(getInputText({ innerText: '\n', childNodes: [{ nodeType: 3 }], firstElementChild: null }), '\n')
+  assert.equal(getInputText({ innerText: '\n', childNodes: [paragraph, paragraph], firstElementChild: paragraph }), '\n')
+  assert.equal(getInputText({ innerText: '\n', childNodes: [br], firstElementChild: br }), '\n')
+  const textarea = new FakeTextarea()
+  textarea.value = '\n'
+  assert.equal(getInputText(textarea), '\n')
 })
