@@ -1,6 +1,6 @@
 import type { createQueue } from './queue'
 import type { createChainExecutor } from './chain_executor'
-import styles from './panel.css?inline'
+import styles from './status_panel.css?inline'
 
 export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: ReturnType<typeof createChainExecutor>) {
   const host = document.createElement('div')

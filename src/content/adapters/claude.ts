@@ -4,7 +4,7 @@ import {
   findComposerSendButton,
   isVisible,
   setFilesOnInput,
-} from './utils'
+} from './page_dom'
 
 class ClaudeAdapter extends Adapter {
   id = 'claude'

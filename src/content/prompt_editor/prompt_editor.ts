@@ -1,4 +1,4 @@
-import styles from './editor.css?raw';
+import styles from './prompt_editor.css?raw';
 import trashSvg from './trash.svg?raw';
 
 export type PromptDraft = {

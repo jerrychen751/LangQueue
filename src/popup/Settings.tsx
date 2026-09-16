@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import type { AppSettings } from '../types'
-import type { SaveSettingsMessage, SaveSettingsResultMessage } from '../types/messages'
-import { getSettings, exportLibrary, importLibrary } from '../utils/storage'
+import type { AppSettings } from '../library/model'
+import { callBackground } from '../messaging/transport'
+import { getSettings, exportLibrary, importLibrary } from '../library/storage'
 import { useToast } from '../components/useToast'
-import { downloadJson } from '../utils/download'
+import { downloadJson } from './downloadJson'
 
 type SettingsProps = {
   onBack: () => void
@@ -82,8 +82,8 @@ export default function Settings({ onBack }: SettingsProps) {
     const pending = (async () => {
       let ok = false
       try {
-        const response: SaveSettingsResultMessage | undefined = await chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', payload: { settings: next } } satisfies SaveSettingsMessage)
-        ok = response?.type === 'SAVE_SETTINGS_RESULT' && Boolean(response.payload?.ok)
+        await callBackground('SAVE_SETTINGS', { settings: next })
+        ok = true
       } catch {
         ok = false
       }

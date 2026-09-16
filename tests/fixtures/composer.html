@@ -14,9 +14,9 @@
   <p>Run through the local Vite server. All sends use a local stub.</p>
   <pre id="results">Running...</pre>
   <script type="module">
-    import { getInputText, appendInputText } from '/src/content/core/insert/composer.ts'
-    import { insertComposerPrompt } from '/src/content/core/insert/manual.ts'
-    import { createExecutionCoordinator } from '/src/content/core/queue/execution.ts'
+    import { getInputText, appendInputText } from '/src/content/composer/composer_text.ts'
+    import { insertComposerPrompt } from '/src/content/composer/insert_prompt.ts'
+    import { createExecutionCoordinator } from '/src/content/execution/step_execution.ts'
 
     const results = []
     for (const tag of ['textarea', 'div']) {

@@ -1,9 +1,9 @@
-import type { Adapter } from '../../adapters/adapter'
-import type { AttachmentRef } from '../../../types'
-import type { InsertAndSendPromptResultMessage } from '../../../types/messages'
-import { createExecutionCoordinator, getConversationHref, sendPromptWhenReady } from '../queue/execution'
-import { fetchAttachmentFiles } from '../messaging'
-import { appendInputText, getInputText, setInputText } from './composer'
+import type { Adapter } from '../adapters/adapter'
+import type { AttachmentRef } from '../../library/model'
+import type { InsertPromptResult } from '../../messaging/protocol'
+import { createExecutionCoordinator, getConversationHref, sendPromptWhenReady } from '../execution/step_execution'
+import { fetchAttachmentFiles } from '../library_client'
+import { appendInputText, getInputText, setInputText } from './composer_text'
 
 export async function insertComposerPrompt(
   adapter: Adapter,
@@ -13,7 +13,7 @@ export async function insertComposerPrompt(
   mode: 'overwrite' | 'append',
   shouldSend: boolean,
   expectedHref: string,
-): Promise<InsertAndSendPromptResultMessage['payload']> {
+): Promise<InsertPromptResult> {
   if (!content.trim() && attachments.length === 0) return { ok: false, sendAttempted: false, reason: 'This prompt has no text or enabled attachments. Your draft was kept.' }
   if (!coordinator.tryAcquire('manual')) return { ok: false, sendAttempted: false, reason: 'Finish or cancel the current queue or chain before inserting another prompt.' }
   let input: HTMLTextAreaElement | null = null

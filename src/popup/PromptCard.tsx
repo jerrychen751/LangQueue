@@ -1,5 +1,5 @@
 import { Pencil, Trash2, Send } from 'lucide-react'
-import type { Prompt } from '../types'
+import type { Prompt } from '../library/model'
 import { useToast } from '../components/useToast'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 import { useRef, useState } from 'react'

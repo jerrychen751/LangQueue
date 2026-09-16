@@ -40,11 +40,11 @@ function createPopup(name, overrides = {}, library = {}) {
       if (path === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
       if (path === 'lucide-react') return {};
       if (path === '../components/useToast') return { useToast: () => ({ showToast: toast => toasts.push(toast) }) };
-      if (path === '../utils/storage') return {
+      if (path === '../library/storage') return {
         getAllPrompts: async () => [prompt], getAllChains: async () => [], getUsageStats: async () => ({}),
         logUsage: async () => { uses++; }, deletePrompt: async () => {}, ...overrides,
       };
-      if (path === '../utils/messaging') return { sendPromptToTab: async () => {}, ...overrides };
+      if (path === './activeTab') return { sendPromptToTab: async () => {}, ...overrides };
       if (path === './PromptCard') return { PromptCard: 'PromptCard' };
       return { default: path };
     },

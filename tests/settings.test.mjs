@@ -40,11 +40,22 @@ function createSettings() {
     queue = result.catch(() => {});
     return result;
   };
+  const popupChrome = { runtime: { sendMessage(message) {
+    if (transportFailure === 'throw') throw new Error('Context invalidated');
+    if (transportFailure === 'reject') return Promise.reject(new Error('No receiver'));
+    messages.push(structuredClone(message));
+    return new Promise((resolve) => {
+      assert.equal(receiver(structuredClone(message), {}, resolve), true);
+    });
+  } } };
+  const requests = {};
+  vm.runInNewContext(compileSource('src/messaging/transport.ts'), { exports: requests, Error, chrome: popupChrome });
   vm.runInNewContext(compileSource('src/background/index.ts'), {
     exports: {},
     chrome: { runtime: { onMessage: { addListener(fn) { receiver = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } } },
     require(path) {
-      if (path === '../utils/storage') return { saveSettings };
+      if (path === '../library/storage') return { saveSettings };
+      if (path === '../messaging/transport') return requests;
       return {};
     },
   });
@@ -71,19 +82,13 @@ function createSettings() {
   vm.runInNewContext(compileSource('src/popup/Settings.tsx'), {
     exports,
     navigator: { platform: 'Mac' },
-    chrome: { runtime: { sendMessage(message) {
-      if (transportFailure === 'throw') throw new Error('Context invalidated');
-      if (transportFailure === 'reject') return Promise.reject(new Error('No receiver'));
-      messages.push(structuredClone(message));
-      return new Promise((resolve) => {
-        assert.equal(receiver(structuredClone(message), {}, resolve), true);
-      });
-    } } },
+    chrome: popupChrome,
     require(path) {
       if (path === 'react') return react;
       if (path === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
-      if (path === '../utils/storage') return { getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })) };
+      if (path === '../library/storage') return { getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })) };
       if (path === '../components/useToast') return { useToast: () => ({ showToast() {} }) };
+      if (path === '../messaging/transport') return requests;
       return {};
     },
   });

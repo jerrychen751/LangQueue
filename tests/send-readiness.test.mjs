@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { sendPromptWhenReady } from '../src/content/core/queue/execution.ts'
-import { getInputText } from '../src/content/core/insert/composer.ts'
+import { sendPromptWhenReady } from '../src/content/execution/step_execution.ts'
+import { getInputText } from '../src/content/composer/composer_text.ts'
 
 class FakeTextarea {
   isConnected = true

@@ -1,8 +1,8 @@
-import type { Adapter } from '../../adapters/adapter'
-import { isInputReady } from '../../adapters/utils'
-import { appendInputText, getInputText, setInputText } from '../insert/composer'
-import { fetchAttachmentFiles } from '../messaging'
-import type { AttachmentRef } from '../../../types'
+import type { Adapter } from '../adapters/adapter'
+import { isInputReady } from '../adapters/page_dom'
+import { appendInputText, getInputText, setInputText } from '../composer/composer_text'
+import { fetchAttachmentFiles } from '../library_client'
+import type { AttachmentRef } from '../../library/model'
 
 export function createExecutionCoordinator() {
   let owner: 'queue' | 'chain' | 'manual' | null = null

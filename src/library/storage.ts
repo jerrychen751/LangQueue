@@ -13,8 +13,8 @@ import type {
   PromptStep,
   UsageLog,
   UsageSchema,
-} from '../types';
-import { CURRENT_CHAINS_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION } from '../types';
+} from './model';
+import { CURRENT_CHAINS_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION } from './model';
 import {
   deleteAttachment,
   exportAttachmentRecords,

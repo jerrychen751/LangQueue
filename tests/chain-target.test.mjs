@@ -4,7 +4,8 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import test from 'node:test'
 import vm from 'node:vm'
-import { runChainOnTab } from '../src/utils/messaging.ts'
+import { runChainOnTab } from '../src/popup/activeTab.ts'
+import * as requests from '../src/messaging/transport.ts'
 
 const require = createRequire(resolve('package.json'))
 const ts = require('typescript')
@@ -14,16 +15,17 @@ function createReceiver() {
   let starts = 0
   const exports = {}
   const dependencies = {
-    './editor/editor': { createEditor: () => ({}) },
-    './overlay/overlay': { createOverlay: () => ({}) },
-    './queue/queue': { createQueue: () => ({}) },
-    './queue/chain_executor': { createChainExecutor: () => ({ run() { starts++ }, getCancellationVersion: () => 0 }) },
-    './queue/panel': { createQueuePanel: () => ({}) },
-    './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
-    './messaging': { getSettings: async () => ({}) },
-    './page_tweaks/tweaks': { applyTweaks() {} },
+    './prompt_editor/prompt_editor': { createEditor: () => ({}) },
+    './prompt_overlay': { createOverlay: () => ({}) },
+    './execution/queue': { createQueue: () => ({}) },
+    './execution/chain_executor': { createChainExecutor: () => ({ run() { starts++ }, getCancellationVersion: () => 0 }) },
+    './execution/status_panel': { createQueuePanel: () => ({}) },
+    './execution/step_execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
+    './library_client': { getSettings: async () => ({}) },
+    './page_tweaks': { applyTweaks() {} },
+    '../messaging/transport': requests,
   }
-  vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/core/controller.ts'), 'utf8'), {
+  vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/controller.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, {
     exports, document: { documentElement: {}, addEventListener() {} }, window: { addEventListener() {} },
@@ -39,11 +41,11 @@ test('chain receiver refuses missing and changed target URLs before starting', a
   const fixture = createReceiver()
   for (const expectedHref of [undefined, 'https://chatgpt.com/c/original']) {
     const response = await fixture.receive({ steps: [{ content: 'private' }], expectedHref })
-    assert.equal(response.ok, false)
-    assert.equal(response.reason, 'CONVERSATION_CHANGED')
+    assert.equal(response.result.ok, false)
+    assert.equal(response.result.reason, 'CONVERSATION_CHANGED')
   }
   assert.equal(fixture.getStarts(), 0)
-  assert.equal((await fixture.receive({ steps: [{ content: 'private' }], expectedHref: 'https://chatgpt.com/c/current' })).ok, true)
+  assert.equal((await fixture.receive({ steps: [{ content: 'private' }], expectedHref: 'https://chatgpt.com/c/current' })).result.ok, true)
   assert.equal(fixture.getStarts(), 1)
 })
 
@@ -52,7 +54,7 @@ test('chain caller pins the original tab and URL across readiness checks', async
   const messages = []
   globalThis.chrome = { tabs: {
     query(options, callback) { queries++; callback([{ id: 12, url: 'https://chatgpt.com/c/original' }]) },
-    async sendMessage(id, message) { messages.push({ id, message }); return message.type === 'COMPAT_CHECK' ? { type: 'COMPAT_STATUS', payload: { ready: true } } : { ok: false, reason: 'CONVERSATION_CHANGED' } },
+    async sendMessage(id, message) { messages.push({ id, message }); return message.type === 'COMPAT_CHECK' ? { ok: true, result: { ready: true } } : { ok: true, result: { ok: false, reason: 'CONVERSATION_CHANGED' } } },
   } }
   await assert.rejects(runChainOnTab([{ content: 'private' }]), /conversation changed before the chain started/)
   assert.equal(queries, 1)
@@ -64,7 +66,7 @@ test('chain caller explains settings and changed draft failures', async () => {
   for (const [reason, expected] of [['SETTINGS_UNAVAILABLE', /Settings are unavailable.*reload settings/], ['COMPOSER_CHANGED', /draft changed.*Start the chain again/], ['CANCELLED', /cancelled before it started.*draft was kept/]]) {
     globalThis.chrome = { tabs: {
       query(options, callback) { callback([{ id: 12, url: 'https://chatgpt.com/c/original' }]) },
-      async sendMessage(id, message) { return message.type === 'COMPAT_CHECK' ? { type: 'COMPAT_STATUS', payload: { ready: true } } : { ok: false, reason } },
+      async sendMessage(id, message) { return message.type === 'COMPAT_CHECK' ? { ok: true, result: { ready: true } } : { ok: true, result: { ok: false, reason } } },
     } }
     await assert.rejects(runChainOnTab([{ content: 'private' }]), expected)
   }

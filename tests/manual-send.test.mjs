@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { insertComposerPrompt } from '../src/content/core/insert/manual.ts'
-import { createExecutionCoordinator } from '../src/content/core/queue/execution.ts'
-import { insertAndSendPromptToTab, sendPromptToTab } from '../src/utils/messaging.ts'
+import { insertComposerPrompt } from '../src/content/composer/insert_prompt.ts'
+import { createExecutionCoordinator } from '../src/content/execution/step_execution.ts'
+import { insertAndSendPromptToTab, sendPromptToTab } from '../src/popup/activeTab.ts'
 
 class FakeTextarea {
   storedValue = ''
@@ -18,7 +18,7 @@ class FakeTextarea {
 globalThis.HTMLTextAreaElement = FakeTextarea
 globalThis.location = { href: 'https://chatgpt.com/' }
 globalThis.chrome = { runtime: { sendMessage: async () => ({
-  type: 'ATTACHMENT_GET_CHUNK_RESULT', payload: { ok: true, chunkBase64: '', nextOffset: 0, totalBytes: 0, done: true },
+  ok: true, result: { chunkBase64: '', nextOffset: 0, totalBytes: 0, done: true },
 }) } }
 
 function createFixture() {
@@ -191,7 +191,7 @@ test('popup send queries one tab and sends one combined request to that tab', as
   const requests = []
   globalThis.chrome = { tabs: {
     query(options, callback) { queries++; callback([{ id: queries === 1 ? 41 : 42, url: 'https://chatgpt.com/c/original' }]) },
-    async sendMessage(tabId, message) { requests.push({ tabId, message }); return { type: 'INSERT_AND_SEND_PROMPT_RESULT', payload: { ok: true, sendAttempted: true } } },
+    async sendMessage(tabId, message) { requests.push({ tabId, message }); return { ok: true, result: { ok: true, sendAttempted: true } } },
   } }
   await insertAndSendPromptToTab('saved prompt', attachments)
   assert.equal(queries, 1)
@@ -218,7 +218,7 @@ test('insertion-only requests retain their action and report the actual rejectio
   let message
   globalThis.chrome = { tabs: {
     query(options, callback) { callback([{ id: 41, url: 'https://chatgpt.com/c/original' }]) },
-    async sendMessage(tabId, request) { message = request; return { type: 'INJECT_PROMPT_RESULT', payload: { ok: false, reason: 'Your draft changed.' } } },
+    async sendMessage(tabId, request) { message = request; return { ok: true, result: { ok: false, reason: 'Your draft changed.' } } },
   } }
   await assert.rejects(sendPromptToTab('saved prompt'), /Your draft changed/)
   assert.equal(message.type, 'INJECT_PROMPT')

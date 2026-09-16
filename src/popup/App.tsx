@@ -3,16 +3,16 @@ import { Plus, Settings as SettingsIcon, Download, Workflow } from 'lucide-react
 import Logo from '../components/Logo'
 import { PromptCard } from './PromptCard'
 import PromptModal from '../components/PromptModal'
-import type { Prompt, PromptChain } from '../types'
-import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, deleteChain, getPrompt, exportLibrary } from '../utils/storage'
-import { sendPromptToTab, detectActivePlatform, insertAndSendPromptToTab, runChainOnTab } from '../utils/messaging'
+import type { Prompt, PromptChain } from '../library/model'
+import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, deleteChain, getPrompt, exportLibrary } from '../library/storage'
+import { sendPromptToTab, detectActivePlatform, insertAndSendPromptToTab, runChainOnTab } from './activeTab'
 import { useToast } from '../components/useToast'
-import { checkTabCompatibility } from '../utils/messaging'
+import { checkTabCompatibility } from './activeTab'
 import FilterBar, { type SortOption } from '../components/FilterBar'
 import Settings from './Settings'
 import ChainBuilder from '../components/ChainBuilder'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
-import { downloadJson } from '../utils/download'
+import { downloadJson } from './downloadJson'
 
 const PLATFORM_NAMES = {
   chatgpt: 'ChatGPT',

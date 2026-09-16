@@ -1,4 +1,4 @@
-import { isInputReady } from './utils'
+import { isInputReady } from './page_dom'
 
 export abstract class Adapter {
   /** The name of the LLM */

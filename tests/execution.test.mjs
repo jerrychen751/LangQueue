@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { executeStep, createExecutionCoordinator } from '../src/content/core/queue/execution.ts'
-import { createChainExecutor } from '../src/content/core/queue/chain_executor.ts'
-import { createQueue } from '../src/content/core/queue/queue.ts'
+import { executeStep, createExecutionCoordinator } from '../src/content/execution/step_execution.ts'
+import { createChainExecutor } from '../src/content/execution/chain_executor.ts'
+import { createQueue } from '../src/content/execution/queue.ts'
 
 class FakeTextarea {
   isConnected = true
@@ -112,7 +112,7 @@ test('queue waits for the chain composer lock and allows removal', async () => {
 
 test('cancelling an upload prevents send and keeps the composer locked until upload settles', async () => {
   globalThis.chrome = { runtime: { sendMessage: async message => message.type === 'ATTACHMENT_GET_CHUNK' ? {
-    type: 'ATTACHMENT_GET_CHUNK_RESULT', payload: { ok: true, chunkBase64: '', nextOffset: 0, totalBytes: 0, done: true },
+    ok: true, result: { chunkBase64: '', nextOffset: 0, totalBytes: 0, done: true },
   } : undefined } }
   const adapter = createAdapter()
   let finishUpload

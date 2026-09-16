@@ -23,12 +23,13 @@ function createMessaging() {
     if (failed) throw new Error('Storage unavailable')
     return name === 'getSettings' ? { multimodalEnabled: false } : []
   }]))
+  const runtime = { sendMessage: message => new Promise(resolve => receiver(message, {}, resolve)) }
+  const requests = loadModule('src/messaging/transport.ts', { chrome: { runtime } })
   loadModule('src/background/index.ts', {
     chrome: { runtime: { onMessage: { addListener(fn) { receiver = fn } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } } },
-    require: path => path === '../utils/storage' ? storage : {},
+    require: path => path === '../library/storage' ? storage : path === '../messaging/transport' ? requests : {},
   })
-  const runtime = { sendMessage: message => new Promise(resolve => receiver(message, {}, resolve)) }
-  return { api: loadModule('src/content/core/messaging.ts', { chrome: { runtime } }), runtime, fail() { failed = true } }
+  return { api: loadModule('src/content/library_client.ts', { chrome: { runtime }, require: path => path === '../messaging/transport' ? requests : {} }), runtime, fail() { failed = true } }
 }
 
 test('read and search distinguish successful empty results from storage failures', async () => {

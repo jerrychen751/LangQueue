@@ -1,6 +1,6 @@
 type InputElement = HTMLTextAreaElement | HTMLElement
 
-export type SlashContext =
+export type ShortcutContext =
   | {
       kind: 'textarea'
       input: HTMLTextAreaElement
@@ -13,7 +13,7 @@ export type SlashContext =
       kind: 'contenteditable'
       input: HTMLElement
       query: string
-      slashIndex: number
+      shortcutIndex: number
       textBefore: string
       textAfter: string
       rect: DOMRect
@@ -23,41 +23,41 @@ const TRIGGER_RE = /\$([^\s]*)$/
 const ZERO_WIDTH_RE = /[\u200B-\u200D\u2060\uFEFF]/g
 const SPACE_CHARS = new Set([' ', '\u00A0'])
 
-function getSlashMatch(text: string): { query: string; slashIndex: number } | null {
+function getShortcutMatch(text: string): { query: string; shortcutIndex: number } | null {
   const match = TRIGGER_RE.exec(text)
   if (!match || typeof match.index !== 'number') return null
-  const slashIndex = match.index
-  const before = text.slice(0, slashIndex)
+  const shortcutIndex = match.index
+  const before = text.slice(0, shortcutIndex)
   if (before.length === 0) {
-    return { query: match[1] ?? '', slashIndex }
+    return { query: match[1] ?? '', shortcutIndex }
   }
   const withoutZeroWidth = before.replace(ZERO_WIDTH_RE, '')
   if (withoutZeroWidth.length === 0) {
-    return { query: match[1] ?? '', slashIndex }
+    return { query: match[1] ?? '', shortcutIndex }
   }
   const prevChar = before[before.length - 1]
   if (!SPACE_CHARS.has(prevChar)) return null
-  return { query: match[1] ?? '', slashIndex }
+  return { query: match[1] ?? '', shortcutIndex }
 }
 
 function isContentEditable(el: HTMLElement): boolean {
   return el.getAttribute('contenteditable') === 'true'
 }
 
-export function detectSlashContext(input: InputElement | null): SlashContext | null {
+export function detectShortcutContext(input: InputElement | null): ShortcutContext | null {
   if (!input) return null
 
   if (input instanceof HTMLTextAreaElement) {
     const caret = input.selectionStart ?? 0
     const before = (input.value || '').slice(0, caret)
-    const match = getSlashMatch(before)
+    const match = getShortcutMatch(before)
     if (!match) return null
     const rect = input.getBoundingClientRect()
     return {
       kind: 'textarea',
       input,
       query: match.query,
-      start: match.slashIndex,
+      start: match.shortcutIndex,
       end: caret,
       rect,
     }
@@ -74,7 +74,7 @@ export function detectSlashContext(input: InputElement | null): SlashContext | n
     beforeRange.selectNodeContents(input)
     beforeRange.setEnd(range.endContainer, range.endOffset)
     const textBefore = beforeRange.toString()
-    const match = getSlashMatch(textBefore)
+    const match = getShortcutMatch(textBefore)
     if (!match) return null
 
     const afterRange = range.cloneRange()
@@ -87,7 +87,7 @@ export function detectSlashContext(input: InputElement | null): SlashContext | n
       kind: 'contenteditable',
       input,
       query: match.query,
-      slashIndex: match.slashIndex,
+      shortcutIndex: match.shortcutIndex,
       textBefore,
       textAfter,
       rect,

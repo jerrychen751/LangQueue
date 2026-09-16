@@ -1,4 +1,4 @@
-import type { SlashContext } from '../detect/slash'
+import type { ShortcutContext } from '../shortcut_trigger'
 
 type InputElement = HTMLTextAreaElement | HTMLElement
 
@@ -93,7 +93,7 @@ export function appendInputText(el: InputElement, value: string) {
   }
 }
 
-export function replaceSlashContext(context: SlashContext, replacement: string) {
+export function replaceShortcutContext(context: ShortcutContext, replacement: string) {
   if (context.kind === 'textarea') {
     const { input, start, end } = context
     input.setRangeText(replacement, start, end, 'end')
@@ -102,7 +102,7 @@ export function replaceSlashContext(context: SlashContext, replacement: string) 
     return
   }
 
-  const before = context.textBefore.slice(0, context.slashIndex)
+  const before = context.textBefore.slice(0, context.shortcutIndex)
   const next = `${before}${replacement}${context.textAfter}`
   setContentEditableValue(context.input, next)
 }

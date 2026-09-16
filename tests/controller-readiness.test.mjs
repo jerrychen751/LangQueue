@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import test from 'node:test'
 import vm from 'node:vm'
+import * as requests from '../src/messaging/transport.ts'
 
 const require = createRequire(resolve('package.json'))
 const ts = require('typescript')
@@ -26,25 +27,26 @@ function createController() {
   let queueVersion = 0
   let cancelQueue
   const dependencies = {
-    './editor/editor': { createEditor: () => ({}) },
-    './overlay/overlay': { createOverlay(callbacks) { selection = callbacks.onSelect; return { isOpen: () => false, hide() {}, show(...args) { shown.push(args) } } } },
-    './queue/queue': { createQueue: () => ({ enqueue(item) { queued.push(item); return true }, cancel() { queueVersion++ }, getCancellationVersion: () => queueVersion }) },
-    './queue/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args) }, cancel() { chainVersion++ }, getCancellationVersion: () => chainVersion }) },
-    './queue/panel': { createQueuePanel(queue) { cancelQueue = queue.cancel; return { showMessage(message) { notices.push(message) } } } },
-    './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
-    './messaging': {
+    './prompt_editor/prompt_editor': { createEditor: () => ({}) },
+    './prompt_overlay': { createOverlay(callbacks) { selection = callbacks.onSelect; return { isOpen: () => false, hide() {}, show(...args) { shown.push(args) } } } },
+    './execution/queue': { createQueue: () => ({ enqueue(item) { queued.push(item); return true }, cancel() { queueVersion++ }, getCancellationVersion: () => queueVersion }) },
+    './execution/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args) }, cancel() { chainVersion++ }, getCancellationVersion: () => chainVersion }) },
+    './execution/status_panel': { createQueuePanel(queue) { cancelQueue = queue.cancel; return { showMessage(message) { notices.push(message) } } } },
+    './execution/step_execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
+    './library_client': {
       getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })),
       searchPrompts: async () => { if (searchFailed) throw new Error('read failed'); return [] },
       searchChains: async () => [],
       logUsage: async () => { throw new Error('usage failed') },
     },
-    './page_tweaks/tweaks': { applyTweaks() {} },
-    './insert/composer': { getInputText: input => input.value, setInputText(input, text) { input.value = text } },
-    './insert/manual': { async insertComposerPrompt(...args) { inserted.push(args); return { ok: true } } },
-    './detect/slash': { detectSlashContext: () => ({ query: '', rect: {} }) },
+    './page_tweaks': { applyTweaks() {} },
+    './composer/composer_text': { getInputText: input => input.value, setInputText(input, text) { input.value = text } },
+    './composer/insert_prompt': { async insertComposerPrompt(...args) { inserted.push(args); return { ok: true } } },
+    './shortcut_trigger': { detectShortcutContext: () => ({ query: '', rect: {} }) },
+    '../messaging/transport': requests,
   }
   const exports = {}
-  vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/core/controller.ts'), 'utf8'), {
+  vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/controller.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, {
     exports, Error, document: { documentElement: {}, addEventListener(name, callback) { events[name] = callback } },
@@ -73,13 +75,13 @@ test('failed settings keep the draft and require another explicit action before 
   await settle()
   const failed = fixture.receive()
   fixture.loads[1].reject(new Error('unavailable'))
-  assert.equal((await failed).payload.ok, false)
+  assert.equal((await failed).result.ok, false)
   assert.match(fixture.notices.at(-1), /Details: unavailable/)
   assert.equal(fixture.input.value, 'My draft')
   assert.equal(fixture.inserted.length, 0)
   const retried = fixture.receive()
   fixture.loads[2].resolve({ multimodalEnabled: false })
-  assert.equal((await retried).payload.ok, true)
+  assert.equal((await retried).result.ok, true)
   assert.equal(fixture.inserted.length, 1)
   assert.equal(fixture.inserted[0][3].length, 0)
 })
@@ -142,7 +144,7 @@ test('a stale settings read cannot overwrite a newer disabled-attachments prefer
   await settle()
   fixture.loads[0].resolve({ multimodalEnabled: true })
   await settle()
-  assert.equal((await fixture.receive()).payload.ok, true)
+  assert.equal((await fixture.receive()).result.ok, true)
   assert.equal(fixture.inserted[0][3].length, 0)
 })
 
@@ -151,7 +153,7 @@ test('chain start refuses a draft changed during settings loading', async () => 
   const pending = fixture.runChain()
   fixture.input.value = 'New draft'
   fixture.loads[0].resolve({})
-  assert.equal((await pending).reason, 'COMPOSER_CHANGED')
+  assert.equal((await pending).result.reason, 'COMPOSER_CHANGED')
   assert.equal(fixture.chains.length, 0)
   assert.equal(fixture.input.value, 'New draft')
 })
@@ -161,13 +163,13 @@ test('cancel prevents pending chain starts after settings resolve but allows a n
   const pending = [fixture.runChain(), fixture.runChain()]
   assert.equal((await fixture.cancelChain()).ok, true)
   fixture.loads[0].resolve({})
-  for (const result of await Promise.all(pending)) {
-    assert.equal(result.ok, false)
-    assert.equal(result.reason, 'CANCELLED')
+  for (const response of await Promise.all(pending)) {
+    assert.equal(response.result.ok, false)
+    assert.equal(response.result.reason, 'CANCELLED')
   }
   assert.equal(fixture.chains.length, 0)
   assert.equal(fixture.input.value, 'My draft')
-  assert.equal((await fixture.runChain()).ok, true)
+  assert.equal((await fixture.runChain()).result.ok, true)
   assert.equal(fixture.chains.length, 1)
 })
 

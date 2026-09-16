@@ -1,5 +1,5 @@
-import type { AttachmentRef } from '../../../types'
-import type { ChainStep } from '../../../types/messages'
+import type { AttachmentRef } from '../library/model'
+import type { ChainStep } from '../messaging/protocol'
 
 export type OverlayItem =
   | {

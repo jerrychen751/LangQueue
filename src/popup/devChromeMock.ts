@@ -107,10 +107,8 @@ export function installDevChromeMock(): void {
       async sendMessage(message: unknown) {
         const request = message as { type?: string; payload?: { settings?: unknown } }
         if (request?.type === 'SAVE_SETTINGS') {
-          const settings = request.payload?.settings
-          if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return { type: 'SAVE_SETTINGS_RESULT', payload: { ok: false, error: 'Invalid settings payload' } }
-          previewStorage.langqueue_settings = structuredClone(settings)
-          return { type: 'SAVE_SETTINGS_RESULT', payload: { ok: true } }
+          previewStorage.langqueue_settings = structuredClone(request.payload?.settings)
+          return { ok: true }
         }
         runtimeListeners.forEach((listener) => listener(message))
         return undefined
@@ -144,14 +142,14 @@ export function installDevChromeMock(): void {
       },
       async sendMessage(_tabId: number, message: { type?: string }) {
         if (message.type === 'COMPAT_CHECK') {
-          return { type: 'COMPAT_STATUS', payload: { ready: true } }
+          return { ok: true, result: { ready: true } }
         }
         if (message.type === 'INSERT_AND_SEND_PROMPT') {
-          return { type: 'INSERT_AND_SEND_PROMPT_RESULT', payload: { ok: true, sendAttempted: true } }
+          return { ok: true, result: { ok: true, sendAttempted: true } }
         }
-        if (message.type === 'RUN_CHAIN') return { ok: true }
+        if (message.type === 'RUN_CHAIN') return { ok: true, result: { ok: true } }
         if (message.type === 'INJECT_PROMPT') {
-          return { type: 'INJECT_PROMPT_RESULT', payload: { ok: true } }
+          return { ok: true, result: { ok: true, sendAttempted: false } }
         }
         return undefined
       },

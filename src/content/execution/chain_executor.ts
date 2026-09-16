@@ -1,7 +1,7 @@
-import type { Adapter } from '../../adapters/adapter'
-import type { ChainStep, ChainProgressMessage } from '../../../types/messages'
-import type { AppSettings } from '../../../types'
-import { createExecutionCoordinator, executeStep, getConversationHref, isConversationReady, assertExecutionContext, waitForExecutionDelay } from './execution'
+import type { Adapter } from '../adapters/adapter'
+import type { ChainStep, ChainProgressMessage } from '../../messaging/protocol'
+import type { AppSettings } from '../../library/model'
+import { createExecutionCoordinator, executeStep, getConversationHref, isConversationReady, assertExecutionContext, waitForExecutionDelay } from './step_execution'
 
 type InputElement = HTMLTextAreaElement | HTMLElement
 

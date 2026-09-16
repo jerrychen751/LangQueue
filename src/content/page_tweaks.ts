@@ -1,4 +1,4 @@
-import type { AppSettings } from '../../../types'
+import type { AppSettings } from '../library/model'
 
 const STYLE_ID = 'langqueue-tweaks-style'
 const ROOT_CLASS = 'langqueue-no-autoscroll'

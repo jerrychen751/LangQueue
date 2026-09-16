@@ -46,9 +46,9 @@ function createModal(name) {
       if (path === 'react') return react;
       if (path === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
       if (path === 'lucide-react') return {};
-      if (path === '../utils/storage') return { savePrompt: save, updatePrompt: save, saveChain: save };
+      if (path === '../library/storage') return { savePrompt: save, updatePrompt: save, saveChain: save };
       if (path === './useToast') return { useToast: () => ({ showToast() {} }) };
-      if (path === '../utils/attachments') return { createAttachmentDraft(file) { return { id: 'picked-file', name: file.name, size: file.size, mimeType: file.type }; } };
+      if (path === '../library/attachments') return { createAttachmentDraft(file) { return { id: 'picked-file', name: file.name, size: file.size, mimeType: file.type }; } };
       throw new Error(path);
     },
   });

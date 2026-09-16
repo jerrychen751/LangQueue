@@ -6,7 +6,7 @@ import {
   isButtonEnabledAndVisible,
   isVisible,
   setFilesOnInput,
-} from './utils'
+} from './page_dom'
 
 class GeminiAdapter extends Adapter {
   id = 'gemini' as const

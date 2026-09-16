@@ -1,4 +1,4 @@
-import type { AttachmentExportRecord, AttachmentKind, AttachmentRef } from '../types'
+import type { AttachmentExportRecord, AttachmentKind, AttachmentRef } from './model'
 
 const ATTACHMENTS_DB_NAME = 'langqueue_attachments'
 const ATTACHMENTS_STORE_NAME = 'attachments'

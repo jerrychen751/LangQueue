@@ -7,12 +7,12 @@ import vm from 'node:vm';
 
 const require = createRequire(resolve('package.json'));
 const ts = require('typescript');
-const source = ts.transpileModule(readFileSync(resolve('src/utils/storage.ts'), 'utf8'), {
+const source = ts.transpileModule(readFileSync(resolve('src/library/storage.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
 const attachmentExports = {};
-vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/utils/attachments.ts'), 'utf8'), {
+vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/library/attachments.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText, { exports: attachmentExports, File, crypto, atob, btoa });
 
@@ -65,7 +65,7 @@ function createStorageContexts(initial = {}) {
       File,
       crypto,
       require(path) {
-        if (path === '../types') return { CURRENT_SCHEMA_VERSION: 3, CURRENT_CHAINS_SCHEMA_VERSION: 2 };
+        if (path === './model') return { CURRENT_SCHEMA_VERSION: 3, CURRENT_CHAINS_SCHEMA_VERSION: 2 };
         if (path === './attachments') return {
           inferAttachmentKind: () => 'file',
           listAttachmentIds: async () => { if (shouldFailCleanup) throw new Error("Cleanup failed"); return [...attachments.keys()]; },

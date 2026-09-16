@@ -4,7 +4,7 @@
  * It is the entry point of the content script, which runs inside of the context of a web page so it can read the page's DOM and interact with the page.
  */
 
-import { initController } from './core/controller'
+import { initController } from './controller'
 import { createChatGPTAdapter } from './adapters/chatgpt'
 import { createClaudeAdapter } from './adapters/claude'
 import { createGeminiAdapter } from './adapters/gemini'

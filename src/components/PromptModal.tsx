@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Loader2, Paperclip, Trash2 } from 'lucide-react'
-import type { AttachmentRef, Prompt } from '../types'
-import { savePrompt, updatePrompt } from '../utils/storage'
+import type { AttachmentRef, Prompt } from '../library/model'
+import { savePrompt, updatePrompt } from '../library/storage'
 import { useToast } from './useToast'
-import { createAttachmentDraft } from '../utils/attachments'
+import { createAttachmentDraft } from '../library/attachments'
 
 type PromptModalProps = {
   open: boolean

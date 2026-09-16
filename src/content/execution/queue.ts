@@ -1,6 +1,6 @@
-import type { Adapter } from '../../adapters/adapter'
-import type { AttachmentRef } from '../../../types'
-import { createExecutionCoordinator, executeStep, getConversationHref, isConversationReady, type ExecutionStatus } from './execution'
+import type { Adapter } from '../adapters/adapter'
+import type { AttachmentRef } from '../../library/model'
+import { createExecutionCoordinator, executeStep, getConversationHref, isConversationReady, type ExecutionStatus } from './step_execution'
 
 type InputElement = HTMLTextAreaElement | HTMLElement
 

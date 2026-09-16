@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Trash2, X, Save, Plus, Paperclip } from 'lucide-react'
-import { saveChain } from '../utils/storage'
+import { saveChain } from '../library/storage'
 import { useToast } from './useToast'
-import type { AttachmentRef, PromptChain } from '../types'
-import { createAttachmentDraft } from '../utils/attachments'
+import type { AttachmentRef, PromptChain } from '../library/model'
+import { createAttachmentDraft } from '../library/attachments'
 
 type ChainBuilderProps = {
   open: boolean

@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import test from 'node:test'
 import vm from 'node:vm'
+import * as requests from '../src/messaging/transport.ts'
 
 const require = createRequire(resolve('package.json'))
 const ts = require('typescript')
@@ -52,7 +53,7 @@ test('overlay hides its shadow root and ignores synthetic selection and edit act
   let selected = 0
   let edited = 0
   let created = 0
-  const fixture = createFixture('src/content/core/overlay/overlay.ts')
+  const fixture = createFixture('src/content/prompt_overlay.ts')
   const overlay = fixture.exports.createOverlay({ onSelect() { selected++ }, onEdit() { edited++ }, onCreate() { created++ }, onClose() {} })
   overlay.show({ x: 10, top: 100, bottom: 120 }, [{ kind: 'chain', id: 'chain', title: 'Chain', steps: [{ content: 'private' }] }, { kind: 'prompt', id: 'prompt', title: 'Prompt', content: 'private' }], '')
   assert.equal(fixture.document.documentElement.children[0].shadowRoot, null)
@@ -65,7 +66,7 @@ test('overlay hides its shadow root and ignores synthetic selection and edit act
 test('editor ignores synthetic save, delete, and keyboard shortcuts', async () => {
   let saves = 0
   let deletes = 0
-  const fixture = createFixture('src/content/core/editor/editor.ts')
+  const fixture = createFixture('src/content/prompt_editor/prompt_editor.ts')
   const editor = fixture.exports.createEditor({ onSave() { saves++; return true }, onDelete() { deletes++; return true } })
   editor.open({ id: 'prompt', title: 'Prompt', content: 'private' })
   assert.equal(fixture.document.documentElement.children[0].shadowRoot, null)
@@ -80,7 +81,7 @@ test('editor ignores synthetic save, delete, and keyboard shortcuts', async () =
 
 test('queue controls ignore synthetic retry, cancellation, and removal', () => {
   let actions = 0
-  const fixture = createFixture('src/content/core/queue/panel.ts')
+  const fixture = createFixture('src/content/execution/status_panel.ts')
   fixture.exports.createQueuePanel({
     getSnapshot: () => ({ items: [{ id: 'item', content: 'private' }], status: 'failed', canRetry: true }),
     subscribe(callback) { callback() }, retry() { actions++ }, cancel() { actions++ }, remove() { actions++ }, clearError() { actions++ },
@@ -94,17 +95,18 @@ test('controller ignores synthetic library input and selection but keeps runtime
   let selected = 0
   let searched = 0
   let inserted = 0
-  const fixture = createFixture('src/content/core/controller.ts', {
-    './editor/editor': { createEditor: () => ({}) },
-    './overlay/overlay': { createOverlay: () => ({ isOpen: () => true, selectCurrent() { selected++ } }) },
-    './queue/queue': { createQueue: () => ({}) },
-    './queue/chain_executor': { createChainExecutor: () => ({}) },
-    './queue/panel': { createQueuePanel: () => ({}) },
-    './queue/execution': { getConversationHref: () => 'https://chatgpt.com/c/one', createExecutionCoordinator: () => ({}) },
-    './messaging': { getSettings: async () => ({}), searchPrompts() { searched++; return [] } },
-    './page_tweaks/tweaks': { applyTweaks() {} },
-    './insert/composer': { getInputText: element => element.value },
-    './insert/manual': { async insertComposerPrompt() { inserted++; return { ok: true } } },
+  const fixture = createFixture('src/content/controller.ts', {
+    './prompt_editor/prompt_editor': { createEditor: () => ({}) },
+    './prompt_overlay': { createOverlay: () => ({ isOpen: () => true, selectCurrent() { selected++ } }) },
+    './execution/queue': { createQueue: () => ({}) },
+    './execution/chain_executor': { createChainExecutor: () => ({}) },
+    './execution/status_panel': { createQueuePanel: () => ({}) },
+    './execution/step_execution': { getConversationHref: () => 'https://chatgpt.com/c/one', createExecutionCoordinator: () => ({}) },
+    './library_client': { getSettings: async () => ({}), searchPrompts() { searched++; return [] } },
+    './page_tweaks': { applyTweaks() {} },
+    './composer/composer_text': { getInputText: element => element.value },
+    './composer/insert_prompt': { async insertComposerPrompt() { inserted++; return { ok: true } } },
+    '../messaging/transport': requests,
   })
   const input = new fixture.Element('textarea')
   fixture.exports.initController({ getInputElement: () => input, getText: element => element.value })
@@ -121,7 +123,7 @@ test('controller ignores synthetic library input and selection but keeps runtime
 
 test('in-page editor allows file-only edits and resets attachment state for new prompts', async () => {
   let saves = 0
-  const fixture = createFixture('src/content/core/editor/editor.ts')
+  const fixture = createFixture('src/content/prompt_editor/prompt_editor.ts')
   const editor = fixture.exports.createEditor({ onSave() { saves++; return true }, onDelete() { return true } })
   editor.open({ id: 'files', title: 'Files', content: '', attachmentCount: 1 })
   const save = fixture.nodes.find(node => node.textContent === 'Save')

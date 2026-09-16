@@ -1,17 +1,18 @@
-import type { Adapter } from '../adapters/adapter'
-import type { AppSettings, Platform } from '../../types'
-import type { ChainStep, KnownMessage } from '../../types/messages'
-import { detectSlashContext } from './detect/slash'
-import { getInputText, setInputText } from './insert/composer'
-import { insertComposerPrompt } from './insert/manual'
-import { createEditor } from './editor/editor'
-import { createOverlay } from './overlay/overlay'
-import { createQueue } from './queue/queue'
-import { createExecutionCoordinator, getConversationHref, isConversationReady } from './queue/execution'
-import { createQueuePanel } from './queue/panel'
-import { createChainExecutor } from './queue/chain_executor'
-import { applyTweaks } from './page_tweaks/tweaks'
-import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './messaging'
+import type { Adapter } from './adapters/adapter'
+import type { AppSettings, Platform } from '../library/model'
+import type { InsertPromptResult, TabRequests } from '../messaging/protocol'
+import { listenForRequests, type RequestHandlers } from '../messaging/transport'
+import { detectShortcutContext } from './shortcut_trigger'
+import { getInputText, setInputText } from './composer/composer_text'
+import { insertComposerPrompt } from './composer/insert_prompt'
+import { createEditor } from './prompt_editor/prompt_editor'
+import { createOverlay } from './prompt_overlay'
+import { createQueue } from './execution/queue'
+import { createExecutionCoordinator, getConversationHref, isConversationReady } from './execution/step_execution'
+import { createQueuePanel } from './execution/status_panel'
+import { createChainExecutor } from './execution/chain_executor'
+import { applyTweaks } from './page_tweaks'
+import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './library_client'
 
 type InputElement = HTMLTextAreaElement | HTMLElement
 
@@ -148,14 +149,14 @@ export function initController(adapter: Adapter) {
     return { x: rect.left, top: rect.top, bottom: rect.bottom }
   }
 
-  async function updateSlashSuggestions() {
+  async function updateShortcutSuggestions() {
     const input = activeInput || adapter.getInputElement()
     if (!input) {
       pendingSearchToken += 1
       overlay.hide()
       return
     }
-    const context = detectSlashContext(input)
+    const context = detectShortcutContext(input)
     if (!context) {
       pendingSearchToken += 1
       overlay.hide()
@@ -263,7 +264,7 @@ export function initController(adapter: Adapter) {
     if (!event.isTrusted) return
     const input = getEventInput(event)
     if (!input) return
-    void updateSlashSuggestions()
+    void updateShortcutSuggestions()
   }
 
   function handleFocus() {
@@ -303,100 +304,49 @@ export function initController(adapter: Adapter) {
     }, 0)
   }
 
-  function handleMessage(message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (res?: unknown) => void) {
-    if (!message || typeof message !== 'object' || !('type' in message)) return
-    const msg = message as KnownMessage
-    if (msg.type === 'COMPAT_CHECK') {
-      const ready = Boolean(adapter.getInputElement())
-      sendResponse({ type: 'COMPAT_STATUS', payload: { ready } })
-      return
-    }
-    if (msg.type === 'INJECT_PROMPT' || msg.type === 'INSERT_AND_SEND_PROMPT') {
-      const content = msg.payload?.content
-      const attachments = Array.isArray(msg.payload?.attachments) ? msg.payload.attachments : []
-      const shouldSend = msg.type === 'INSERT_AND_SEND_PROMPT'
-      const resultType = shouldSend ? 'INSERT_AND_SEND_PROMPT_RESULT' : 'INJECT_PROMPT_RESULT'
-      if (!content && attachments.length === 0) {
-        sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'No prompt text or attachments were provided.' } })
-        return
-      }
-      if (typeof msg.payload.expectedHref !== 'string') {
-        sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'The target conversation is missing. Reload the extension and try again.' } })
-        return
-      }
-      const expectedInput = adapter.getInputElement()
-      const expectedText = expectedInput ? getInputText(expectedInput) : null
-      void (async () => {
-        if (!await ensureSettingsLoaded()) {
-          sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'Settings are unavailable. Try the action again to reload settings.' } })
-          return
-        }
-        const input = adapter.getInputElement()
-        if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
-          sendResponse({ type: resultType, payload: { ok: false, sendAttempted: false, reason: 'The draft changed while settings loaded. Try again when ready.' } })
-          return
-        }
-        const mode = settings.insertionMode || 'overwrite'
-        const contentWithNL = !content || content.endsWith('\n') ? content || '' : content + '\n'
-        await insertComposerPrompt(adapter, coordinator, contentWithNL,
-          settings.multimodalEnabled === false ? [] : attachments, mode, shouldSend, msg.payload.expectedHref)
-          .then(result => sendResponse({ type: resultType, payload: result }))
-      })()
-      return true
-    }
-    if (msg.type === 'RUN_CHAIN') {
-      const chainVersion = chainExecutor.getCancellationVersion()
-      const payload = msg.payload
-      if (!payload || !Array.isArray(payload.steps) || payload.steps.length === 0) {
-        sendResponse({ ok: false, reason: 'NO_STEPS' })
-        return
-      }
-      if (typeof payload.expectedHref !== 'string' || payload.expectedHref !== getConversationHref()) {
-        sendResponse({ ok: false, reason: 'CONVERSATION_CHANGED' })
-        return
-      }
-      const expectedInput = adapter.getInputElement()
-      const expectedText = expectedInput ? getInputText(expectedInput) : null
-      void (async () => {
-        if (!await ensureSettingsLoaded()) {
-          sendResponse({ ok: false, reason: 'SETTINGS_UNAVAILABLE' })
-          return
-        }
-        if (chainVersion !== chainExecutor.getCancellationVersion()) {
-          sendResponse({ ok: false, reason: 'CANCELLED' })
-          return
-        }
-        if (payload.expectedHref !== getConversationHref()) {
-          sendResponse({ ok: false, reason: 'CONVERSATION_CHANGED' })
-          return
-        }
-        const input = adapter.getInputElement()
-        if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
-          sendResponse({ ok: false, reason: 'COMPOSER_CHANGED' })
-          executionPanel.showMessage('The draft changed while settings loaded. Start the chain again when ready.')
-          return
-        }
-        if (!isConversationReady()) {
-          sendResponse({ ok: false, reason: 'CONVERSATION_REQUIRED' })
-          void chainExecutor.run(payload.steps as ChainStep[], settings, payload.insertionModeOverride)
-          return
-        }
-        if (coordinator.isBusy()) {
-          sendResponse({ ok: false, reason: 'COMPOSER_BUSY' })
-          return
-        }
-        sendResponse({ ok: true })
-        void chainExecutor.run(payload.steps as ChainStep[], settings, payload.insertionModeOverride)
-        return
-      })()
-      return true
-    }
-    if (msg.type === 'CANCEL_CHAIN') {
-      chainExecutor.cancel()
-      sendResponse({ ok: true })
-      return
-    }
+  async function handleInsertRequest({ content, attachments = [], expectedHref }: TabRequests['INJECT_PROMPT']['payload'], shouldSend: boolean): Promise<InsertPromptResult> {
+    if (!content && attachments.length === 0) return { ok: false, sendAttempted: false, reason: 'No prompt text or attachments were provided.' }
+    const expectedInput = adapter.getInputElement()
+    const expectedText = expectedInput ? getInputText(expectedInput) : null
+    if (!await ensureSettingsLoaded()) return { ok: false, sendAttempted: false, reason: 'Settings are unavailable. Try the action again to reload settings.' }
+    const input = adapter.getInputElement()
+    if (input !== expectedInput || (input && getInputText(input) !== expectedText)) return { ok: false, sendAttempted: false, reason: 'The draft changed while settings loaded. Try again when ready.' }
+    const mode = settings.insertionMode || 'overwrite'
+    const contentWithNL = !content || content.endsWith('\n') ? content || '' : content + '\n'
+    return insertComposerPrompt(adapter, coordinator, contentWithNL,
+      settings.multimodalEnabled === false ? [] : attachments, mode, shouldSend, expectedHref)
   }
+
+  const requestHandlers: RequestHandlers<TabRequests> = {
+    COMPAT_CHECK: async () => ({ ready: Boolean(adapter.getInputElement()) }),
+    INJECT_PROMPT: (payload) => handleInsertRequest(payload, false),
+    INSERT_AND_SEND_PROMPT: (payload) => handleInsertRequest(payload, true),
+    RUN_CHAIN: async ({ steps, expectedHref, insertionModeOverride }) => {
+      const chainVersion = chainExecutor.getCancellationVersion()
+      if (expectedHref !== getConversationHref()) return { ok: false, reason: 'CONVERSATION_CHANGED' }
+      const expectedInput = adapter.getInputElement()
+      const expectedText = expectedInput ? getInputText(expectedInput) : null
+      if (!await ensureSettingsLoaded()) return { ok: false, reason: 'SETTINGS_UNAVAILABLE' }
+      if (chainVersion !== chainExecutor.getCancellationVersion()) return { ok: false, reason: 'CANCELLED' }
+      if (expectedHref !== getConversationHref()) return { ok: false, reason: 'CONVERSATION_CHANGED' }
+      const input = adapter.getInputElement()
+      if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
+        executionPanel.showMessage('The draft changed while settings loaded. Start the chain again when ready.')
+        return { ok: false, reason: 'COMPOSER_CHANGED' }
+      }
+      if (!isConversationReady()) {
+        void chainExecutor.run(steps, settings, insertionModeOverride)
+        return { ok: false, reason: 'CONVERSATION_REQUIRED' }
+      }
+      if (coordinator.isBusy()) return { ok: false, reason: 'COMPOSER_BUSY' }
+      void chainExecutor.run(steps, settings, insertionModeOverride)
+      return { ok: true }
+    },
+    CANCEL_CHAIN: async () => {
+      chainExecutor.cancel()
+    },
+  }
+
 
   const observer = new MutationObserver(() => refreshInput())
   observer.observe(document.documentElement, { childList: true, subtree: true })
@@ -407,7 +357,7 @@ export function initController(adapter: Adapter) {
   document.addEventListener('focusin', handleFocus, true)
   document.addEventListener('focusout', handleFocusOut, true)
   document.addEventListener('mousedown', handlePointerDown, true)
-  chrome.runtime.onMessage.addListener(handleMessage)
+  chrome.runtime.onMessage.addListener(listenForRequests<TabRequests>(requestHandlers))
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return
     if (changes.langqueue_settings) {

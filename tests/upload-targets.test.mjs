@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createChatGPTAdapter } from '../src/content/adapters/chatgpt.ts'
 import { createClaudeAdapter } from '../src/content/adapters/claude.ts'
 import { createGeminiAdapter } from '../src/content/adapters/gemini.ts'
-import { findEnabledFileInput, waitForSelectorsToDisappear } from '../src/content/adapters/utils.ts'
+import { findEnabledFileInput, waitForSelectorsToDisappear } from '../src/content/adapters/page_dom.ts'
 
 class FakeFileInput {
   type = 'file'

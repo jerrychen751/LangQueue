@@ -7,7 +7,7 @@ import vm from 'node:vm';
 
 const require = createRequire(resolve('package.json'));
 const ts = require('typescript');
-const source = ts.transpileModule(readFileSync(resolve('src/utils/attachments.ts'), 'utf8'), {
+const source = ts.transpileModule(readFileSync(resolve('src/library/attachments.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
