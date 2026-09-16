@@ -21,7 +21,7 @@ After a production rebuild, click **Reload** on the extension card and refresh t
 npm run dev
 ```
 
-Open the development server's `/popup.html` page to work on the popup with sample Chrome API data. This browser preview uses a development mock; it does not test real extension storage, tab messaging, or content scripts.
+Open the development server's `/popup.html` page to work on the popup with sample Chrome API data, and `/onboarding.html` for the first-run welcome and import page. This browser preview uses a development mock; it does not test real extension storage, tab messaging, or content scripts.
 
 For extension development, keep the Vite server running and load its generated `dist` directory in Chrome. Use the production build and reload steps above for the final check. A production build replaces the development output.
 

@@ -17,6 +17,7 @@ LangQueue is a personal prompt orchestration Chrome extension for ChatGPT, Claud
 - **Queue while generating**: Press Enter during generation to queue the prompt and auto‑send once the model is idle.
 - **Prompt chains**: Run multi‑step sequences with optional delays and auto‑send.
 - **Page tweaks**: Optional behavior changes like preventing auto‑scroll on submit.
+- **Import from Claude or ChatGPT skills**: Bring skills folders from Claude Code or Codex, plus any Markdown prompt files, into the library from the first‑run page or from Settings. Each `SKILL.md` becomes one prompt titled from its frontmatter `name`.
 - **Privacy**: All data stays in local Chrome storage; no external services.
 
 ### Supported sites
@@ -39,3 +40,4 @@ LangQueue is content‑script‑first. The in‑page controller handles prompt t
 - Site adapters: `src/content/adapters` (ChatGPT, Claude, Gemini DOM heuristics and send/generate detection).
 - Background: `src/background/index.ts` (settings, prompt search, usage logging, updates/deletes).
 - Popup UI: `src/popup` (library view and minimal settings).
+- Onboarding page: `src/onboarding` (first‑run welcome and Markdown import).
