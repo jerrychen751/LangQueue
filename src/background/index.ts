@@ -9,8 +9,10 @@ function generatePromptId(): string {
   return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  // Placeholder for first-run logic
+chrome.runtime.onInstalled.addListener((details) => {
+  // First-run logic
+  if (details.reason !== 'install') return
+  chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') }).catch(() => {})
 })
 
 const requestHandlers: RequestHandlers<BackgroundRequests> = {

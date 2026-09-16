@@ -342,6 +342,18 @@ export default function Settings({ onBack }: SettingsProps) {
                   {importing ? 'Importing…' : 'Import JSON'}
                 </button>
               </div>
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div>
+                    <div className="font-medium">Import skills folders</div>
+                    <div className="mt-1 text-[11px] text-[#6f7c82]">Bring Claude or ChatGPT skills and Markdown prompts into the library.</div>
+                  </div>
+                  <button
+                  className="compact-button whitespace-nowrap"
+                  onClick={() => { void chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html#import') }) }}
+                >
+                  Open importer
+                </button>
+              </div>
               {importSummary ? (
                 <div className="px-4 py-2 text-[11px] text-[#46555c]">{importSummary}</div>
               ) : null}
