@@ -1,5 +1,6 @@
 {
   "name": "extension",
+  "description": "A Chrome extension to streamline LLM workflows on ChatGPT, Gemini, and Claude by enabling storage, insertion, and queuing of multi-modal prompt chains.",
   "private": true,
   "version": "0.0.0",
   "type": "module",

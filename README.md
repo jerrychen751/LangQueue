@@ -1,6 +1,6 @@
 ## LangQueue
 
-LangQueue is a personal prompt orchestration Chrome extension for ChatGPT, Claude, and Gemini. It keeps a local prompt library and surfaces fast, in‑page insertion tools so you can drop structured prompts and chains into an active chat without leaving the page.
+A Chrome extension to streamline LLM workflows on ChatGPT, Gemini, and Claude by enabling storage, insertion, and queuing of multi-modal prompt chains.
 
 <table>
   <tr>
