@@ -2,12 +2,15 @@
 
 A Chrome extension to streamline LLM workflows on ChatGPT, Gemini, and Claude by enabling storage, insertion, and queuing of multi-modal prompt chains.
 
-<table>
-  <tr>
-    <td><img width="600" height="337" alt="Screenshot 2026-01-21 at 8 24 25 PM" src="https://github.com/user-attachments/assets/5d933464-5492-4398-b26c-6a8f3b8031d4" /></td>
-    <td><img width="600" height="477" alt="Screenshot 2026-01-21 at 8 25 39 PM" src="https://github.com/user-attachments/assets/b793b078-9a81-4a56-8804-08d4a9267e08" /></td>
-  </tr>
-</table>
+<p align="center">
+  <img alt="LangQueue marquee: your prompts, already saved, on ChatGPT, Gemini, and Claude" src="marketing/store-interface/marquee-1400x560.jpg" />
+</p>
+
+<p align="center">
+  <img width="32%" alt="Prompt library popup beside a saved prompt card" src="marketing/store-interface/01-library-1280x800.jpg" />
+  <img width="32%" alt="Prompt editor with requirements.md attached to a prompt" src="marketing/store-interface/02-attachments-1280x800.jpg" />
+  <img width="32%" alt="Prompt chain editor with audit, revise, and verify steps" src="marketing/store-interface/03-chains-1280x800.jpg" />
+</p>
 
 ### Capabilities
 
