@@ -766,6 +766,27 @@ async function importLibraryUnlocked(data: unknown) {
   return importDataUnlocked(data, { mode: 'merge', duplicateStrategy: 'replace' });
 }
 
+async function importPromptDraftsUnlocked(drafts: Array<{ title: string; content: string }>): Promise<{ imported: number; skipped: number }> {
+  const db = await getPrompts();
+  const titles = new Set(Object.values(db.promptsById).map((prompt) => prompt.title));
+  const ts = Date.now();
+  let imported = 0;
+  let skipped = 0;
+  for (const draft of drafts) {
+    const title = normalizeTitle(draft.title);
+    if (!title || titles.has(title)) {
+      skipped += 1;
+      continue;
+    }
+    titles.add(title);
+    const id = generateId('p');
+    db.promptsById[id] = { id, title, content: draft.content, attachments: [], usageCount: 0, createdAt: ts, updatedAt: ts };
+    imported += 1;
+  }
+  if (imported > 0) await savePrompts(db);
+  return { imported, skipped };
+}
+
 function serializeStorageOperation<Args extends unknown[], Result>(
   operation: (...args: Args) => Promise<Result>
 ): (...args: Args) => Promise<Result> {
@@ -794,3 +815,4 @@ export const exportChains = serializeStorageOperation(exportChainsUnlocked);
 export const importChains = serializeStorageOperation(importChainsUnlocked);
 export const exportLibrary = serializeStorageOperation(exportLibraryUnlocked);
 export const importLibrary = serializeStorageOperation(importLibraryUnlocked);
+export const importPromptDrafts = serializeStorageOperation(importPromptDraftsUnlocked);

@@ -364,3 +364,24 @@ test('inconsistent binary kinds and MIME casing reject imports without changing 
   assert.deepEqual(records, before);
   assert.equal(writes.length, 0);
 });
+
+test('markdown prompt imports skip existing and repeated titles in one write', async () => {
+  const { popup, records, writes } = createStorageContexts(createLibrary());
+  const result = await popup.importPromptDrafts([
+    { title: 'p1', content: 'duplicate of an existing title' },
+    { title: 'review', content: 'Review the diff.' },
+    { title: ' review ', content: 'repeated inside the batch' },
+    { title: 'plan', content: 'Plan the work.' },
+    { title: '  ', content: 'untitled' },
+  ]);
+  assert.equal(result.imported, 2);
+  assert.equal(result.skipped, 3);
+  const prompts = Object.values(records.langqueue_prompts.promptsById);
+  assert.deepEqual(prompts.map((prompt) => prompt.title).sort(), ['p1', 'plan', 'review']);
+  assert.equal(prompts.find((prompt) => prompt.title === 'review').content, 'Review the diff.');
+  assert.equal(writes.length, 1);
+  const repeat = await popup.importPromptDrafts([{ title: 'plan', content: 'again' }]);
+  assert.equal(repeat.imported, 0);
+  assert.equal(repeat.skipped, 1);
+  assert.equal(writes.length, 1);
+});
