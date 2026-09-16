@@ -28,7 +28,7 @@ function createController() {
   let cancelQueue;
   const dependencies = {
     './prompt_editor/prompt_editor': { createEditor: () => ({}) },
-    './prompt_overlay': { createOverlay(callbacks) { selection = callbacks.onSelect; return { isOpen: () => false, hide() {}, show(...args) { shown.push(args); } }; } },
+    './shortcut_suggestions': { createShortcutSuggestions(callbacks) { selection = callbacks.onSelect; return { isOpen: () => false, hide() {}, show(...args) { shown.push(args); } }; } },
     './execution/queue': { createQueue: () => ({ enqueue(item) { queued.push(item); return true; }, cancel() { queueVersion++; }, getCancellationVersion: () => queueVersion }) },
     './execution/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args); }, cancel() { chainVersion++; }, getCancellationVersion: () => chainVersion }) },
     './execution/status_panel': { createQueuePanel(queue) { cancelQueue = queue.cancel; return { showMessage(message) { notices.push(message); } }; } },
@@ -91,7 +91,7 @@ test('failed settings keep the draft and require another explicit action before 
   assert.equal(fixture.inserted[0][3].length, 0);
 });
 
-test('manual and overlay selections refuse a draft changed during settings loading', async () => {
+test('manual and shortcut suggestion selections refuse a draft changed during settings loading', async () => {
   for (const action of ['receive', 'select']) {
     const fixture = createController();
     const pending = fixture[action]();
@@ -192,7 +192,7 @@ test('queue cancellation preserves a draft awaiting settings and allows a later 
   assert.equal(fixture.input.value, '');
 });
 
-test('chain cancellation invalidates an overlay selection awaiting settings', async () => {
+test('chain cancellation invalidates a shortcut suggestion selection awaiting settings', async () => {
   const fixture = createController();
   fixture.selectChain();
   await fixture.cancelChain();

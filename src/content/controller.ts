@@ -6,7 +6,7 @@ import { detectShortcutContext } from './shortcut_trigger';
 import { getInputText, setInputText } from './composer/composer_text';
 import { insertComposerPrompt } from './composer/insert_prompt';
 import { createEditor } from './prompt_editor/prompt_editor';
-import { createOverlay } from './prompt_overlay';
+import { createShortcutSuggestions } from './shortcut_suggestions';
 import { createQueue } from './execution/queue';
 import { createExecutionCoordinator, getConversationHref, isConversationReady } from './execution/step_execution';
 import { createQueuePanel } from './execution/status_panel';
@@ -42,7 +42,7 @@ export function initController(adapter: Adapter) {
     onDelete: async (id) => deletePrompt(id),
   });
 
-  const overlay = createOverlay({
+  const shortcutSuggestions = createShortcutSuggestions({
     onSelect: (item) => {
       const chainVersion = item.kind === 'chain' ? chainExecutor.getCancellationVersion() : null;
       void (async () => {
@@ -72,13 +72,13 @@ export function initController(adapter: Adapter) {
             executionPanel.showMessage(result.reason || 'Prompt insertion failed. Check the composer before trying again.');
             return;
           }
-          overlay.hide();
+          shortcutSuggestions.hide();
           void logUsage(item.id, mapPlatform(adapter.id)).catch(() => {
             executionPanel.showMessage('The prompt was inserted, but its usage count could not be saved. Do not insert it again just to update the count.');
           });
           return;
         }
-        overlay.hide();
+        shortcutSuggestions.hide();
         if (chainExecutor.isRunning()) {
           return;
         }
@@ -86,13 +86,13 @@ export function initController(adapter: Adapter) {
       })();
     },
     onEdit: (item) => {
-      overlay.hide();
+      shortcutSuggestions.hide();
       if (item.kind === 'prompt') {
         editor.open({ id: item.id, title: item.title, content: item.content, attachmentCount: item.attachments.length });
       }
     },
     onCreate: () => {
-      overlay.hide();
+      shortcutSuggestions.hide();
       editor.open({ title: '', content: '' });
     },
     onClose: () => {
@@ -111,7 +111,7 @@ export function initController(adapter: Adapter) {
       conversationHref = nextHref;
       queue.stopForNavigation();
       chainExecutor.stopForNavigation();
-      overlay.hide();
+      shortcutSuggestions.hide();
       pendingSearchToken += 1;
     }
     const next = adapter.getInputElement();
@@ -163,7 +163,7 @@ export function initController(adapter: Adapter) {
     return settingsRequest;
   }
 
-  function overlayPositionFromRect(rect: DOMRect) {
+  function suggestionsPositionFromRect(rect: DOMRect) {
     return { x: rect.left, top: rect.top, bottom: rect.bottom };
   }
 
@@ -171,13 +171,13 @@ export function initController(adapter: Adapter) {
     const input = activeInput || adapter.getInputElement();
     if (!input) {
       pendingSearchToken += 1;
-      overlay.hide();
+      shortcutSuggestions.hide();
       return;
     }
     const context = detectShortcutContext(input);
     if (!context) {
       pendingSearchToken += 1;
-      overlay.hide();
+      shortcutSuggestions.hide();
       return;
     }
     const query = context.query || '';
@@ -206,7 +206,7 @@ export function initController(adapter: Adapter) {
         })),
       ];
       const label = query ? `$${query}` : '';
-      overlay.show(overlayPositionFromRect(context.rect), items, label);
+      shortcutSuggestions.show(suggestionsPositionFromRect(context.rect), items, label);
       if (searchErrorShown) {
         executionPanel.showMessage('');
       }
@@ -215,7 +215,7 @@ export function initController(adapter: Adapter) {
       if (token !== pendingSearchToken) {
         return;
       }
-      overlay.hide();
+      shortcutSuggestions.hide();
       searchErrorShown = true;
       const detail = error instanceof Error ? ` Details: ${error.message}` : '';
       executionPanel.showMessage(`The prompt library could not be loaded. Type your shortcut again to retry; if it still fails, reload the extension.${detail}`);
@@ -244,24 +244,24 @@ export function initController(adapter: Adapter) {
     if (!event.isTrusted) {
       return;
     }
-    if (overlay.isOpen()) {
+    if (shortcutSuggestions.isOpen()) {
       if (event.key === 'ArrowDown') {
-        overlay.moveSelection(1);
+        shortcutSuggestions.moveSelection(1);
         event.preventDefault();
         return;
       }
       if (event.key === 'ArrowUp') {
-        overlay.moveSelection(-1);
+        shortcutSuggestions.moveSelection(-1);
         event.preventDefault();
         return;
       }
       if (event.key === 'Tab' || event.key === 'Enter') {
-        overlay.selectCurrent();
+        shortcutSuggestions.selectCurrent();
         event.preventDefault();
         return;
       }
       if (event.key === 'Escape') {
-        overlay.hide();
+        shortcutSuggestions.hide();
         event.preventDefault();
         return;
       }
@@ -323,7 +323,7 @@ export function initController(adapter: Adapter) {
     if (!event.isTrusted) {
       return;
     }
-    if (!overlay.isOpen()) {
+    if (!shortcutSuggestions.isOpen()) {
       return;
     }
     const input = activeInput || adapter.getInputElement();
@@ -331,10 +331,10 @@ export function initController(adapter: Adapter) {
     if (input instanceof HTMLElement && target && input.contains(target)) {
       return;
     }
-    if (overlay.isEventInside(event)) {
+    if (shortcutSuggestions.isEventInside(event)) {
       return;
     }
-    overlay.hide();
+    shortcutSuggestions.hide();
   }
 
   function isInputActive(): boolean {
@@ -356,25 +356,25 @@ export function initController(adapter: Adapter) {
   }
 
   function handleFocusOut(event: FocusEvent) {
-    if (!overlay.isOpen()) {
+    if (!shortcutSuggestions.isOpen()) {
       return;
     }
     const related = event.relatedTarget as Node | null;
-    if (overlay.isNodeInside(related)) {
+    if (shortcutSuggestions.isNodeInside(related)) {
       return;
     }
     setTimeout(() => {
-      if (!overlay.isOpen()) {
+      if (!shortcutSuggestions.isOpen()) {
         return;
       }
       if (isInputActive()) {
         return;
       }
       const active = document.activeElement as Node | null;
-      if (overlay.isNodeInside(active)) {
+      if (shortcutSuggestions.isNodeInside(active)) {
         return;
       }
-      overlay.hide();
+      shortcutSuggestions.hide();
     }, 0);
   }
 

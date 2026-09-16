@@ -59,13 +59,13 @@ function createFixture(path, dependencies = {}) {
   return { exports, document, nodes, Element };
 }
 
-test('overlay hides its shadow root and ignores synthetic selection and edit actions', () => {
+test('shortcut suggestions hide their shadow root and ignore synthetic selection and edit actions', () => {
   let selected = 0;
   let edited = 0;
   let created = 0;
-  const fixture = createFixture('src/content/prompt_overlay.ts');
-  const overlay = fixture.exports.createOverlay({ onSelect() { selected++; }, onEdit() { edited++; }, onCreate() { created++; }, onClose() {} });
-  overlay.show({ x: 10, top: 100, bottom: 120 }, [{ kind: 'chain', id: 'chain', title: 'Chain', steps: [{ content: 'private' }] }, { kind: 'prompt', id: 'prompt', title: 'Prompt', content: 'private' }], '');
+  const fixture = createFixture('src/content/shortcut_suggestions.ts');
+  const shortcutSuggestions = fixture.exports.createShortcutSuggestions({ onSelect() { selected++; }, onEdit() { edited++; }, onCreate() { created++; }, onClose() {} });
+  shortcutSuggestions.show({ x: 10, top: 100, bottom: 120 }, [{ kind: 'chain', id: 'chain', title: 'Chain', steps: [{ content: 'private' }] }, { kind: 'prompt', id: 'prompt', title: 'Prompt', content: 'private' }], '');
   assert.equal(fixture.document.documentElement.children[0].shadowRoot, null);
   for (const node of fixture.nodes) { node.dispatch('mousedown'); node.dispatch('click'); }
   assert.deepEqual([selected, edited, created], [0, 0, 0]);
@@ -111,7 +111,7 @@ test('controller ignores synthetic library input and selection but keeps runtime
   let inserted = 0;
   const fixture = createFixture('src/content/controller.ts', {
     './prompt_editor/prompt_editor': { createEditor: () => ({}) },
-    './prompt_overlay': { createOverlay: () => ({ isOpen: () => true, selectCurrent() { selected++; } }) },
+    './shortcut_suggestions': { createShortcutSuggestions: () => ({ isOpen: () => true, selectCurrent() { selected++; } }) },
     './execution/queue': { createQueue: () => ({}) },
     './execution/chain_executor': { createChainExecutor: () => ({}) },
     './execution/status_panel': { createQueuePanel: () => ({}) },

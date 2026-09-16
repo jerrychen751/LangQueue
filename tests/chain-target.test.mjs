@@ -16,7 +16,7 @@ function createReceiver() {
   const exports = {};
   const dependencies = {
     './prompt_editor/prompt_editor': { createEditor: () => ({}) },
-    './prompt_overlay': { createOverlay: () => ({}) },
+    './shortcut_suggestions': { createShortcutSuggestions: () => ({}) },
     './execution/queue': { createQueue: () => ({}) },
     './execution/chain_executor': { createChainExecutor: () => ({ run() { starts++; }, getCancellationVersion: () => 0 }) },
     './execution/status_panel': { createQueuePanel: () => ({}) },

@@ -1,7 +1,7 @@
 import type { AttachmentRef } from '../library/model';
 import type { ChainStep } from '../messaging/protocol';
 
-export type OverlayItem =
+export type ShortcutSuggestion =
   | {
       kind: 'prompt';
       id: string;
@@ -16,15 +16,15 @@ export type OverlayItem =
       steps: ChainStep[];
     };
 
-type OverlayCallbacks = {
-  onSelect: (item: OverlayItem) => void;
-  onEdit: (item: OverlayItem) => void;
+type ShortcutSuggestionsCallbacks = {
+  onSelect: (item: ShortcutSuggestion) => void;
+  onEdit: (item: ShortcutSuggestion) => void;
   onClose: () => void;
   onCreate: () => void;
 };
 
-type OverlayState = {
-  items: OverlayItem[];
+type ShortcutSuggestionsState = {
+  items: ShortcutSuggestion[];
   selectedIndex: number;
 };
 
@@ -43,7 +43,7 @@ const STYLES = `
     --lq-accent-hover: #426c7a;
     --lq-accent-text: #f7fafb;
   }
-  .lq-overlay {
+  .lq-shortcut-suggestions {
     position: fixed;
     z-index: 2147483647;
     min-width: 300px;
@@ -57,8 +57,8 @@ const STYLES = `
     color-scheme: light;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
-  .lq-overlay,
-  .lq-overlay * {
+  .lq-shortcut-suggestions,
+  .lq-shortcut-suggestions * {
     box-sizing: border-box;
   }
   .lq-header {
@@ -211,14 +211,14 @@ const STYLES = `
   }
 `;
 
-export function createOverlay(callbacks: OverlayCallbacks) {
+export function createShortcutSuggestions(callbacks: ShortcutSuggestionsCallbacks) {
   const host = document.createElement('div');
-  host.setAttribute('data-langqueue-overlay', 'true');
+  host.setAttribute('data-langqueue-shortcut-suggestions', 'true');
   const shadow = host.attachShadow({ mode: 'closed' });
   const style = document.createElement('style');
   style.textContent = STYLES;
   const container = document.createElement('div');
-  container.className = 'lq-overlay';
+  container.className = 'lq-shortcut-suggestions';
   container.style.display = 'none';
   const header = document.createElement('div');
   header.className = 'lq-header';
@@ -247,7 +247,7 @@ export function createOverlay(callbacks: OverlayCallbacks) {
   shadow.appendChild(container);
   document.documentElement.appendChild(host);
 
-  const state: OverlayState = { items: [], selectedIndex: 0 };
+  const state: ShortcutSuggestionsState = { items: [], selectedIndex: 0 };
 
   function applyScrollLimit() {
     list.style.maxHeight = '';
@@ -353,7 +353,7 @@ export function createOverlay(callbacks: OverlayCallbacks) {
     }
   }
 
-  function show(position: { x: number; top: number; bottom: number }, items: OverlayItem[], label: string) {
+  function show(position: { x: number; top: number; bottom: number }, items: ShortcutSuggestion[], label: string) {
     state.items = items;
     state.selectedIndex = Math.min(state.selectedIndex, Math.max(0, items.length - 1));
     header.textContent = label;
