@@ -5,7 +5,7 @@ import { listenForRequests, type RequestHandlers } from '../messaging/transport'
 import { detectShortcutContext } from './shortcut_trigger';
 import { getInputText, setInputText } from './composer/composer_text';
 import { insertComposerPrompt } from './composer/insert_prompt';
-import { createEditor } from './prompt_editor/prompt_editor';
+import { createPromptEditor } from './prompt_editor/prompt_editor';
 import { createShortcutSuggestions } from './shortcut_suggestions';
 import { createQueue } from './execution/queue';
 import { createExecutionCoordinator, getConversationHref, isConversationReady } from './execution/step_execution';
@@ -32,7 +32,7 @@ export function initController(adapter: Adapter) {
   let readySent = false;
   let conversationHref = getConversationHref();
 
-  const editor = createEditor({
+  const promptEditor = createPromptEditor({
     onSave: async (draft) => {
       if (draft.id) {
         return updatePrompt(draft.id, draft.title, draft.content);
@@ -88,12 +88,12 @@ export function initController(adapter: Adapter) {
     onEdit: (item) => {
       shortcutSuggestions.hide();
       if (item.kind === 'prompt') {
-        editor.open({ id: item.id, title: item.title, content: item.content, attachmentCount: item.attachments.length });
+        promptEditor.open({ id: item.id, title: item.title, content: item.content, attachmentCount: item.attachments.length });
       }
     },
     onCreate: () => {
       shortcutSuggestions.hide();
-      editor.open({ title: '', content: '' });
+      promptEditor.open({ title: '', content: '' });
     },
     onClose: () => {
       pendingSearchToken += 1;

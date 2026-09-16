@@ -73,19 +73,19 @@ test('shortcut suggestions hide their shadow root and ignore synthetic selection
   assert.equal(selected, 1);
 });
 
-test('editor ignores synthetic save, delete, and keyboard shortcuts', async () => {
+test('prompt promptEditor ignores synthetic save, delete, and keyboard shortcuts', async () => {
   let saves = 0;
   let deletes = 0;
   const fixture = createFixture('src/content/prompt_editor/prompt_editor.ts');
-  const editor = fixture.exports.createEditor({ onSave() { saves++; return true; }, onDelete() { deletes++; return true; } });
-  editor.open({ id: 'prompt', title: 'Prompt', content: 'private' });
+  const promptEditor = fixture.exports.createPromptEditor({ onSave() { saves++; return true; }, onDelete() { deletes++; return true; } });
+  promptEditor.open({ id: 'prompt', title: 'Prompt', content: 'private' });
   assert.equal(fixture.document.documentElement.children[0].shadowRoot, null);
   for (const node of fixture.nodes) {
     node.dispatch('click');
   }
   fixture.document.dispatch('keydown', { key: 'Enter', ctrlKey: true });
   fixture.document.dispatch('keydown', { key: 'Escape' });
-  assert.deepEqual([saves, deletes, editor.isOpen()], [0, 0, true]);
+  assert.deepEqual([saves, deletes, promptEditor.isOpen()], [0, 0, true]);
   fixture.nodes.find(node => node.textContent === 'Save').dispatch('click', { isTrusted: true });
   await Promise.resolve();
   assert.equal(saves, 1);
@@ -110,7 +110,7 @@ test('controller ignores synthetic library input and selection but keeps runtime
   let searched = 0;
   let inserted = 0;
   const fixture = createFixture('src/content/controller.ts', {
-    './prompt_editor/prompt_editor': { createEditor: () => ({}) },
+    './prompt_editor/prompt_editor': { createPromptEditor: () => ({}) },
     './shortcut_suggestions': { createShortcutSuggestions: () => ({ isOpen: () => true, selectCurrent() { selected++; } }) },
     './execution/queue': { createQueue: () => ({}) },
     './execution/chain_executor': { createChainExecutor: () => ({}) },
@@ -135,16 +135,16 @@ test('controller ignores synthetic library input and selection but keeps runtime
   assert.equal(inserted, 1);
 });
 
-test('in-page editor allows file-only edits and resets attachment state for new prompts', async () => {
+test('prompt promptEditor allows file-only edits and resets attachment state for new prompts', async () => {
   let saves = 0;
   const fixture = createFixture('src/content/prompt_editor/prompt_editor.ts');
-  const editor = fixture.exports.createEditor({ onSave() { saves++; return true; }, onDelete() { return true; } });
-  editor.open({ id: 'files', title: 'Files', content: '', attachmentCount: 1 });
+  const promptEditor = fixture.exports.createPromptEditor({ onSave() { saves++; return true; }, onDelete() { return true; } });
+  promptEditor.open({ id: 'files', title: 'Files', content: '', attachmentCount: 1 });
   const save = fixture.nodes.find(node => node.textContent === 'Save');
   save.dispatch('click', { isTrusted: true });
   await Promise.resolve();
   assert.equal(saves, 1);
-  editor.open({ title: 'Empty', content: '' });
+  promptEditor.open({ title: 'Empty', content: '' });
   save.dispatch('click', { isTrusted: true });
   await Promise.resolve();
   assert.equal(saves, 1);

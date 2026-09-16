@@ -15,7 +15,7 @@ function createReceiver() {
   let starts = 0;
   const exports = {};
   const dependencies = {
-    './prompt_editor/prompt_editor': { createEditor: () => ({}) },
+    './prompt_editor/prompt_editor': { createPromptEditor: () => ({}) },
     './shortcut_suggestions': { createShortcutSuggestions: () => ({}) },
     './execution/queue': { createQueue: () => ({}) },
     './execution/chain_executor': { createChainExecutor: () => ({ run() { starts++; }, getCancellationVersion: () => 0 }) },

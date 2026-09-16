@@ -7,7 +7,7 @@ Reset all inherited properties.
 }
 
 /* 
-Darker backdrop against the rest of the popup modal editor.
+Darker backdrop behind the prompt editor.
 */
 .backdrop {
   position: fixed;
@@ -21,9 +21,9 @@ Darker backdrop against the rest of the popup modal editor.
 }
 
 /* 
-Modal editor, which contains the shortcut name and prompt contents.
+Prompt editor dialog, which contains the shortcut name and prompt contents.
 */
-.modal {
+.dialog {
   width: min(1080px, 92vw);
   max-height: 85vh;
   background: #ffffff;
@@ -39,14 +39,14 @@ Modal editor, which contains the shortcut name and prompt contents.
 }
 
 /* 
-Modal editor as well as all contained elements (descendents).
+Prompt editor dialog as well as all contained elements (descendents).
 */
-.modal, .modal * {
+.dialog, .dialog * {
   box-sizing: border-box;
 }
 
 /* 
-Top bar of the modal (title + close button).
+Top bar of the prompt editor (title + close button).
 */
 .header {
   padding: 15px 18px 13px 18px;
@@ -57,7 +57,7 @@ Top bar of the modal (title + close button).
 }
 
 /*
-Title/label for the popup modal editor.
+Title/label for the prompt editor.
 */
 .title {
   font-size: 18px;
@@ -67,7 +67,7 @@ Title/label for the popup modal editor.
 }
 
 /*
-Close button for the popup modal editor ('X' char).
+Close button for the prompt editor ('X' char).
 */
 .close {
   display: inline-grid;
@@ -101,7 +101,7 @@ Text box for prompt instructions.
 
 /*
 Body section containing form fields. overflow-y and min-height: 0
-allow this flex child to scroll when the modal hits max-height.
+allow this flex child to scroll when the prompt editor hits max-height.
 */
 .body {
   padding: 18px;
@@ -260,7 +260,7 @@ Square delete button with trash icon.
   box-shadow: 0 0 0 2px rgba(82, 125, 140, 0.14);
 }
 
-.modal ::selection {
+.dialog ::selection {
   color: #ffffff;
   background: #527d8c;
 }

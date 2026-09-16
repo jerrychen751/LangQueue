@@ -9,37 +9,37 @@ export type PromptDraft = {
 };
 
 /**
- * Builds the DOM tree for the modal editor. Returns a JS object with 3 properties/functions to manage the visibility of the modal editor.
+ * Builds the DOM tree for the prompt editor. Returns a JS object with 3 properties/functions to manage the visibility of the prompt editor.
  * 
  * All DOM construction, UI logic, input validation, and event handling is self-contained.
  * 
- * Callback functions are passed in upon creation of editor (logic injected at call site).
+ * Callback functions are passed in upon creation of the prompt editor (logic injected at call site).
  */
-export function createEditor(callbacks: {
+export function createPromptEditor(callbacks: {
   onSave: (draft: PromptDraft) => Promise<boolean> | boolean;
   onDelete: (id: string) => Promise<boolean> | boolean;
   onClose?: () => void;
 }) {
-  // Build elements of DOM/HTML for modal editor
+  // Build elements of DOM/HTML for the prompt editor
   const host = document.createElement('div');
-  host.setAttribute('data-langqueue-editor', 'true');
+  host.setAttribute('data-langqueue-prompt-editor', 'true');
   const shadow = host.attachShadow({ mode: 'closed' });
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(styles);
 
   const backdrop = document.createElement('div');
   backdrop.className = 'backdrop';
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.setAttribute('role', 'dialog');
-  modal.setAttribute('aria-modal', 'true');
-  modal.setAttribute('aria-labelledby', 'editor-title');
+  const dialog = document.createElement('div');
+  dialog.className = 'dialog';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'prompt-editor-title');
 
   const header = document.createElement('div');
   header.className = 'header';
   const title = document.createElement('div');
   title.className = 'title';
-  title.id = 'editor-title';
+  title.id = 'prompt-editor-title';
   title.textContent = 'Edit Shortcut';
   const closeBtn = document.createElement('button');
   closeBtn.className = 'close';
@@ -93,8 +93,8 @@ export function createEditor(callbacks: {
   saveBtn.textContent = 'Save';
   footer.append(deleteBtn, cancelBtn, saveBtn);
 
-  modal.append(header, body, footer);
-  backdrop.append(modal);
+  dialog.append(header, body, footer);
+  backdrop.append(dialog);
   shadow.append(backdrop);
   shadow.adoptedStyleSheets = [sheet];
   document.documentElement.append(host);
@@ -102,9 +102,9 @@ export function createEditor(callbacks: {
   // Track internal state for UI logic (e.g., invalidate certain buttons during save operations)
   let activePromptId: string | undefined;
   let hasAttachments = false;
-  let isOpen = false; // allow check for events depending on visibility of modal editor (i.e., `esc` shouldn't do anything if editor not open)
+  let isOpen = false; // allow check for events depending on visibility of the prompt editor (i.e., `esc` shouldn't do anything if editor not open)
   let busy = false; // guarantee one op at a time
-  let lastFocused: HTMLElement | null = null; // restore focus to element after modal editor is closed
+  let lastFocused: HTMLElement | null = null; // restore focus to element after the prompt editor is closed
 
   function setBusy(next: boolean) {
     busy = next;
@@ -114,7 +114,7 @@ export function createEditor(callbacks: {
     closeBtn.disabled = next;
     nameInput.disabled = next;
     instructionsArea.disabled = next;
-    modal.setAttribute('aria-busy', String(next));
+    dialog.setAttribute('aria-busy', String(next));
   }
 
   function setError(message: string) {
@@ -216,7 +216,7 @@ export function createEditor(callbacks: {
       return;
     }
     if (event.key === 'Tab') {
-      const controls = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')).filter((element) => element.getClientRects().length > 0);
+      const controls = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')).filter((element) => element.getClientRects().length > 0);
       const first = controls[0];
       const last = controls[controls.length - 1];
       if (!first || !last) {

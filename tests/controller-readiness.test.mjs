@@ -27,7 +27,7 @@ function createController() {
   let queueVersion = 0;
   let cancelQueue;
   const dependencies = {
-    './prompt_editor/prompt_editor': { createEditor: () => ({}) },
+    './prompt_editor/prompt_editor': { createPromptEditor: () => ({}) },
     './shortcut_suggestions': { createShortcutSuggestions(callbacks) { selection = callbacks.onSelect; return { isOpen: () => false, hide() {}, show(...args) { shown.push(args); } }; } },
     './execution/queue': { createQueue: () => ({ enqueue(item) { queued.push(item); return true; }, cancel() { queueVersion++; }, getCancellationVersion: () => queueVersion }) },
     './execution/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args); }, cancel() { chainVersion++; }, getCancellationVersion: () => chainVersion }) },
