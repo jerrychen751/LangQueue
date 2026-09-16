@@ -104,6 +104,9 @@ export function installDevChromeMock(): void {
           runtimeListeners.delete(listener)
         },
       },
+      getURL(path: string) {
+        return '/' + path
+      },
       async sendMessage(message: unknown) {
         const request = message as { type?: string; payload?: { settings?: unknown } }
         if (request?.type === 'SAVE_SETTINGS') {
@@ -139,6 +142,10 @@ export function installDevChromeMock(): void {
         callback: (tabs: chrome.tabs.Tab[]) => void
       ) {
         callback([{ id: 1, url: 'https://chatgpt.com/' } as chrome.tabs.Tab])
+      },
+      async create(properties: { url?: string }) {
+        if (properties.url) window.open(properties.url, '_blank')
+        return {} as chrome.tabs.Tab
       },
       async sendMessage(_tabId: number, message: { type?: string }) {
         if (message.type === 'COMPAT_CHECK') {

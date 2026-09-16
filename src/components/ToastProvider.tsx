@@ -8,7 +8,7 @@ type Toast = {
   variant: ToastVariant
 }
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({ children, className = 'fixed bottom-3 left-[200px] z-[9999] w-[376px] -translate-x-1/2 space-y-2' }: { children: React.ReactNode; className?: string }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const timeoutsRef = useRef<Record<string, number>>({})
 
@@ -40,7 +40,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed bottom-3 left-[200px] z-[9999] w-[376px] -translate-x-1/2 space-y-2">
+      <div className={className}>
         {toasts.map((t) => (
           <div
             key={t.id}
