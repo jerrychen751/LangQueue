@@ -36,7 +36,7 @@ LangQueue is a personal prompt orchestration Chrome extension for ChatGPT, Claud
 
 LangQueue is content‑script‑first. The in‑page controller handles prompt trigger detection, overlay UI, in‑page editing, prompt insertion, queueing, chain execution, and page tweaks. The background service worker stays thin and only coordinates storage and messaging. The popup is a lightweight library surface rather than the primary interaction model.
 
-- Content core: `src/content/core` (prompt trigger detection, overlay, editor, insertion, queue, chains, tweaks).
+- Content script: `src/content` (prompt trigger detection, overlay, editor, insertion, queue, chains, tweaks).
 - Site adapters: `src/content/adapters` (ChatGPT, Claude, Gemini DOM heuristics and send/generate detection).
 - Background: `src/background/index.ts` (settings, prompt search, usage logging, updates/deletes).
 - Popup UI: `src/popup` (library view and minimal settings).
