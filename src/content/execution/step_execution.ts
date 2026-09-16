@@ -1,7 +1,7 @@
 import type { Adapter } from '../adapters/adapter';
 import { isInputReady } from '../adapters/page_dom';
 import { appendInputText, getInputText, setInputText } from '../composer/composer_text';
-import { fetchAttachmentFiles } from '../library_client';
+import { fetchAttachmentFiles } from '../library_requests';
 import type { AttachmentRef } from '../../library/model';
 
 export function createExecutionCoordinator() {

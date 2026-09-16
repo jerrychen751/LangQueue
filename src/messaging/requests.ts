@@ -1,4 +1,4 @@
-import type { BackgroundRequests, RequestResponse, TabRequests } from './protocol';
+import type { BackgroundRequests, RequestResponse, TabRequests } from './request_types';
 
 export type RequestHandlers<Requests extends Record<string, { payload: unknown; result: unknown }>> = {
   [K in keyof Requests]: (payload: Requests[K]['payload']) => Promise<Requests[K]['result']>

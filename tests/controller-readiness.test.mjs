@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
-import * as requests from '../src/messaging/transport.ts';
+import * as requests from '../src/messaging/requests.ts';
 
 const require = createRequire(resolve('package.json'));
 const ts = require('typescript');
@@ -33,7 +33,7 @@ function createController() {
     './execution/chain_executor': { createChainExecutor: () => ({ isRunning: () => false, run(...args) { chains.push(args); }, cancel() { chainVersion++; }, getCancellationVersion: () => chainVersion }) },
     './execution/status_panel': { createQueuePanel(queue) { cancelQueue = queue.cancel; return { showMessage(message) { notices.push(message); } }; } },
     './execution/step_execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
-    './library_client': {
+    './library_requests': {
       getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })),
       searchPrompts: async () => {
         if (searchFailed) {
@@ -48,7 +48,7 @@ function createController() {
     './composer/composer_text': { getInputText: input => input.value, setInputText(input, text) { input.value = text; } },
     './composer/insert_prompt': { async insertComposerPrompt(...args) { inserted.push(args); return { ok: true }; } },
     './shortcut_trigger': { detectShortcutContext: () => ({ query: '', rect: {} }) },
-    '../messaging/transport': requests,
+    '../messaging/requests': requests,
   };
   const exports = {};
   vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/controller.ts'), 'utf8'), {

@@ -1,5 +1,5 @@
 import type { Adapter } from '../adapters/adapter';
-import type { ChainStep, ChainProgressMessage } from '../../messaging/protocol';
+import type { ChainStep, ChainProgressMessage } from '../../messaging/request_types';
 import type { AppSettings } from '../../library/model';
 import { createExecutionCoordinator, executeStep, getConversationHref, isConversationReady, assertExecutionContext, waitForExecutionDelay } from './step_execution';
 

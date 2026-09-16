@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
-import * as requests from '../src/messaging/transport.ts';
+import * as requests from '../src/messaging/requests.ts';
 
 const require = createRequire(resolve('package.json'));
 const ts = require('typescript');
@@ -116,11 +116,11 @@ test('controller ignores synthetic library input and selection but keeps runtime
     './execution/chain_executor': { createChainExecutor: () => ({}) },
     './execution/status_panel': { createQueuePanel: () => ({}) },
     './execution/step_execution': { getConversationHref: () => 'https://chatgpt.com/c/one', createExecutionCoordinator: () => ({}) },
-    './library_client': { getSettings: async () => ({}), searchPrompts() { searched++; return []; } },
+    './library_requests': { getSettings: async () => ({}), searchPrompts() { searched++; return []; } },
     './page_tweaks': { applyTweaks() {} },
     './composer/composer_text': { getInputText: element => element.value },
     './composer/insert_prompt': { async insertComposerPrompt() { inserted++; return { ok: true }; } },
-    '../messaging/transport': requests,
+    '../messaging/requests': requests,
   });
   const input = new fixture.Element('textarea');
   fixture.exports.initController({ getInputElement: () => input, getText: element => element.value });

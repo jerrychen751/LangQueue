@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
 import { runChainOnTab } from '../src/popup/activeTab.ts';
-import * as requests from '../src/messaging/transport.ts';
+import * as requests from '../src/messaging/requests.ts';
 
 const require = createRequire(resolve('package.json'));
 const ts = require('typescript');
@@ -21,9 +21,9 @@ function createReceiver() {
     './execution/chain_executor': { createChainExecutor: () => ({ run() { starts++; }, getCancellationVersion: () => 0 }) },
     './execution/status_panel': { createQueuePanel: () => ({}) },
     './execution/step_execution': { getConversationHref: () => 'https://chatgpt.com/c/current', isConversationReady: () => true, createExecutionCoordinator: () => ({ isBusy: () => false }) },
-    './library_client': { getSettings: async () => ({}) },
+    './library_requests': { getSettings: async () => ({}) },
     './page_tweaks': { applyTweaks() {} },
-    '../messaging/transport': requests,
+    '../messaging/requests': requests,
   };
   vm.runInNewContext(ts.transpileModule(readFileSync(resolve('src/content/controller.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },

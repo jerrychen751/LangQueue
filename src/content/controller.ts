@@ -1,7 +1,7 @@
 import type { Adapter } from './adapters/adapter';
 import type { AppSettings, Platform } from '../library/model';
-import type { InsertPromptResult, TabRequests } from '../messaging/protocol';
-import { listenForRequests, type RequestHandlers } from '../messaging/transport';
+import type { InsertPromptResult, TabRequests } from '../messaging/request_types';
+import { listenForRequests, type RequestHandlers } from '../messaging/requests';
 import { detectShortcutContext } from './shortcut_trigger';
 import { getInputText, setInputText } from './composer/composer_text';
 import { insertComposerPrompt } from './composer/insert_prompt';
@@ -12,7 +12,7 @@ import { createExecutionCoordinator, getConversationHref, isConversationReady } 
 import { createQueuePanel } from './execution/status_panel';
 import { createChainExecutor } from './execution/chain_executor';
 import { applyTweaks } from './page_tweaks';
-import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './library_client';
+import { createPrompt, deletePrompt, getSettings, logUsage, searchPrompts, searchChains, updatePrompt } from './library_requests';
 
 type InputElement = HTMLTextAreaElement | HTMLElement;
 

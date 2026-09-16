@@ -1,5 +1,5 @@
 import type { AttachmentRef, Platform } from '../library/model';
-import { callBackground } from '../messaging/transport';
+import { callBackground } from '../messaging/requests';
 
 export async function getSettings() {
   return callBackground('GET_SETTINGS', undefined);

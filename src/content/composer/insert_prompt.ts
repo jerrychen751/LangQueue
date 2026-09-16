@@ -1,8 +1,8 @@
 import type { Adapter } from '../adapters/adapter';
 import type { AttachmentRef } from '../../library/model';
-import type { InsertPromptResult } from '../../messaging/protocol';
+import type { InsertPromptResult } from '../../messaging/request_types';
 import { createExecutionCoordinator, getConversationHref, sendPromptWhenReady } from '../execution/step_execution';
-import { fetchAttachmentFiles } from '../library_client';
+import { fetchAttachmentFiles } from '../library_requests';
 import { appendInputText, getInputText, setInputText } from './composer_text';
 
 export async function insertComposerPrompt(

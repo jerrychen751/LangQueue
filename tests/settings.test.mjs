@@ -53,7 +53,7 @@ function createSettings() {
     });
   } } };
   const requests = {};
-  vm.runInNewContext(compileSource('src/messaging/transport.ts'), { exports: requests, Error, chrome: popupChrome });
+  vm.runInNewContext(compileSource('src/messaging/requests.ts'), { exports: requests, Error, chrome: popupChrome });
   vm.runInNewContext(compileSource('src/background/index.ts'), {
     exports: {},
     chrome: { runtime: { onMessage: { addListener(fn) { receiver = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } } },
@@ -61,7 +61,7 @@ function createSettings() {
       if (path === '../library/storage') {
         return { saveSettings };
       }
-      if (path === '../messaging/transport') {
+      if (path === '../messaging/requests') {
         return requests;
       }
       return {};
@@ -108,7 +108,7 @@ function createSettings() {
       if (path === '../components/useToast') {
         return { useToast: () => ({ showToast() {} }) };
       }
-      if (path === '../messaging/transport') {
+      if (path === '../messaging/requests') {
         return requests;
       }
       return {};

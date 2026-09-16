@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import type { AppSettings } from '../library/model';
-import { callBackground } from '../messaging/transport';
+import { callBackground } from '../messaging/requests';
 import { getSettings, exportLibrary, importLibrary } from '../library/storage';
 import { useToast } from '../components/useToast';
 import { downloadJson } from './downloadJson';

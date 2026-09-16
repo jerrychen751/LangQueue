@@ -2,8 +2,8 @@
 
 import { getSettings, saveSettings, searchPrompts, searchChains, logUsage, updatePrompt, deletePrompt, savePrompt } from '../library/storage';
 import { getAttachmentChunkBase64, getAttachmentMeta } from '../library/attachments';
-import type { BackgroundRequests } from '../messaging/protocol';
-import { listenForRequests, type RequestHandlers } from '../messaging/transport';
+import type { BackgroundRequests } from '../messaging/request_types';
+import { listenForRequests, type RequestHandlers } from '../messaging/requests';
 
 function generatePromptId(): string {
   return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`;

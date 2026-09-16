@@ -1,6 +1,6 @@
-import type { ChainStep, InsertPromptResult } from '../messaging/protocol';
+import type { ChainStep, InsertPromptResult } from '../messaging/request_types';
 import type { AttachmentRef, Platform } from '../library/model';
-import { sendToTab } from '../messaging/transport';
+import { sendToTab } from '../messaging/requests';
 
 function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   return new Promise((resolve) => {

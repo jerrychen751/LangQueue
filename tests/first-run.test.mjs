@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
-import * as requests from '../src/messaging/transport.ts';
+import * as requests from '../src/messaging/requests.ts';
 
 const require = createRequire(resolve('package.json'));
 const ts = require('typescript');
@@ -19,7 +19,7 @@ function installBackground(create) {
       runtime: { onMessage: { addListener() {} }, onInstalled: { addListener(fn) { installed = fn; } }, getURL: (path) => `chrome-extension://id/${path}` },
       tabs: { create },
     },
-    require: (path) => path === '../messaging/transport' ? requests : {},
+    require: (path) => path === '../messaging/requests' ? requests : {},
   });
   return installed;
 }

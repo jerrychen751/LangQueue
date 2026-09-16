@@ -1,5 +1,5 @@
 import type { AttachmentRef } from '../library/model';
-import type { ChainStep } from '../messaging/protocol';
+import type { ChainStep } from '../messaging/request_types';
 
 export type ShortcutSuggestion =
   | {
