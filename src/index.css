@@ -440,7 +440,7 @@
     text-transform: uppercase;
   }
 
-  .modal-backdrop {
+  .dialog-backdrop {
     position: fixed;
     z-index: 50;
     top: 0;
@@ -455,7 +455,7 @@
     backdrop-filter: blur(2px);
   }
 
-  .modal-surface {
+  .dialog-surface {
     width: 372px;
     max-height: 572px;
     overflow: auto;
@@ -466,7 +466,7 @@
     box-shadow: 0 16px 40px rgba(28, 39, 44, 0.18);
   }
 
-  .modal-header {
+  .dialog-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -474,7 +474,7 @@
     border-bottom: 1px solid #d9dfe1;
   }
 
-  .modal-title {
+  .dialog-title {
     font-size: 18px;
     font-weight: 650;
     letter-spacing: -0.01em;

@@ -1,7 +1,7 @@
 import { Pencil, Trash2, Send } from 'lucide-react';
 import type { Prompt } from '../library/model';
 import { useToast } from '../components/useToast';
-import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import DeleteConfirmation from '../components/DeleteConfirmation';
 import { useRef, useState } from 'react';
 
 type PromptCardProps = {
@@ -103,7 +103,7 @@ export function PromptCard({
           </button>
         </div>
       </article>
-      <DeleteConfirmModal
+      <DeleteConfirmation
         open={confirmOpen}
         busy={deleting}
         title="Delete this prompt?"

@@ -274,7 +274,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
 
   return (
     <div
-      className="modal-backdrop"
+      className="dialog-backdrop"
       aria-hidden={!open}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
@@ -287,7 +287,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
         role="dialog"
         aria-modal="true"
         aria-labelledby="chain-builder-title"
-        className="modal-surface outline-none"
+        className="dialog-surface outline-none"
       >
         <fieldset disabled={saving} className="contents">
           <input
@@ -302,10 +302,10 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
               void addAttachmentsToStep(pendingAttachmentStepId, e.target.files);
             }}
           />
-          <div className="modal-header">
+          <div className="dialog-header">
             <div>
               <div className="popup-kicker">Sequential workflow</div>
-              <div id="chain-builder-title" className="modal-title mt-1">
+              <div id="chain-builder-title" className="dialog-title mt-1">
                 {initialChain ? 'Edit prompt chain' : 'Build prompt chain'}
               </div>
             </div>

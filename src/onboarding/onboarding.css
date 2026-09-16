@@ -207,12 +207,12 @@ body,
   font-size: 12px;
 }
 
-.modal-backdrop {
+.dialog-backdrop {
   width: 100vw;
   height: 100vh;
 }
 
-.modal-surface {
+.dialog-surface {
   width: min(560px, calc(100vw - 28px));
   max-height: calc(100vh - 28px);
 }

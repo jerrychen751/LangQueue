@@ -5,7 +5,7 @@ import { savePrompt, updatePrompt } from '../library/storage';
 import { useToast } from './useToast';
 import { createAttachmentDraft } from '../library/attachments';
 
-type PromptModalProps = {
+type PromptEditorProps = {
   open: boolean;
   initialPrompt?: Prompt;
   onClose: () => void;
@@ -16,7 +16,7 @@ function generateClientId(): string {
   return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-export default function PromptModal({ open, initialPrompt, onClose, onSaved }: PromptModalProps) {
+export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: PromptEditorProps) {
   const isEditing = Boolean(initialPrompt);
   const titleRef = useRef<HTMLInputElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -243,10 +243,10 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
 
   return (
     <div
-      className="modal-backdrop"
+      className="dialog-backdrop"
       aria-hidden={!open}
       onMouseDown={(e) => {
-        // Close when clicking the backdrop (overlay) area only
+        // Close when clicking the backdrop area only
         if (e.target === e.currentTarget) {
           close();
         }
@@ -256,14 +256,14 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="prompt-modal-title"
-        className="modal-surface outline-none"
+        aria-labelledby="prompt-editor-title"
+        className="dialog-surface outline-none"
       >
         <fieldset disabled={saving} className="contents">
-          <div className="modal-header">
+          <div className="dialog-header">
             <div>
               <div className="popup-kicker">{isEditing ? 'Revise library item' : 'Add library item'}</div>
-              <div id="prompt-modal-title" className="modal-title mt-1">
+              <div id="prompt-editor-title" className="dialog-title mt-1">
                 {isEditing ? 'Edit prompt' : 'New prompt'}
               </div>
             </div>

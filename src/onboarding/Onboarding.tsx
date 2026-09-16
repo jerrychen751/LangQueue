@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText, FolderOpen, Plus } from 'lucide-react';
 import Logo from '../components/Logo';
-import PromptModal from '../components/PromptModal';
+import PromptEditor from '../components/PromptEditor';
 import { useToast } from '../components/useToast';
 import { importPromptDrafts } from '../library/storage';
 import { findSkillSupportPaths, isPromptFilePath, parsePromptFile, type ParsedPromptFile } from '../library/promptFiles';
@@ -17,7 +17,7 @@ export default function Onboarding() {
   const [reading, setReading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [summary, setSummary] = useState<{ imported: number; skipped: number } | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [createdTitle, setCreatedTitle] = useState<string | null>(null);
   const { showToast } = useToast();
 
@@ -166,7 +166,7 @@ export default function Onboarding() {
               Save a prompt once. Insert it later from the toolbar popup, or type <code>$</code> in a supported chat to search your library.
             </p>
             <div className="onboarding-actions">
-              <button className="primary-button" onClick={() => setModalOpen(true)}>
+              <button className="primary-button" onClick={() => setEditorOpen(true)}>
                 <Plus size={15} /> New prompt
               </button>
             </div>
@@ -233,12 +233,12 @@ export default function Onboarding() {
         <span>Everything stays in local Chrome storage</span>
       </footer>
 
-      <PromptModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
+      <PromptEditor
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
         onSaved={(saved) => {
           setCreatedTitle(saved.title);
-          setModalOpen(false);
+          setEditorOpen(false);
         }}
       />
     </div>

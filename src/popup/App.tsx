@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Settings as SettingsIcon, Download, Workflow } from 'lucide-react';
 import Logo from '../components/Logo';
 import { PromptCard } from './PromptCard';
-import PromptModal from '../components/PromptModal';
+import PromptEditor from '../components/PromptEditor';
 import type { Prompt, PromptChain } from '../library/model';
 import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, deleteChain, getPrompt, exportLibrary } from '../library/storage';
 import { sendPromptToTab, detectActivePlatform, insertAndSendPromptToTab, runChainOnTab } from './activeTab';
@@ -11,7 +11,7 @@ import { checkTabCompatibility } from './activeTab';
 import FilterBar, { type SortOption } from '../components/FilterBar';
 import Settings from './Settings';
 import ChainBuilder from '../components/ChainBuilder';
-import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import DeleteConfirmation from '../components/DeleteConfirmation';
 import { downloadJson } from './downloadJson';
 
 const PLATFORM_NAMES = {
@@ -26,7 +26,7 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortOption>('recent');
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Prompt | undefined>(undefined);
   const [compatible, setCompatible] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -72,7 +72,7 @@ export default function App() {
       return;
     }
     setEditing(prompt);
-    setModalOpen(true);
+    setEditorOpen(true);
   }, []);
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function App() {
         const type = (message as { type?: string }).type;
         if (type === 'OPEN_NEW_PROMPT') {
           setEditing(undefined);
-          setModalOpen(true);
+          setEditorOpen(true);
         }
         if (type === 'OPEN_EDIT_PROMPT') {
           const promptId = (message as { payload?: { promptId?: string } }).payload?.promptId;
@@ -154,7 +154,7 @@ export default function App() {
       });
       if (pending === 'OPEN_NEW_PROMPT' || (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'OPEN_NEW_PROMPT')) {
         setEditing(undefined);
-        setModalOpen(true);
+        setEditorOpen(true);
         chrome.storage.local.remove(['langqueue_pending_action']);
       }
       if (pending === 'FOCUS_SEARCH' || (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'FOCUS_SEARCH')) {
@@ -220,7 +220,7 @@ export default function App() {
 
   async function handleCreate() {
     setEditing(undefined);
-    setModalOpen(true);
+    setEditorOpen(true);
   }
 
   async function handleDelete(p: Prompt) {
@@ -358,7 +358,7 @@ export default function App() {
                 prompt={p}
                 onEdit={() => {
                   setEditing(p);
-                  setModalOpen(true);
+                  setEditorOpen(true);
                 }}
                 onDelete={handleDelete}
                 onInsert={handleInsert}
@@ -491,10 +491,10 @@ export default function App() {
         </div>
       </footer>
 
-      <PromptModal
-        open={modalOpen}
+      <PromptEditor
+        open={editorOpen}
         initialPrompt={editing}
-        onClose={() => setModalOpen(false)}
+        onClose={() => setEditorOpen(false)}
         onSaved={async (saved) => {
           // Optimistically update local list immediately for snappy UX
           setPrompts((prev) => {
@@ -508,7 +508,7 @@ export default function App() {
           });
           // Then ensure canonical ordering and stats from storage
           await handleRefresh();
-          setModalOpen(false);
+          setEditorOpen(false);
         }}
       />
 
@@ -518,7 +518,7 @@ export default function App() {
         onClose={() => setChainOpen(false)}
         onSaved={handleRefresh}
       />
-      <DeleteConfirmModal
+      <DeleteConfirmation
         open={Boolean(deleteChainTarget)}
         busy={deletingChain}
         title="Delete chain?"
