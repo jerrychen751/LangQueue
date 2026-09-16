@@ -1,41 +1,41 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { ToastContext, type ToastContextValue, type ToastVariant } from './toastContext'
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ToastContext, type ToastContextValue, type ToastVariant } from './toastContext';
 
 type Toast = {
-  id: string
-  title?: string
-  message: string
-  variant: ToastVariant
-}
+  id: string;
+  title?: string;
+  message: string;
+  variant: ToastVariant;
+};
 
 export function ToastProvider({ children, className = 'fixed bottom-3 left-[200px] z-[9999] w-[376px] -translate-x-1/2 space-y-2' }: { children: React.ReactNode; className?: string }) {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const timeoutsRef = useRef<Record<string, number>>({})
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const timeoutsRef = useRef<Record<string, number>>({});
 
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-    const handle = timeoutsRef.current[id]
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+    const handle = timeoutsRef.current[id];
     if (handle) {
-      clearTimeout(handle)
-      delete timeoutsRef.current[id]
+      clearTimeout(handle);
+      delete timeoutsRef.current[id];
     }
-  }, [])
+  }, []);
 
   const showToast = useCallback((opts: { title?: string; message: string; variant?: ToastVariant; durationMs?: number }) => {
-    const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const toast: Toast = {
       id,
       title: opts.title,
       message: opts.message,
       variant: opts.variant ?? 'info',
-    }
-    setToasts((prev) => [...prev, toast])
-    const duration = Math.max(1200, opts.durationMs ?? 2400)
-    const handle = window.setTimeout(() => removeToast(id), duration)
-    timeoutsRef.current[id] = handle
-  }, [removeToast])
+    };
+    setToasts((prev) => [...prev, toast]);
+    const duration = Math.max(1200, opts.durationMs ?? 2400);
+    const handle = window.setTimeout(() => removeToast(id), duration);
+    timeoutsRef.current[id] = handle;
+  }, [removeToast]);
 
-  const value = useMemo<ToastContextValue>(() => ({ showToast }), [showToast])
+  const value = useMemo<ToastContextValue>(() => ({ showToast }), [showToast]);
 
   return (
     <ToastContext.Provider value={value}>
@@ -62,5 +62,5 @@ export function ToastProvider({ children, className = 'fixed bottom-3 left-[200p
         ))}
       </div>
     </ToastContext.Provider>
-  )
+  );
 }

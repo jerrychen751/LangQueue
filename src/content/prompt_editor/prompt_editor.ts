@@ -141,7 +141,9 @@ export function createEditor(callbacks: {
   }
 
   function close() {
-    if (busy) return;
+    if (busy) {
+      return;
+    }
     backdrop.style.display = 'none';
     isOpen = false;
     callbacks.onClose?.();
@@ -151,7 +153,9 @@ export function createEditor(callbacks: {
   }
 
   async function handleSave() {
-    if (busy) return;
+    if (busy) {
+      return;
+    }
     const titleVal = nameInput.value.trim();
     const rawContent = instructionsArea.value;
     const trimmedContent = rawContent.trim();
@@ -184,7 +188,9 @@ export function createEditor(callbacks: {
   }
 
   async function handleDelete() {
-    if (busy || !activePromptId) return;
+    if (busy || !activePromptId) {
+      return;
+    }
     setBusy(true);
     try {
       const ok = await callbacks.onDelete(activePromptId);
@@ -203,8 +209,12 @@ export function createEditor(callbacks: {
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (!event.isTrusted) return;
-    if (!isOpen) return;
+    if (!event.isTrusted) {
+      return;
+    }
+    if (!isOpen) {
+      return;
+    }
     if (event.key === 'Tab') {
       const controls = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')).filter((element) => element.getClientRects().length > 0);
       const first = controls[0];
@@ -232,13 +242,33 @@ export function createEditor(callbacks: {
     }
   }
 
-  closeBtn.addEventListener('click', (event) => { if (event.isTrusted) close(); });
-  cancelBtn.addEventListener('click', (event) => { if (event.isTrusted) close(); });
-  saveBtn.addEventListener('click', (event) => { if (event.isTrusted) void handleSave(); });
-  deleteBtn.addEventListener('click', (event) => { if (event.isTrusted) void handleDelete(); });
+  closeBtn.addEventListener('click', (event) => {
+    if (event.isTrusted) {
+      close();
+    }
+  });
+  cancelBtn.addEventListener('click', (event) => {
+    if (event.isTrusted) {
+      close();
+    }
+  });
+  saveBtn.addEventListener('click', (event) => {
+    if (event.isTrusted) {
+      void handleSave();
+    }
+  });
+  deleteBtn.addEventListener('click', (event) => {
+    if (event.isTrusted) {
+      void handleDelete();
+    }
+  });
   backdrop.addEventListener('mousedown', (event) => {
-    if (!event.isTrusted) return;
-    if (event.target === backdrop) close();
+    if (!event.isTrusted) {
+      return;
+    }
+    if (event.target === backdrop) {
+      close();
+    }
   });
   document.addEventListener('keydown', handleKeydown, true);
 

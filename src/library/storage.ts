@@ -50,14 +50,22 @@ function safeNumber(value: unknown, fallback: number): number {
 }
 
 function normalizeAttachmentRefs(raw: unknown): AttachmentRef[] {
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
   const out: AttachmentRef[] = [];
   for (const entry of raw) {
-    if (!entry || typeof entry !== 'object') continue;
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
     const candidate = entry as Partial<AttachmentRef>;
-    if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string' || typeof candidate.mimeType !== 'string') continue;
+    if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string' || typeof candidate.mimeType !== 'string') {
+      continue;
+    }
     const size = safeNumber(candidate.size, 0);
-    if (size <= 0) continue;
+    if (size <= 0) {
+      continue;
+    }
     const kind = candidate.kind === 'image' || candidate.kind === 'file'
       ? candidate.kind
       : inferAttachmentKind(candidate.mimeType);
@@ -74,11 +82,19 @@ function normalizeAttachmentRefs(raw: unknown): AttachmentRef[] {
 }
 
 function normalizePrompt(raw: unknown): Prompt | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
   const candidate = raw as Partial<Prompt>;
-  if (typeof candidate.id !== 'string') return null;
-  if (typeof candidate.title !== 'string') return null;
-  if (typeof candidate.content !== 'string') return null;
+  if (typeof candidate.id !== 'string') {
+    return null;
+  }
+  if (typeof candidate.title !== 'string') {
+    return null;
+  }
+  if (typeof candidate.content !== 'string') {
+    return null;
+  }
   const ts = Date.now();
   return {
     id: candidate.id,
@@ -163,10 +179,16 @@ function normalizeChainStep(raw: unknown): PromptStep {
 }
 
 function normalizeChain(raw: unknown): PromptChain | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
   const candidate = raw as Partial<PromptChain>;
-  if (typeof candidate.id !== 'string') return null;
-  if (typeof candidate.title !== 'string') return null;
+  if (typeof candidate.id !== 'string') {
+    return null;
+  }
+  if (typeof candidate.title !== 'string') {
+    return null;
+  }
   const ts = Date.now();
   const stepsRaw = Array.isArray(candidate.steps) ? candidate.steps : [];
   return {
@@ -235,20 +257,28 @@ function normalizeTitle(title: string): string {
 
 function assertUniqueTitle(db: PromptsSchema, title: string, ignoreId?: string): string {
   const normalized = normalizeTitle(title);
-  if (!normalized) throw new Error('Title is required.');
+  if (!normalized) {
+    throw new Error('Title is required.');
+  }
   const exists = Object.values(db.promptsById).some((p) => p.title === normalized && p.id !== ignoreId);
-  if (exists) throw new Error('A shortcut with that name already exists.');
+  if (exists) {
+    throw new Error('A shortcut with that name already exists.');
+  }
   return normalized;
 }
 
 function collectReferencedAttachmentIds(db: PromptsSchema, chains: PromptChain[]): Set<string> {
   const ids = new Set<string>();
   for (const prompt of Object.values(db.promptsById)) {
-    for (const attachment of prompt.attachments) ids.add(attachment.id);
+    for (const attachment of prompt.attachments) {
+      ids.add(attachment.id);
+    }
   }
   for (const chain of chains) {
     for (const step of chain.steps) {
-      for (const attachment of step.attachments) ids.add(attachment.id);
+      for (const attachment of step.attachments) {
+        ids.add(attachment.id);
+      }
     }
   }
   return ids;
@@ -267,7 +297,9 @@ async function cleanupUnusedAttachments(): Promise<void> {
       .map((id) => deleteAttachment(id))
   );
   for (const result of results) {
-    if (result.status === 'rejected') throw result.reason;
+    if (result.status === 'rejected') {
+      throw result.reason;
+    }
   }
 }
 
@@ -330,7 +362,9 @@ async function updatePromptUnlocked(
   pendingAttachments: ReadonlyMap<string, File> = new Map()): Promise<void> {
   const db = await getPrompts();
   const existing = db.promptsById[id];
-  if (!existing) throw new Error(`Prompt not found: ${id}`);
+  if (!existing) {
+    throw new Error(`Prompt not found: ${id}`);
+  }
   const normalizedTitle = assertUniqueTitle(db, updates.title ?? existing.title, id);
   const ts = Date.now();
   db.promptsById[id] = {
@@ -347,7 +381,9 @@ async function updatePromptUnlocked(
 
 async function searchPromptsUnlocked(query: string): Promise<Prompt[]> {
   const q = query.trim().toLowerCase();
-  if (!q) return getAllPromptsUnlocked();
+  if (!q) {
+    return getAllPromptsUnlocked();
+  }
   const db = await getPrompts();
 
   function scorePrompt(p: Prompt): number {
@@ -355,12 +391,20 @@ async function searchPromptsUnlocked(query: string): Promise<Prompt[]> {
     const title = (p.title || '').toLowerCase();
     const content = (p.content || '').toLowerCase();
 
-    if (title === q) score += 120;
-    else if (title.startsWith(q)) score += 100;
-    else if (title.includes(q)) score += 80;
+    if (title === q) {
+      score += 120;
+    } else if (title.startsWith(q)) {
+      score += 100;
+    } else if (title.includes(q)) {
+      score += 80;
+    }
 
-    if (content.includes(q)) score += 50;
-    if (p.lastUsedAt) score += 5;
+    if (content.includes(q)) {
+      score += 50;
+    }
+    if (p.lastUsedAt) {
+      score += 5;
+    }
     return score;
   }
 
@@ -414,9 +458,13 @@ async function getRecentlyUsedPromptsUnlocked(limit = 5): Promise<Prompt[]> {
     .filter((p) => Boolean(p.lastUsedAt))
     .sort((a, b) => {
       const byLast = (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0);
-      if (byLast !== 0) return byLast;
+      if (byLast !== 0) {
+        return byLast;
+      }
       const byUpdated = (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
-      if (byUpdated !== 0) return byUpdated;
+      if (byUpdated !== 0) {
+        return byUpdated;
+      }
       return (b.createdAt ?? 0) - (a.createdAt ?? 0);
     })
     .slice(0, Math.max(0, limit));
@@ -506,8 +554,11 @@ async function saveChainUnlocked(chain: PromptChain, pendingAttachments: Readonl
     createdAt: chain.createdAt || Date.now(),
     updatedAt: Date.now(),
   };
-  if (idx >= 0) list[idx] = normalized;
-  else list.unshift(normalized);
+  if (idx >= 0) {
+    list[idx] = normalized;
+  } else {
+    list.unshift(normalized);
+  }
   await saveWithAttachments(pendingAttachments, () => saveChainsEnvelope({ ...envelope, items: list }));
   await cleanupUnusedAttachments().catch(() => {});
 }
@@ -522,17 +573,25 @@ async function deleteChainUnlocked(id: string): Promise<void> {
 async function searchChainsUnlocked(query: string): Promise<PromptChain[]> {
   const q = query.trim().toLowerCase();
   const chains = await getAllChainsUnlocked();
-  if (!q) return chains;
+  if (!q) {
+    return chains;
+  }
 
   function scoreChain(chain: PromptChain): number {
     let score = 0;
     const title = (chain.title || '').toLowerCase();
-    if (title === q) score += 120;
-    else if (title.startsWith(q)) score += 100;
-    else if (title.includes(q)) score += 80;
+    if (title === q) {
+      score += 120;
+    } else if (title.startsWith(q)) {
+      score += 100;
+    } else if (title.includes(q)) {
+      score += 80;
+    }
 
     const stepText = chain.steps.map((s) => s.content || '').join('\n').toLowerCase();
-    if (stepText.includes(q)) score += 50;
+    if (stepText.includes(q)) {
+      score += 50;
+    }
     return score;
   }
 
@@ -609,11 +668,15 @@ async function exportLibraryUnlocked(
   if (options?.includeBinaries) {
     const attachmentIds = new Set<string>();
     for (const prompt of out.prompts) {
-      for (const attachment of prompt.attachments) attachmentIds.add(attachment.id);
+      for (const attachment of prompt.attachments) {
+        attachmentIds.add(attachment.id);
+      }
     }
     for (const chain of out.chains) {
       for (const step of chain.steps) {
-        for (const attachment of step.attachments) attachmentIds.add(attachment.id);
+        for (const attachment of step.attachments) {
+          attachmentIds.add(attachment.id);
+        }
       }
     }
     out.attachments = await exportAttachmentRecords(Array.from(attachmentIds));
@@ -625,11 +688,19 @@ async function exportLibraryUnlocked(
 type ImportCounts = { imported: number; skipped: number; replaced: number; duplicated: number };
 
 function validateImportedAttachments(raw: unknown): AttachmentRef[] {
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw)) throw new Error('Invalid attachment references in backup.');
-  if (raw.some((entry) => entry && typeof entry === 'object' && entry.kind !== undefined && entry.kind !== 'image' && entry.kind !== 'file')) throw new Error('Invalid attachment kind in backup.');
+  if (raw === undefined) {
+    return [];
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error('Invalid attachment references in backup.');
+  }
+  if (raw.some((entry) => entry && typeof entry === 'object' && entry.kind !== undefined && entry.kind !== 'image' && entry.kind !== 'file')) {
+    throw new Error('Invalid attachment kind in backup.');
+  }
   const refs = normalizeAttachmentRefs(raw);
-  if (refs.length !== raw.length || refs.some((ref) => !ref.id || !ref.name || !Number.isSafeInteger(ref.size))) throw new Error('Invalid attachment references in backup.');
+  if (refs.length !== raw.length || refs.some((ref) => !ref.id || !ref.name || !Number.isSafeInteger(ref.size))) {
+    throw new Error('Invalid attachment references in backup.');
+  }
   return refs;
 }
 
@@ -638,24 +709,38 @@ async function importDataUnlocked(
   options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }
 ): Promise<{ prompts?: ImportCounts; chains?: ImportCounts; attachments?: { imported: number } }> {
   const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid backup. Expected a JSON object.');
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Invalid backup. Expected a JSON object.');
+  }
   const file = parsed as Partial<LibraryExportFile>;
   const hasPrompts = Object.hasOwn(file, 'prompts');
   const hasChains = Object.hasOwn(file, 'chains');
-  if ((!hasPrompts && !hasChains) || (hasPrompts && !Array.isArray(file.prompts)) || (hasChains && !Array.isArray(file.chains))) throw new Error('Invalid backup. Expected prompts or chains.');
-  if (hasPrompts && hasChains ? file.version !== 3 : file.version !== 1 && file.version !== 2) throw new Error('Unsupported backup version. Export a supported backup from LangQueue.');
+  if ((!hasPrompts && !hasChains) || (hasPrompts && !Array.isArray(file.prompts)) || (hasChains && !Array.isArray(file.chains))) {
+    throw new Error('Invalid backup. Expected prompts or chains.');
+  }
+  if (hasPrompts && hasChains ? file.version !== 3 : file.version !== 1 && file.version !== 2) {
+    throw new Error('Unsupported backup version. Export a supported backup from LangQueue.');
+  }
   const prompts = (file.prompts ?? []).map((raw) => {
     const prompt = normalizePrompt(raw);
-    if (!prompt || !prompt.id || !prompt.title.trim()) throw new Error('Invalid prompt in backup.');
+    if (!prompt || !prompt.id || !prompt.title.trim()) {
+      throw new Error('Invalid prompt in backup.');
+    }
     prompt.attachments = validateImportedAttachments(raw.attachments);
     return prompt;
   });
   const chains = (file.chains ?? []).map((raw) => {
     const chain = normalizeChain(raw);
-    if (!chain || !chain.id || !chain.title.trim() || !Array.isArray(raw.steps)) throw new Error('Invalid chain in backup.');
+    if (!chain || !chain.id || !chain.title.trim() || !Array.isArray(raw.steps)) {
+      throw new Error('Invalid chain in backup.');
+    }
     chain.steps = raw.steps.map((step) => {
-      if (typeof step === 'string') return normalizeChainStep(step);
-      if (!step || typeof step !== 'object' || typeof step.content !== 'string') throw new Error('Invalid chain step in backup.');
+      if (typeof step === 'string') {
+        return normalizeChainStep(step);
+      }
+      if (!step || typeof step !== 'object' || typeof step.content !== 'string') {
+        throw new Error('Invalid chain step in backup.');
+      }
       return { content: step.content, attachments: validateImportedAttachments(step.attachments) };
     });
     return chain;
@@ -666,16 +751,24 @@ async function importDataUnlocked(
   if (storedPrompts === undefined) {
     db = createEmptyPrompts();
   } else {
-    if (!storedPrompts || typeof storedPrompts !== 'object') throw new Error('Stored prompt library is invalid. Export your existing data before importing.');
+    if (!storedPrompts || typeof storedPrompts !== 'object') {
+      throw new Error('Stored prompt library is invalid. Export your existing data before importing.');
+    }
     const current = storedPrompts as { meta?: Partial<PromptsSchema['meta']>; prompts?: unknown; promptsById?: unknown };
     const version = current.meta?.schemaVersion;
-    if (version !== undefined && (typeof version !== 'number' || !Number.isInteger(version) || version < 1 || version > CURRENT_SCHEMA_VERSION)) throw new Error('Unsupported stored prompt schema.');
+    if (version !== undefined && (typeof version !== 'number' || !Number.isInteger(version) || version < 1 || version > CURRENT_SCHEMA_VERSION)) {
+      throw new Error('Unsupported stored prompt schema.');
+    }
     const records = Array.isArray(storedPrompts) ? storedPrompts : Array.isArray(current.prompts) ? current.prompts : current.promptsById && typeof current.promptsById === 'object' && !Array.isArray(current.promptsById) ? Object.values(current.promptsById) : null;
-    if (!records) throw new Error('Stored prompt library is invalid.');
+    if (!records) {
+      throw new Error('Stored prompt library is invalid.');
+    }
     const promptsById: Record<string, Prompt> = Object.create(null);
     for (const raw of records) {
       const prompt = normalizePrompt(raw);
-      if (!prompt || Object.hasOwn(promptsById, prompt.id)) throw new Error('Stored prompt library contains invalid or duplicate records.');
+      if (!prompt || Object.hasOwn(promptsById, prompt.id)) {
+        throw new Error('Stored prompt library contains invalid or duplicate records.');
+      }
       prompt.attachments = validateImportedAttachments((raw as Partial<Prompt>).attachments);
       promptsById[prompt.id] = prompt;
     }
@@ -686,17 +779,29 @@ async function importDataUnlocked(
   if (storedChains === undefined) {
     envelope = createEmptyChainsEnvelope();
   } else {
-    if (!storedChains || typeof storedChains !== 'object') throw new Error('Stored chain library is invalid.');
+    if (!storedChains || typeof storedChains !== 'object') {
+      throw new Error('Stored chain library is invalid.');
+    }
     const current = storedChains as { version?: unknown; updatedAt?: unknown; items?: unknown };
-    if (current.version !== undefined && (typeof current.version !== 'number' || !Number.isInteger(current.version) || current.version < 1 || current.version > CURRENT_CHAINS_SCHEMA_VERSION)) throw new Error('Unsupported stored chain schema.');
+    if (current.version !== undefined && (typeof current.version !== 'number' || !Number.isInteger(current.version) || current.version < 1 || current.version > CURRENT_CHAINS_SCHEMA_VERSION)) {
+      throw new Error('Unsupported stored chain schema.');
+    }
     const records = Array.isArray(storedChains) ? storedChains : Array.isArray(current.items) ? current.items : null;
-    if (!records) throw new Error('Stored chain library is invalid.');
+    if (!records) {
+      throw new Error('Stored chain library is invalid.');
+    }
     const items = records.map((raw) => {
       const chain = normalizeChain(raw);
-      if (!chain || !Array.isArray(raw.steps)) throw new Error('Stored chain library contains invalid records.');
+      if (!chain || !Array.isArray(raw.steps)) {
+        throw new Error('Stored chain library contains invalid records.');
+      }
       chain.steps = raw.steps.map((step: unknown) => {
-        if (typeof step === 'string') return normalizeChainStep(step);
-        if (!step || typeof step !== 'object' || typeof (step as Partial<PromptStep>).content !== 'string') throw new Error('Stored chain contains an invalid step.');
+        if (typeof step === 'string') {
+          return normalizeChainStep(step);
+        }
+        if (!step || typeof step !== 'object' || typeof (step as Partial<PromptStep>).content !== 'string') {
+          throw new Error('Stored chain contains an invalid step.');
+        }
         const candidate = step as PromptStep;
         return { content: candidate.content, attachments: validateImportedAttachments(candidate.attachments) };
       });
@@ -719,17 +824,25 @@ async function importDataUnlocked(
   const remappedById = new Map<string, AttachmentRef>();
   const pendingAttachments = new Map<string, File>();
   for (const refs of [...prompts.map((prompt) => prompt.attachments), ...chains.flatMap((chain) => chain.steps.map((step) => step.attachments))]) {
-    if (!selectedRefs.has(refs)) continue;
+    if (!selectedRefs.has(refs)) {
+      continue;
+    }
     for (let index = 0; index < refs.length; index++) {
       const ref = refs[index];
       const binary = binaryById.get(ref.id);
       let stored = binary?.ref ?? existingById.get(ref.id);
       if (!stored) {
         stored = (await getAttachmentMeta(ref.id)) ?? undefined;
-        if (stored) existingById.set(ref.id, stored);
+        if (stored) {
+          existingById.set(ref.id, stored);
+        }
       }
-      if (!stored) throw new Error('Missing attachment "' + ref.name + '". Export again with attachment files included, then import that backup.');
-      if (stored.size !== ref.size || stored.mimeType !== ref.mimeType || stored.name !== ref.name || stored.kind !== ref.kind) throw new Error('Attachment metadata does not match its file: ' + ref.name);
+      if (!stored) {
+        throw new Error('Missing attachment "' + ref.name + '". Export again with attachment files included, then import that backup.');
+      }
+      if (stored.size !== ref.size || stored.mimeType !== ref.mimeType || stored.name !== ref.name || stored.kind !== ref.kind) {
+        throw new Error('Attachment metadata does not match its file: ' + ref.name);
+      }
       if (binary) {
         let remapped = remappedById.get(ref.id);
         if (!remapped) {
@@ -744,21 +857,29 @@ async function importDataUnlocked(
   const updates = { [PROMPTS_KEY]: db, [CHAINS_KEY]: envelope };
   const referenced = collectReferencedAttachmentIds(db, envelope.items);
   for (const id of pendingAttachments.keys()) {
-    if (!referenced.has(id)) pendingAttachments.delete(id);
+    if (!referenced.has(id)) {
+      pendingAttachments.delete(id);
+    }
   }
   await saveWithAttachments(pendingAttachments, () => chrome.storage.local.set(updates));
   await cleanupUnusedAttachments().catch(() => {});
-  if (hasPrompts && hasChains) result.attachments = { imported: pendingAttachments.size };
+  if (hasPrompts && hasChains) {
+    result.attachments = { imported: pendingAttachments.size };
+  }
   return result;
 }
 
 async function importPromptsUnlocked(data: unknown, options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<ImportCounts> {
-  if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'prompts') || Object.hasOwn(data, 'chains')) throw new Error('Invalid prompt export format');
+  if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'prompts') || Object.hasOwn(data, 'chains')) {
+    throw new Error('Invalid prompt export format');
+  }
   return (await importDataUnlocked(data, options)).prompts!;
 }
 
 async function importChainsUnlocked(data: unknown, options: { mode: ImportMode; duplicateStrategy: DuplicateStrategy }): Promise<ImportCounts> {
-  if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'chains') || Object.hasOwn(data, 'prompts')) throw new Error('Invalid chain export format');
+  if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'chains') || Object.hasOwn(data, 'prompts')) {
+    throw new Error('Invalid chain export format');
+  }
   return (await importDataUnlocked(data, options)).chains!;
 }
 
@@ -783,7 +904,9 @@ async function importPromptDraftsUnlocked(drafts: Array<{ title: string; content
     db.promptsById[id] = { id, title, content: draft.content, attachments: [], usageCount: 0, createdAt: ts, updatedAt: ts };
     imported += 1;
   }
-  if (imported > 0) await savePrompts(db);
+  if (imported > 0) {
+    await savePrompts(db);
+  }
   return { imported, skipped };
 }
 

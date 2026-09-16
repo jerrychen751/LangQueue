@@ -1,126 +1,148 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
-import { sendPromptWhenReady } from '../src/content/execution/step_execution.ts'
-import { getInputText } from '../src/content/composer/composer_text.ts'
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { sendPromptWhenReady } from '../src/content/execution/step_execution.ts';
+import { getInputText } from '../src/content/composer/composer_text.ts';
 
 class FakeTextarea {
-  isConnected = true
-  value = 'prepared prompt'
+  isConnected = true;
+  value = 'prepared prompt';
 }
-globalThis.HTMLTextAreaElement = FakeTextarea
-globalThis.location = { href: 'https://chatgpt.com/c/test' }
+globalThis.HTMLTextAreaElement = FakeTextarea;
+globalThis.location = { href: 'https://chatgpt.com/c/test' };
 
 function createFixture() {
-  const input = new FakeTextarea()
-  const controller = new AbortController()
-  let attempts = 0
+  const input = new FakeTextarea();
+  const controller = new AbortController();
+  let attempts = 0;
   const adapter = {
     input, ready: false, sends: 0, generating: false,
-    getInputElement() { return this.input },
-    getSendButton() { return this.ready ? {} : null },
-    isGenerating() { return this.generating },
-    clickSend() { this.sends++; return true },
-  }
-  return { adapter, input, controller, getAttempts: () => attempts, send: () => sendPromptWhenReady(adapter, input, 'prepared prompt', globalThis.location.href, () => { attempts++ }, controller.signal, { timeoutMs: 20, pollMs: 2 }) }
+    getInputElement() { return this.input; },
+    getSendButton() { return this.ready ? {} : null; },
+    isGenerating() { return this.generating; },
+    clickSend() { this.sends++; return true; },
+  };
+  return { adapter, input, controller, getAttempts: () => attempts, send: () => sendPromptWhenReady(adapter, input, 'prepared prompt', globalThis.location.href, () => { attempts++; }, controller.signal, { timeoutMs: 20, pollMs: 2 }) };
 }
 
 test('delayed Send availability clicks once after it becomes enabled', async context => {
-  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] })
-  const fixture = createFixture()
-  const pending = fixture.send()
-  assert.equal(fixture.adapter.sends, 0)
-  setTimeout(() => { fixture.adapter.ready = true }, 5)
-  context.mock.timers.tick(6)
-  await pending
-  assert.equal(fixture.adapter.sends, 1)
-  assert.equal(fixture.getAttempts(), 1)
-})
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const fixture = createFixture();
+  const pending = fixture.send();
+  assert.equal(fixture.adapter.sends, 0);
+  setTimeout(() => { fixture.adapter.ready = true; }, 5);
+  context.mock.timers.tick(6);
+  await pending;
+  assert.equal(fixture.adapter.sends, 1);
+  assert.equal(fixture.getAttempts(), 1);
+});
 
 test('readiness timeout never marks or attempts a send', async context => {
-  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] })
-  const fixture = createFixture()
-  const pending = fixture.send()
-  context.mock.timers.tick(20)
-  await assert.rejects(pending, /SEND_FAILED/)
-  assert.equal(fixture.adapter.sends, 0)
-  assert.equal(fixture.getAttempts(), 0)
-  assert.equal(fixture.input.value, 'prepared prompt')
-})
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const fixture = createFixture();
+  const pending = fixture.send();
+  context.mock.timers.tick(20);
+  await assert.rejects(pending, /SEND_FAILED/);
+  assert.equal(fixture.adapter.sends, 0);
+  assert.equal(fixture.getAttempts(), 0);
+  assert.equal(fixture.input.value, 'prepared prompt');
+});
 
 for (const cause of ['cancel', 'navigation', 'draft', 'input', 'detached', 'generation']) {
   test(`readiness stops before clicking after ${cause}`, async () => {
-    const fixture = createFixture()
-    const href = globalThis.location.href
-    const pending = fixture.send()
-    if (cause === 'cancel') fixture.controller.abort()
-    if (cause === 'navigation') globalThis.location.href += '/changed'
-    if (cause === 'draft') fixture.input.value = 'New draft'
-    if (cause === 'input') fixture.adapter.input = new FakeTextarea()
-    if (cause === 'detached') fixture.input.isConnected = false
-    if (cause === 'generation') fixture.adapter.generating = true
-    fixture.adapter.ready = true
+    const fixture = createFixture();
+    const href = globalThis.location.href;
+    const pending = fixture.send();
+    if (cause === 'cancel') {
+      fixture.controller.abort();
+    }
+    if (cause === 'navigation') {
+      globalThis.location.href += '/changed';
+    }
+    if (cause === 'draft') {
+      fixture.input.value = 'New draft';
+    }
+    if (cause === 'input') {
+      fixture.adapter.input = new FakeTextarea();
+    }
+    if (cause === 'detached') {
+      fixture.input.isConnected = false;
+    }
+    if (cause === 'generation') {
+      fixture.adapter.generating = true;
+    }
+    fixture.adapter.ready = true;
     try {
-      await assert.rejects(pending)
-      assert.equal(fixture.adapter.sends, 0)
-      assert.equal(fixture.getAttempts(), 0)
-      if (cause === 'draft') assert.equal(fixture.input.value, 'New draft')
-    } finally { globalThis.location.href = href }
-  })
+      await assert.rejects(pending);
+      assert.equal(fixture.adapter.sends, 0);
+      assert.equal(fixture.getAttempts(), 0);
+      if (cause === 'draft') {
+        assert.equal(fixture.input.value, 'New draft');
+      }
+    } finally { globalThis.location.href = href; }
+  });
 }
 
 test('composer context is checked again after button discovery', async () => {
-  const fixture = createFixture()
-  fixture.adapter.getSendButton = () => { fixture.input.value = 'New draft'; return {} }
-  await assert.rejects(fixture.send(), /COMPOSER_CHANGED/)
-  assert.equal(fixture.adapter.sends, 0)
-})
+  const fixture = createFixture();
+  fixture.adapter.getSendButton = () => { fixture.input.value = 'New draft'; return {}; };
+  await assert.rejects(fixture.send(), /COMPOSER_CHANGED/);
+  assert.equal(fixture.adapter.sends, 0);
+});
 
 test('button disappearing before click is a definite unsent failure', async () => {
-  const fixture = createFixture()
-  fixture.adapter.ready = true
-  fixture.adapter.clickSend = () => false
-  await assert.rejects(fixture.send(), /^Error: SEND_FAILED$/)
-  assert.equal(fixture.adapter.sends, 0)
-})
+  const fixture = createFixture();
+  fixture.adapter.ready = true;
+  fixture.adapter.clickSend = () => false;
+  await assert.rejects(fixture.send(), /^Error: SEND_FAILED$/);
+  assert.equal(fixture.adapter.sends, 0);
+});
 
 test('a click throwing SEND_FAILED retains uncertainty and is never repeated', async () => {
-  const fixture = createFixture()
-  fixture.adapter.ready = true
-  fixture.adapter.clickSend = () => { fixture.adapter.sends++; throw new Error('SEND_FAILED') }
-  await assert.rejects(fixture.send(), /SEND_UNCERTAIN/)
-  assert.equal(fixture.adapter.sends, 1)
-  assert.equal(fixture.getAttempts(), 1)
-})
+  const fixture = createFixture();
+  fixture.adapter.ready = true;
+  fixture.adapter.clickSend = () => { fixture.adapter.sends++; throw new Error('SEND_FAILED'); };
+  await assert.rejects(fixture.send(), /SEND_UNCERTAIN/);
+  assert.equal(fixture.adapter.sends, 1);
+  assert.equal(fixture.getAttempts(), 1);
+});
 
 test('file-only send accepts an empty paragraph placeholder and still detects a new draft', async () => {
   for (const changed of [false, true]) {
-    const br = { tagName: 'BR' }
-    const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br }
-    const input = { isConnected: true, innerText: '\n', childNodes: [paragraph], firstElementChild: paragraph }
-    let sends = 0
+    const br = { tagName: 'BR' };
+    const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br };
+    const input = { isConnected: true, innerText: '\n', childNodes: [paragraph], firstElementChild: paragraph };
+    let sends = 0;
     const adapter = {
       getInputElement: () => input,
       isGenerating: () => false,
-      getSendButton() { if (changed) input.innerText = 'New draft'; return {} },
-      clickSend() { sends++; return true },
+      getSendButton() {
+        if (changed) {
+          input.innerText = 'New draft';
+        }
+        return {};
+      },
+      clickSend() { sends++; return true; },
+    };
+    const pending = sendPromptWhenReady(adapter, input, '', globalThis.location.href, () => {});
+    if (changed) {
+      await assert.rejects(pending, /COMPOSER_CHANGED/);
+    } else {
+      await pending;
     }
-    const pending = sendPromptWhenReady(adapter, input, '', globalThis.location.href, () => {})
-    if (changed) await assert.rejects(pending, /COMPOSER_CHANGED/)
-    else await pending
-    assert.equal(sends, changed ? 0 : 1)
+    assert.equal(sends, changed ? 0 : 1);
   }
-})
+});
 
 test('empty placeholder normalization preserves whitespace and multiple paragraphs', () => {
-  const br = { tagName: 'BR' }
-  const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br }
+  const br = { tagName: 'BR' };
+  const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br };
   for (const text of [' ', '\t', '\n\n', 'prompt\n']) {
-    assert.equal(getInputText({ innerText: text, childNodes: [paragraph], firstElementChild: paragraph }), text)
+    assert.equal(getInputText({ innerText: text, childNodes: [paragraph], firstElementChild: paragraph }), text);
   }
-  assert.equal(getInputText({ innerText: '\n', childNodes: [{ nodeType: 3 }], firstElementChild: null }), '\n')
-  assert.equal(getInputText({ innerText: '\n', childNodes: [paragraph, paragraph], firstElementChild: paragraph }), '\n')
-  assert.equal(getInputText({ innerText: '\n', childNodes: [br], firstElementChild: br }), '\n')
-  const textarea = new FakeTextarea()
-  textarea.value = '\n'
-  assert.equal(getInputText(textarea), '\n')
-})
+  assert.equal(getInputText({ innerText: '\n', childNodes: [{ nodeType: 3 }], firstElementChild: null }), '\n');
+  assert.equal(getInputText({ innerText: '\n', childNodes: [paragraph, paragraph], firstElementChild: paragraph }), '\n');
+  assert.equal(getInputText({ innerText: '\n', childNodes: [br], firstElementChild: br }), '\n');
+  const textarea = new FakeTextarea();
+  textarea.value = '\n';
+  assert.equal(getInputText(textarea), '\n');
+});

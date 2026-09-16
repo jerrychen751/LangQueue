@@ -1,18 +1,18 @@
-import { Pencil, Trash2, Send } from 'lucide-react'
-import type { Prompt } from '../library/model'
-import { useToast } from '../components/useToast'
-import DeleteConfirmModal from '../components/DeleteConfirmModal'
-import { useRef, useState } from 'react'
+import { Pencil, Trash2, Send } from 'lucide-react';
+import type { Prompt } from '../library/model';
+import { useToast } from '../components/useToast';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import { useRef, useState } from 'react';
 
 type PromptCardProps = {
-  index: number
-  prompt: Prompt
-  onEdit: (prompt: Prompt) => void
-  onDelete: (prompt: Prompt) => Promise<void>
-  onInsert: (prompt: Prompt) => void
-  onSend?: (prompt: Prompt) => void
-  canInsert?: boolean
-}
+  index: number;
+  prompt: Prompt;
+  onEdit: (prompt: Prompt) => void;
+  onDelete: (prompt: Prompt) => Promise<void>;
+  onInsert: (prompt: Prompt) => void;
+  onSend?: (prompt: Prompt) => void;
+  canInsert?: boolean;
+};
 
 export function PromptCard({
   index,
@@ -23,11 +23,11 @@ export function PromptCard({
   onSend,
   canInsert = true,
 }: PromptCardProps) {
-  const { showToast } = useToast()
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const deletingRef = useRef(false)
-  const promptNumber = String(index + 1).padStart(2, '0')
+  const { showToast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
+  const promptNumber = String(index + 1).padStart(2, '0');
 
   return (
     <>
@@ -86,9 +86,14 @@ export function PromptCard({
             className="card-action"
             data-primary="true"
             onClick={async () => {
-              if (!canInsert) return
-              if (onSend) await onSend(prompt)
-              else await onInsert(prompt)
+              if (!canInsert) {
+                return;
+              }
+              if (onSend) {
+                await onSend(prompt);
+              } else {
+                await onInsert(prompt);
+              }
             }}
             title={canInsert ? 'Send prompt' : 'Open a supported chat page to enable send'}
             aria-label={`Send ${prompt.title || 'prompt'}`}
@@ -104,23 +109,29 @@ export function PromptCard({
         title="Delete this prompt?"
         description="This action cannot be undone."
         confirmLabel={deleting ? 'Deleting…' : 'Delete'}
-        onCancel={() => { if (!deletingRef.current) setConfirmOpen(false) }}
+        onCancel={() => {
+          if (!deletingRef.current) {
+            setConfirmOpen(false);
+          }
+        }}
         onConfirm={async () => {
-          if (deletingRef.current) return
-          deletingRef.current = true
-          setDeleting(true)
+          if (deletingRef.current) {
+            return;
+          }
+          deletingRef.current = true;
+          setDeleting(true);
           try {
-            await onDelete(prompt)
-            setConfirmOpen(false)
-            showToast({ variant: 'success', message: 'Prompt deleted' })
+            await onDelete(prompt);
+            setConfirmOpen(false);
+            showToast({ variant: 'success', message: 'Prompt deleted' });
           } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete prompt. Try again.' })
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete prompt. Try again.' });
           } finally {
-            deletingRef.current = false
-            setDeleting(false)
+            deletingRef.current = false;
+            setDeleting(false);
           }
         }}
       />
     </>
-  )
+  );
 }

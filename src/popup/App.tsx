@@ -1,276 +1,286 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Settings as SettingsIcon, Download, Workflow } from 'lucide-react'
-import Logo from '../components/Logo'
-import { PromptCard } from './PromptCard'
-import PromptModal from '../components/PromptModal'
-import type { Prompt, PromptChain } from '../library/model'
-import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, deleteChain, getPrompt, exportLibrary } from '../library/storage'
-import { sendPromptToTab, detectActivePlatform, insertAndSendPromptToTab, runChainOnTab } from './activeTab'
-import { useToast } from '../components/useToast'
-import { checkTabCompatibility } from './activeTab'
-import FilterBar, { type SortOption } from '../components/FilterBar'
-import Settings from './Settings'
-import ChainBuilder from '../components/ChainBuilder'
-import DeleteConfirmModal from '../components/DeleteConfirmModal'
-import { downloadJson } from './downloadJson'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Settings as SettingsIcon, Download, Workflow } from 'lucide-react';
+import Logo from '../components/Logo';
+import { PromptCard } from './PromptCard';
+import PromptModal from '../components/PromptModal';
+import type { Prompt, PromptChain } from '../library/model';
+import { getAllPrompts, deletePrompt, getUsageStats, logUsage, getAllChains, deleteChain, getPrompt, exportLibrary } from '../library/storage';
+import { sendPromptToTab, detectActivePlatform, insertAndSendPromptToTab, runChainOnTab } from './activeTab';
+import { useToast } from '../components/useToast';
+import { checkTabCompatibility } from './activeTab';
+import FilterBar, { type SortOption } from '../components/FilterBar';
+import Settings from './Settings';
+import ChainBuilder from '../components/ChainBuilder';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import { downloadJson } from './downloadJson';
 
 const PLATFORM_NAMES = {
   chatgpt: 'ChatGPT',
   gemini: 'Gemini',
   claude: 'Claude',
   other: 'No chat',
-} as const
+} as const;
 
 export default function App() {
-  const [prompts, setPrompts] = useState<Prompt[]>([])
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<SortOption>('recent')
-  const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<Prompt | undefined>(undefined)
-  const [compatible, setCompatible] = useState(false)
-  const [checking, setChecking] = useState(true)
-  const [platform, setPlatform] = useState<'chatgpt' | 'gemini' | 'claude' | 'other'>('other')
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortOption>('recent');
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Prompt | undefined>(undefined);
+  const [compatible, setCompatible] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [platform, setPlatform] = useState<'chatgpt' | 'gemini' | 'claude' | 'other'>('other');
   
-  const [stats, setStats] = useState<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }>({ totalPrompts: 0, totalUses: 0, mostUsedPrompt: null })
-  const [view, setView] = useState<'main' | 'settings'>('main')
-  const [chainOpen, setChainOpen] = useState(false)
-  const [chains, setChains] = useState<PromptChain[]>([])
-  const [deleteChainTarget, setDeleteChainTarget] = useState<PromptChain | null>(null)
-  const deletingChainRef = useRef(false)
-  const [deletingChain, setDeletingChain] = useState(false)
-  const insertingRef = useRef(false)
-  const [editingChain, setEditingChain] = useState<PromptChain | undefined>(undefined)
-  const startingChainRef = useRef(false)
-  const [startingChain, setStartingChain] = useState<string | null>(null)
-  const { showToast } = useToast()
-  const [focusSearchSignal, setFocusSearchSignal] = useState(0)
-  const [exporting, setExporting] = useState(false)
+  const [stats, setStats] = useState<{ totalPrompts: number; totalUses: number; mostUsedPrompt: Prompt | null }>({ totalPrompts: 0, totalUses: 0, mostUsedPrompt: null });
+  const [view, setView] = useState<'main' | 'settings'>('main');
+  const [chainOpen, setChainOpen] = useState(false);
+  const [chains, setChains] = useState<PromptChain[]>([]);
+  const [deleteChainTarget, setDeleteChainTarget] = useState<PromptChain | null>(null);
+  const deletingChainRef = useRef(false);
+  const [deletingChain, setDeletingChain] = useState(false);
+  const insertingRef = useRef(false);
+  const [editingChain, setEditingChain] = useState<PromptChain | undefined>(undefined);
+  const startingChainRef = useRef(false);
+  const [startingChain, setStartingChain] = useState<string | null>(null);
+  const { showToast } = useToast();
+  const [focusSearchSignal, setFocusSearchSignal] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const handleFilterChange = useCallback((next: { query: string; sort: SortOption }) => {
-    setQuery(next.query)
-    setSort(next.sort)
-  }, [])
+    setQuery(next.query);
+    setSort(next.sort);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
-        await handleRefresh()
+        await handleRefresh();
       } catch (err) {
         // Non-fatal: show a minimal inline error, but unblock UI
-        console.error('Failed to load prompts/stats', err)
+        console.error('Failed to load prompts/stats', err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    load()
-  }, [])
+    };
+    load();
+  }, []);
 
   const openPromptById = useCallback(async (promptId: string) => {
-    const prompt = await getPrompt(promptId)
-    if (!prompt) return
-    setEditing(prompt)
-    setModalOpen(true)
-  }, [])
+    const prompt = await getPrompt(promptId);
+    if (!prompt) {
+      return;
+    }
+    setEditing(prompt);
+    setModalOpen(true);
+  }, []);
 
   useEffect(() => {
     const handler: Parameters<typeof chrome.runtime.onMessage.addListener>[0] = (message) => {
       if (typeof message === 'object' && message && (message as { type?: string }).type === 'CHAIN_PROGRESS') {
-          const { stepIndex, totalSteps, status, error } = (message as { payload?: { stepIndex?: number; totalSteps?: number; status?: string; error?: string } }).payload || {}
-          if (!status || typeof stepIndex !== 'number' || typeof totalSteps !== 'number') return
+          const { stepIndex, totalSteps, status, error } = (message as { payload?: { stepIndex?: number; totalSteps?: number; status?: string; error?: string } }).payload || {};
+          if (!status || typeof stepIndex !== 'number' || typeof totalSteps !== 'number') {
+            return;
+          }
           if (status === 'sending') {
-            showToast({ message: `Sending step ${stepIndex + 1}/${totalSteps}` })
+            showToast({ message: `Sending step ${stepIndex + 1}/${totalSteps}` });
           }
           if (status === 'completed' && stepIndex === totalSteps - 1) {
-            showToast({ variant: 'success', message: 'Chain completed!' })
+            showToast({ variant: 'success', message: 'Chain completed!' });
           }
           if (status === 'error') {
-            showToast({ variant: 'error', message: `Chain error: ${error ?? 'Unknown error'}` })
+            showToast({ variant: 'error', message: `Chain error: ${error ?? 'Unknown error'}` });
           }
           if (status === 'cancelled') {
-            showToast({ variant: 'info', message: 'Chain cancelled' })
+            showToast({ variant: 'info', message: 'Chain cancelled' });
           }
       }
       if (typeof message === 'object' && message) {
-        const type = (message as { type?: string }).type
+        const type = (message as { type?: string }).type;
         if (type === 'OPEN_NEW_PROMPT') {
-          setEditing(undefined)
-          setModalOpen(true)
+          setEditing(undefined);
+          setModalOpen(true);
         }
         if (type === 'OPEN_EDIT_PROMPT') {
-          const promptId = (message as { payload?: { promptId?: string } }).payload?.promptId
+          const promptId = (message as { payload?: { promptId?: string } }).payload?.promptId;
           if (promptId) {
-            void openPromptById(promptId)
+            void openPromptById(promptId);
           }
         }
         if (type === 'FOCUS_SEARCH') {
-          setFocusSearchSignal((n) => n + 1)
+          setFocusSearchSignal((n) => n + 1);
         }
         if (type === 'TEXTAREA_READY') {
-          setCompatible(true)
+          setCompatible(true);
         }
         if (type === 'DB_CLEARED') {
-          setView('main')
-          handleRefresh()
+          setView('main');
+          handleRefresh();
         }
         if (type === 'PROMPTS_IMPORTED') {
-          setView('main')
-          handleRefresh()
+          setView('main');
+          handleRefresh();
         }
       }
-    }
-    chrome.runtime.onMessage.addListener(handler)
-    return () => chrome.runtime.onMessage.removeListener(handler)
-  }, [showToast, openPromptById])
+    };
+    chrome.runtime.onMessage.addListener(handler);
+    return () => chrome.runtime.onMessage.removeListener(handler);
+  }, [showToast, openPromptById]);
 
   // When navigating back from settings to main, ensure latest prompts are shown
   useEffect(() => {
     if (view === 'main') {
-      handleRefresh()
+      handleRefresh();
     }
-  }, [view])
+  }, [view]);
 
   // Refresh chains when chain builder closes
   useEffect(() => {
     if (!chainOpen) {
-      handleRefresh()
+      handleRefresh();
     }
-  }, [chainOpen])
+  }, [chainOpen]);
 
   useEffect(() => {
     const check = async () => {
-      setChecking(true)
-      const ok = await checkTabCompatibility()
-      setCompatible(ok)
-      const p = await detectActivePlatform()
-      setPlatform(p === 'chatgpt' || p === 'gemini' || p === 'claude' ? p : 'other')
+      setChecking(true);
+      const ok = await checkTabCompatibility();
+      setCompatible(ok);
+      const p = await detectActivePlatform();
+      setPlatform(p === 'chatgpt' || p === 'gemini' || p === 'claude' ? p : 'other');
       // Check for any pending action set by background shortcut
       const pending = await new Promise<unknown>((resolve) => {
-        chrome.storage.local.get(['langqueue_pending_action'], (res) => resolve(res['langqueue_pending_action']))
-      })
+        chrome.storage.local.get(['langqueue_pending_action'], (res) => resolve(res['langqueue_pending_action']));
+      });
       if (pending === 'OPEN_NEW_PROMPT' || (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'OPEN_NEW_PROMPT')) {
-        setEditing(undefined)
-        setModalOpen(true)
-        chrome.storage.local.remove(['langqueue_pending_action'])
+        setEditing(undefined);
+        setModalOpen(true);
+        chrome.storage.local.remove(['langqueue_pending_action']);
       }
       if (pending === 'FOCUS_SEARCH' || (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'FOCUS_SEARCH')) {
-        setFocusSearchSignal((n) => n + 1)
-        chrome.storage.local.remove(['langqueue_pending_action'])
+        setFocusSearchSignal((n) => n + 1);
+        chrome.storage.local.remove(['langqueue_pending_action']);
       }
       if (pending && typeof pending === 'object' && (pending as { type?: string }).type === 'OPEN_EDIT_PROMPT') {
-        const promptId = (pending as { promptId?: string }).promptId
+        const promptId = (pending as { promptId?: string }).promptId;
         if (promptId) {
-          await openPromptById(promptId)
+          await openPromptById(promptId);
         }
-        chrome.storage.local.remove(['langqueue_pending_action'])
+        chrome.storage.local.remove(['langqueue_pending_action']);
       }
-      setChecking(false)
-    }
-    check()
-  }, [openPromptById])
+      setChecking(false);
+    };
+    check();
+  }, [openPromptById]);
 
   const visiblePrompts = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    let list = [...prompts]
+    const q = query.trim().toLowerCase();
+    let list = [...prompts];
     if (q) {
       list = list.filter((p) => {
-        const hay = [p.title, p.content].join('\n').toLowerCase()
-        return hay.includes(q)
-      })
+        const hay = [p.title, p.content].join('\n').toLowerCase();
+        return hay.includes(q);
+      });
     }
     switch (sort) {
       case 'alpha':
-        list.sort((a, b) => a.title.localeCompare(b.title))
-        break
+        list.sort((a, b) => a.title.localeCompare(b.title));
+        break;
       case 'mostUsed':
-        list.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
-        break
+        list.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+        break;
       case 'recent':
       default:
         list.sort((a, b) => {
-          const byLast = (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0)
-          if (byLast !== 0) return byLast
-          const byUpdated = (b.updatedAt ?? 0) - (a.updatedAt ?? 0)
-          if (byUpdated !== 0) return byUpdated
-          return (b.createdAt ?? 0) - (a.createdAt ?? 0)
-        })
-        break
+          const byLast = (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0);
+          if (byLast !== 0) {
+            return byLast;
+          }
+          const byUpdated = (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
+          if (byUpdated !== 0) {
+            return byUpdated;
+          }
+          return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+        });
+        break;
     }
-    return list
-  }, [prompts, query, sort])
+    return list;
+  }, [prompts, query, sort]);
 
   async function handleRefresh() {
     const [items, savedChains, stats] = await Promise.all([
       getAllPrompts(),
       getAllChains(),
       getUsageStats(),
-    ])
-    setPrompts(items)
-    setChains(savedChains)
-    setStats(stats)
+    ]);
+    setPrompts(items);
+    setChains(savedChains);
+    setStats(stats);
   }
 
   async function handleCreate() {
-    setEditing(undefined)
-    setModalOpen(true)
+    setEditing(undefined);
+    setModalOpen(true);
   }
 
   async function handleDelete(p: Prompt) {
-    await deletePrompt(p.id)
-    setPrompts((items) => items.filter((item) => item.id !== p.id))
+    await deletePrompt(p.id);
+    setPrompts((items) => items.filter((item) => item.id !== p.id));
     try {
-      await handleRefresh()
+      await handleRefresh();
     } catch {
-      showToast({ variant: 'info', message: 'Prompt deleted, but library counts could not refresh. Reopen the popup to refresh them.' })
+      showToast({ variant: 'info', message: 'Prompt deleted, but library counts could not refresh. Reopen the popup to refresh them.' });
     }
   }
 
   async function handleInsert(p: Prompt) {
-    if (insertingRef.current) return
-    insertingRef.current = true
+    if (insertingRef.current) {
+      return;
+    }
+    insertingRef.current = true;
     try {
       try {
-        await sendPromptToTab(p.content, p.attachments || [])
-        showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` })
+        await sendPromptToTab(p.content, p.attachments || []);
+        showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Insertion failed'
-        showToast({ variant: 'error', message: `${message}. Check the chat composer and finish or cancel any active queue before trying again.` })
-        return
+        const message = error instanceof Error ? error.message : 'Insertion failed';
+        showToast({ variant: 'error', message: `${message}. Check the chat composer and finish or cancel any active queue before trying again.` });
+        return;
       }
       try {
-        await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id })
-        await handleRefresh()
+        await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id });
+        await handleRefresh();
       } catch {
-        showToast({ variant: 'info', message: 'Prompt inserted, but usage counts could not refresh. Check the composer before inserting again.' })
-        return
+        showToast({ variant: 'info', message: 'Prompt inserted, but usage counts could not refresh. Check the composer before inserting again.' });
+        return;
       }
-      window.close()
+      window.close();
     } finally {
-      insertingRef.current = false
+      insertingRef.current = false;
     }
   }
 
   async function handleExport() {
-    setExporting(true)
+    setExporting(true);
     try {
-      const data = await exportLibrary()
-      const date = new Date()
-      const filename = `langqueue-backup-${date.toISOString().slice(0, 10)}.json`
-      await downloadJson(filename, data)
-      showToast({ variant: 'success', message: 'Exported to Downloads' })
+      const data = await exportLibrary();
+      const date = new Date();
+      const filename = `langqueue-backup-${date.toISOString().slice(0, 10)}.json`;
+      await downloadJson(filename, data);
+      showToast({ variant: 'success', message: 'Exported to Downloads' });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Export failed'
-      showToast({ variant: 'error', message })
+      const message = err instanceof Error ? err.message : 'Export failed';
+      showToast({ variant: 'error', message });
     } finally {
-      setExporting(false)
+      setExporting(false);
     }
   }
 
   if (view === 'settings') {
-    return <Settings onBack={() => setView('main')} />
+    return <Settings onBack={() => setView('main')} />;
   }
 
-  const platformName = PLATFORM_NAMES[platform]
+  const platformName = PLATFORM_NAMES[platform];
 
   return (
     <div className="popup-shell">
@@ -347,23 +357,25 @@ export default function App() {
                 index={index}
                 prompt={p}
                 onEdit={() => {
-                  setEditing(p)
-                  setModalOpen(true)
+                  setEditing(p);
+                  setModalOpen(true);
                 }}
                 onDelete={handleDelete}
                 onInsert={handleInsert}
                 onSend={async (prompt) => {
-                  if (insertingRef.current) return
-                  insertingRef.current = true
+                  if (insertingRef.current) {
+                    return;
+                  }
+                  insertingRef.current = true;
                   try {
-                    await insertAndSendPromptToTab(prompt.content, prompt.attachments || [])
-                    showToast({ variant: 'success', message: 'Send requested' })
-                    window.close()
+                    await insertAndSendPromptToTab(prompt.content, prompt.attachments || []);
+                    showToast({ variant: 'success', message: 'Send requested' });
+                    window.close();
                   } catch (err: unknown) {
-                    const message = err instanceof Error ? err.message : 'Failed to send'
-                    showToast({ variant: 'error', message })
+                    const message = err instanceof Error ? err.message : 'Failed to send';
+                    showToast({ variant: 'error', message });
                   } finally {
-                    insertingRef.current = false
+                    insertingRef.current = false;
                   }
                 }}
                 canInsert={compatible}
@@ -399,17 +411,19 @@ export default function App() {
                         disabled={!compatible || Boolean(startingChain) || !c.steps.length}
                         title={!compatible ? 'Open a supported chat to run this chain' : !c.steps.length ? 'Add steps before running this chain' : 'Run this chain in the active chat'}
                         onClick={async () => {
-                          if (!compatible || !c.steps.length || startingChainRef.current) return
-                          startingChainRef.current = true
-                          setStartingChain(c.id)
+                          if (!compatible || !c.steps.length || startingChainRef.current) {
+                            return;
+                          }
+                          startingChainRef.current = true;
+                          setStartingChain(c.id);
                           try {
-                            await runChainOnTab(c.steps)
-                            showToast({ variant: 'success', message: 'Chain started. Follow its progress in the chat.' })
+                            await runChainOnTab(c.steps);
+                            showToast({ variant: 'success', message: 'Chain started. Follow its progress in the chat.' });
                           } catch (error) {
-                            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not start chain. Check the active chat and try again.' })
+                            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not start chain. Check the active chat and try again.' });
                           } finally {
-                            startingChainRef.current = false
-                            setStartingChain(null)
+                            startingChainRef.current = false;
+                            setStartingChain(null);
                           }
                         }}
                       >
@@ -419,8 +433,8 @@ export default function App() {
                         className="compact-button"
                         aria-label={`Edit chain ${c.title}`}
                         onClick={() => {
-                          setEditingChain(c)
-                          setChainOpen(true)
+                          setEditingChain(c);
+                          setChainOpen(true);
                         }}
                       >
                         Edit
@@ -429,7 +443,7 @@ export default function App() {
                         className="compact-button"
                         aria-label={`Delete chain ${c.title}`}
                         onClick={async () => {
-                          setDeleteChainTarget(c)
+                          setDeleteChainTarget(c);
                         }}
                       >
                         Delete
@@ -463,7 +477,7 @@ export default function App() {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => { setEditingChain(undefined); setChainOpen(true) }}
+            onClick={() => { setEditingChain(undefined); setChainOpen(true); }}
             className="secondary-button"
           >
             <Workflow size={15} /> New chain
@@ -484,17 +498,17 @@ export default function App() {
         onSaved={async (saved) => {
           // Optimistically update local list immediately for snappy UX
           setPrompts((prev) => {
-            const existingIdx = prev.findIndex((p) => p.id === saved.id)
+            const existingIdx = prev.findIndex((p) => p.id === saved.id);
             if (existingIdx >= 0) {
-              const next = [...prev]
-              next[existingIdx] = saved
-              return next
+              const next = [...prev];
+              next[existingIdx] = saved;
+              return next;
             }
-            return [saved, ...prev]
-          })
+            return [saved, ...prev];
+          });
           // Then ensure canonical ordering and stats from storage
-          await handleRefresh()
-          setModalOpen(false)
+          await handleRefresh();
+          setModalOpen(false);
         }}
       />
 
@@ -510,29 +524,35 @@ export default function App() {
         title="Delete chain?"
         description={deleteChainTarget ? `"${deleteChainTarget.title}" will be removed from your library.` : 'This action cannot be undone.'}
         confirmLabel={deletingChain ? 'Deleting…' : 'Delete chain'}
-        onCancel={() => { if (!deletingChainRef.current) setDeleteChainTarget(null) }}
+        onCancel={() => {
+          if (!deletingChainRef.current) {
+            setDeleteChainTarget(null);
+          }
+        }}
         onConfirm={async () => {
-          if (!deleteChainTarget || deletingChainRef.current) return
-          deletingChainRef.current = true
-          setDeletingChain(true)
+          if (!deleteChainTarget || deletingChainRef.current) {
+            return;
+          }
+          deletingChainRef.current = true;
+          setDeletingChain(true);
           try {
-            await deleteChain(deleteChainTarget.id)
-            setChains((items) => items.filter((item) => item.id !== deleteChainTarget.id))
-            setDeleteChainTarget(null)
-            showToast({ variant: 'success', message: 'Chain deleted' })
+            await deleteChain(deleteChainTarget.id);
+            setChains((items) => items.filter((item) => item.id !== deleteChainTarget.id));
+            setDeleteChainTarget(null);
+            showToast({ variant: 'success', message: 'Chain deleted' });
             try {
-              await handleRefresh()
+              await handleRefresh();
             } catch {
-              showToast({ variant: 'info', message: 'Chain deleted, but library counts could not refresh. Reopen the popup to refresh them.' })
+              showToast({ variant: 'info', message: 'Chain deleted, but library counts could not refresh. Reopen the popup to refresh them.' });
             }
           } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete chain. Try again.' })
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete chain. Try again.' });
           } finally {
-            deletingChainRef.current = false
-            setDeletingChain(false)
+            deletingChainRef.current = false;
+            setDeletingChain(false);
           }
         }}
       />
     </div>
-  )
+  );
 }

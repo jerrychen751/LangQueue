@@ -41,8 +41,12 @@ function createSettings() {
     return result;
   };
   const popupChrome = { runtime: { sendMessage(message) {
-    if (transportFailure === 'throw') throw new Error('Context invalidated');
-    if (transportFailure === 'reject') return Promise.reject(new Error('No receiver'));
+    if (transportFailure === 'throw') {
+      throw new Error('Context invalidated');
+    }
+    if (transportFailure === 'reject') {
+      return Promise.reject(new Error('No receiver'));
+    }
     messages.push(structuredClone(message));
     return new Promise((resolve) => {
       assert.equal(receiver(structuredClone(message), {}, resolve), true);
@@ -54,8 +58,12 @@ function createSettings() {
     exports: {},
     chrome: { runtime: { onMessage: { addListener(fn) { receiver = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } } },
     require(path) {
-      if (path === '../library/storage') return { saveSettings };
-      if (path === '../messaging/transport') return requests;
+      if (path === '../library/storage') {
+        return { saveSettings };
+      }
+      if (path === '../messaging/transport') {
+        return requests;
+      }
       return {};
     },
   });
@@ -63,12 +71,16 @@ function createSettings() {
     useRef(value) { const index = cursor++; hooks[index] ??= { current: value }; return hooks[index]; },
     useState(value) {
       const index = cursor++;
-      if (!(index in hooks)) hooks[index] = typeof value === 'function' ? value() : value;
+      if (!(index in hooks)) {
+        hooks[index] = typeof value === 'function' ? value() : value;
+      }
       return [hooks[index], (next) => { hooks[index] = typeof next === 'function' ? next(hooks[index]) : next; }];
     },
     useCallback(callback, deps) {
       const index = cursor++;
-      if (!hooks[index] || deps.some((dep, i) => dep !== hooks[index].deps[i])) hooks[index] = { deps, callback };
+      if (!hooks[index] || deps.some((dep, i) => dep !== hooks[index].deps[i])) {
+        hooks[index] = { deps, callback };
+      }
       return hooks[index].callback;
     },
     useEffect(callback, deps) {
@@ -84,31 +96,51 @@ function createSettings() {
     navigator: { platform: 'Mac' },
     chrome: popupChrome,
     require(path) {
-      if (path === 'react') return react;
-      if (path === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
-      if (path === '../library/storage') return { getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })) };
-      if (path === '../components/useToast') return { useToast: () => ({ showToast() {} }) };
-      if (path === '../messaging/transport') return requests;
+      if (path === 'react') {
+        return react;
+      }
+      if (path === 'react/jsx-runtime') {
+        return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
+      }
+      if (path === '../library/storage') {
+        return { getSettings: () => new Promise((resolve, reject) => loads.push({ resolve, reject })) };
+      }
+      if (path === '../components/useToast') {
+        return { useToast: () => ({ showToast() {} }) };
+      }
+      if (path === '../messaging/transport') {
+        return requests;
+      }
       return {};
     },
   });
   function render() {
     cursor = 0;
     const tree = exports.default({ onBack: () => { backCount++; } });
-    while (effects.length) effects.shift()();
+    while (effects.length) {
+      effects.shift()();
+    }
     return tree;
   }
   function find(tree, predicate) {
-    if (!tree || typeof tree !== 'object') return null;
-    if (predicate(tree)) return tree;
+    if (!tree || typeof tree !== 'object') {
+      return null;
+    }
+    if (predicate(tree)) {
+      return tree;
+    }
     for (const child of [tree.props?.children].flat(Infinity)) {
       const found = find(child, predicate);
-      if (found) return found;
+      if (found) {
+        return found;
+      }
     }
     return null;
   }
   function unmount() {
-    for (const hook of hooks) hook?.cleanup?.();
+    for (const hook of hooks) {
+      hook?.cleanup?.();
+    }
   }
   async function settle() { await new Promise((resolve) => setImmediate(resolve)); }
   return { render, find, loads, messages, snapshots, release, unmount, settle, failNextWrite() { failWrite = true; }, failTransport(mode) { transportFailure = mode; }, getBackCount: () => backCount, getPersisted: () => persisted };

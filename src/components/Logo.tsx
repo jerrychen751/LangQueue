@@ -1,8 +1,8 @@
 type LogoProps = {
-  size?: number
-  className?: string
-  ariaLabel?: string
-}
+  size?: number;
+  className?: string;
+  ariaLabel?: string;
+};
 
 export default function Logo({ size = 20, className, ariaLabel = 'LangQueue logo' }: LogoProps) {
   return (
@@ -19,5 +19,5 @@ export default function Logo({ size = 20, className, ariaLabel = 'LangQueue logo
       <path d="M4 4h120v120H4zM10 10v108h108V10z" fill="#7a8e94" fillRule="evenodd" />
       <path d="M44 34h15v49h29v15H44z" fill="#4f6c75" />
     </svg>
-  )
+  );
 }

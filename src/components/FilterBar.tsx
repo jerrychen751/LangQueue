@@ -1,63 +1,65 @@
-import { useEffect, useRef, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react';
+import { Search, X } from 'lucide-react';
 
-export type SortOption = 'recent' | 'alpha' | 'mostUsed'
+export type SortOption = 'recent' | 'alpha' | 'mostUsed';
 
 type FilterBarProps = {
-  initialQuery?: string
-  initialSort?: SortOption
+  initialQuery?: string;
+  initialSort?: SortOption;
   // When true, focus and select the search input on mount
-  autoFocus?: boolean
+  autoFocus?: boolean;
   // Increment this to re-focus and select the input on demand
-  focusSignal?: number
-  onChange: (s: { query: string; sort: SortOption }) => void
-}
+  focusSignal?: number;
+  onChange: (s: { query: string; sort: SortOption }) => void;
+};
 
 export default function FilterBar({ initialQuery = '', initialSort = 'recent', autoFocus = false, focusSignal, onChange }: FilterBarProps) {
-  const [query, setQuery] = useState(initialQuery)
-  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery)
-  const [sort, setSort] = useState<SortOption>(initialSort)
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [query, setQuery] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
+  const [sort, setSort] = useState<SortOption>(initialSort);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 300)
-    return () => clearTimeout(t)
-  }, [query])
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
   useEffect(() => {
-    onChange({ query: debouncedQuery, sort })
-  }, [debouncedQuery, sort, onChange])
+    onChange({ query: debouncedQuery, sort });
+  }, [debouncedQuery, sort, onChange]);
 
   // Focus handling: on mount if autoFocus, and whenever focusSignal changes
   useEffect(() => {
-    if (!autoFocus) return
-    const el = inputRef.current
+    if (!autoFocus) {
+      return;
+    }
+    const el = inputRef.current;
     if (el) {
       // Use a rAF to ensure element is in DOM and painted
       requestAnimationFrame(() => {
-        el.focus()
-        el.select()
-      })
+        el.focus();
+        el.select();
+      });
     }
-  }, [autoFocus])
+  }, [autoFocus]);
 
   useEffect(() => {
     if (typeof focusSignal === 'number') {
-      const el = inputRef.current
+      const el = inputRef.current;
       if (el) {
         requestAnimationFrame(() => {
-          el.focus()
-          el.select()
-        })
+          el.focus();
+          el.select();
+        });
       }
     }
-  }, [focusSignal])
+  }, [focusSignal]);
 
   function clearAll() {
-    setQuery('')
-    setSort('recent')
+    setQuery('');
+    setSort('recent');
     // Immediately notify listeners without waiting for debounce
-    onChange({ query: '', sort: 'recent' })
+    onChange({ query: '', sort: 'recent' });
   }
 
   return (
@@ -87,5 +89,5 @@ export default function FilterBar({ initialQuery = '', initialSort = 'recent', a
         <X size={14} />
       </button>
     </div>
-  )
+  );
 }

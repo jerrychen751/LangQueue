@@ -19,7 +19,9 @@ function createPopup(name, overrides = {}, library = {}) {
   const react = {
     useState(initial) {
       const index = cursor++;
-      if (!(index in hooks)) hooks[index] = name === 'App' && index === 0 ? library.prompts ?? [prompt] : name === 'App' && index === 3 ? false : name === 'App' && index === 6 ? library.compatible ?? initial : name === 'App' && index === 12 ? library.chains ?? initial : initial;
+      if (!(index in hooks)) {
+        hooks[index] = name === 'App' && index === 0 ? library.prompts ?? [prompt] : name === 'App' && index === 3 ? false : name === 'App' && index === 6 ? library.compatible ?? initial : name === 'App' && index === 12 ? library.chains ?? initial : initial;
+      }
       return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }];
     },
     useRef(initial) { const index = cursor++; hooks[index] ??= { current: initial }; return hooks[index]; },
@@ -36,16 +38,30 @@ function createPopup(name, overrides = {}, library = {}) {
     window: { close() { closes++; } },
     navigator: { clipboard: { async writeText() { copies++; } } },
     require(path) {
-      if (path === 'react') return react;
-      if (path === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
-      if (path === 'lucide-react') return {};
-      if (path === '../components/useToast') return { useToast: () => ({ showToast: toast => toasts.push(toast) }) };
-      if (path === '../library/storage') return {
+      if (path === 'react') {
+        return react;
+      }
+      if (path === 'react/jsx-runtime') {
+        return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
+      }
+      if (path === 'lucide-react') {
+        return {};
+      }
+      if (path === '../components/useToast') {
+        return { useToast: () => ({ showToast: toast => toasts.push(toast) }) };
+      }
+      if (path === '../library/storage') {
+        return {
         getAllPrompts: async () => [prompt], getAllChains: async () => [], getUsageStats: async () => ({}),
         logUsage: async () => { uses++; }, deletePrompt: async () => {}, ...overrides,
       };
-      if (path === './activeTab') return { sendPromptToTab: async () => {}, ...overrides };
-      if (path === './PromptCard') return { PromptCard: 'PromptCard' };
+      }
+      if (path === './activeTab') {
+        return { sendPromptToTab: async () => {}, ...overrides };
+      }
+      if (path === './PromptCard') {
+        return { PromptCard: 'PromptCard' };
+      }
       return { default: path };
     },
   });
@@ -54,11 +70,17 @@ function createPopup(name, overrides = {}, library = {}) {
     return (exports.default || exports.PromptCard)({ index: 0, prompt, ...props });
   }
   function find(tree, predicate) {
-    if (!tree || typeof tree !== 'object') return null;
-    if (predicate(tree)) return tree;
+    if (!tree || typeof tree !== 'object') {
+      return null;
+    }
+    if (predicate(tree)) {
+      return tree;
+    }
     for (const child of [tree.props?.children].flat(Infinity)) {
       const found = find(child, predicate);
-      if (found) return found;
+      if (found) {
+        return found;
+      }
     }
     return null;
   }
@@ -166,7 +188,11 @@ test('prompt confirmation waits for deletion and ignores duplicate attempts', as
 
 test('failed deletion keeps confirmation open and allows retry', async () => {
   let deletes = 0;
-  const props = { onDelete: async () => { if (++deletes === 1) throw new Error('Could not write storage'); } };
+  const props = { onDelete: async () => {
+    if (++deletes === 1) {
+      throw new Error('Could not write storage');
+    }
+  } };
   const popup = createPopup('PromptCard');
   popup.find(popup.render(props), node => node.props.title === 'Delete prompt').props.onClick();
   await popup.find(popup.render(props), node => node.props.title === 'Delete this prompt?').props.onConfirm();

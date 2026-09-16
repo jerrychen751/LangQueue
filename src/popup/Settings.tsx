@@ -1,48 +1,50 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
-import type { AppSettings } from '../library/model'
-import { callBackground } from '../messaging/transport'
-import { getSettings, exportLibrary, importLibrary } from '../library/storage'
-import { useToast } from '../components/useToast'
-import { downloadJson } from './downloadJson'
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import type { AppSettings } from '../library/model';
+import { callBackground } from '../messaging/transport';
+import { getSettings, exportLibrary, importLibrary } from '../library/storage';
+import { useToast } from '../components/useToast';
+import { downloadJson } from './downloadJson';
 
 type SettingsProps = {
-  onBack: () => void
-}
+  onBack: () => void;
+};
 
 export default function Settings({ onBack }: SettingsProps) {
-  const [settings, setSettings] = useState<AppSettings>({})
-  const [status, setStatus] = useState<string | null>(null)
-  const [importing, setImporting] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [importSummary, setImportSummary] = useState<string | null>(null)
-  const { showToast } = useToast()
-  const [loaded, setLoaded] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const settingsRef = useRef<AppSettings>({})
-  const loadedRef = useRef(false)
-  const mountedRef = useRef(true)
-  const loadGeneration = useRef(0)
-  const saveGeneration = useRef(0)
-  const lastSave = useRef<Promise<boolean>>(Promise.resolve(true))
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [settings, setSettings] = useState<AppSettings>({});
+  const [status, setStatus] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const { showToast } = useToast();
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const settingsRef = useRef<AppSettings>({});
+  const loadedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const loadGeneration = useRef(0);
+  const saveGeneration = useRef(0);
+  const lastSave = useRef<Promise<boolean>>(Promise.resolve(true));
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadSettings = useCallback(async () => {
-    const generation = ++loadGeneration.current
-    setLoading(true)
-    setLoadError(null)
+    const generation = ++loadGeneration.current;
+    setLoading(true);
+    setLoadError(null);
     try {
-      const existing = await getSettings()
-      if (generation !== loadGeneration.current) return
+      const existing = await getSettings();
+      if (generation !== loadGeneration.current) {
+        return;
+      }
       // Prefill shortcut defaults by platform if not already set
-      const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+      const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
       const defaults = {
         openLibrary: isMac ? 'Command+Shift+P' : 'Ctrl+Shift+P',
         focusSearch: isMac ? 'Command+Shift+O' : 'Ctrl+Shift+O',
         createPrompt: isMac ? 'Command+Shift+L' : 'Ctrl+Shift+L',
-      }
+      };
       const merged: AppSettings = {
         ...existing,
         multimodalEnabled: existing.multimodalEnabled ?? true,
@@ -52,133 +54,151 @@ export default function Settings({ onBack }: SettingsProps) {
           focusSearch: existing.shortcuts?.focusSearch ?? defaults.focusSearch,
           createPrompt: existing.shortcuts?.createPrompt ?? defaults.createPrompt,
         },
-      }
-      settingsRef.current = merged
-      loadedRef.current = true
-      setSettings(merged)
-      setLoaded(true)
+      };
+      settingsRef.current = merged;
+      loadedRef.current = true;
+      setSettings(merged);
+      setLoaded(true);
     } catch {
-      if (generation === loadGeneration.current) setLoadError('Settings could not be loaded. Retry before making changes.')
+      if (generation === loadGeneration.current) {
+        setLoadError('Settings could not be loaded. Retry before making changes.');
+      }
     } finally {
-      if (generation === loadGeneration.current) setLoading(false)
+      if (generation === loadGeneration.current) {
+        setLoading(false);
+      }
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    mountedRef.current = true
-    void loadSettings()
+    mountedRef.current = true;
+    void loadSettings();
     return () => {
-      mountedRef.current = false
-      loadedRef.current = false
-      loadGeneration.current += 1
-    }
-  }, [loadSettings])
+      mountedRef.current = false;
+      loadedRef.current = false;
+      loadGeneration.current += 1;
+    };
+  }, [loadSettings]);
 
   // Save each settings change after hydration.
   function persistSettings(next: AppSettings): Promise<boolean> {
-    const generation = ++saveGeneration.current
-    setSaving(true)
-    setStatus('Saving')
+    const generation = ++saveGeneration.current;
+    setSaving(true);
+    setStatus('Saving');
     const pending = (async () => {
-      let ok = false
+      let ok = false;
       try {
-        await callBackground('SAVE_SETTINGS', { settings: next })
-        ok = true
+        await callBackground('SAVE_SETTINGS', { settings: next });
+        ok = true;
       } catch {
-        ok = false
+        ok = false;
       }
       if (mountedRef.current && generation === saveGeneration.current) {
-        setStatus(ok ? 'Saved' : 'Save failed')
-        setSaving(false)
+        setStatus(ok ? 'Saved' : 'Save failed');
+        setSaving(false);
       }
-      return ok
-    })()
-    lastSave.current = pending
-    return pending
+      return ok;
+    })();
+    lastSave.current = pending;
+    return pending;
   }
 
   function updateSettings(update: (current: AppSettings) => AppSettings) {
-    if (!loadedRef.current) return
-    const next = update(settingsRef.current)
-    settingsRef.current = next
-    setSettings(next)
-    void persistSettings(next)
+    if (!loadedRef.current) {
+      return;
+    }
+    const next = update(settingsRef.current);
+    settingsRef.current = next;
+    setSettings(next);
+    void persistSettings(next);
   }
 
   async function saveAll() {
-    if (!loadedRef.current) return
-    await persistSettings(settingsRef.current)
+    if (!loadedRef.current) {
+      return;
+    }
+    await persistSettings(settingsRef.current);
   }
 
   async function handleBack() {
     while (mountedRef.current) {
-      const pending = lastSave.current
-      const ok = await pending
-      if (pending !== lastSave.current) continue
-      if (ok && mountedRef.current) onBack()
-      return
+      const pending = lastSave.current;
+      const ok = await pending;
+      if (pending !== lastSave.current) {
+        continue;
+      }
+      if (ok && mountedRef.current) {
+        onBack();
+      }
+      return;
     }
   }
 
   async function handleExport() {
-    if (!loadedRef.current) return
-    setExporting(true)
+    if (!loadedRef.current) {
+      return;
+    }
+    setExporting(true);
     try {
-      const data = await exportLibrary({ includeBinaries: Boolean(settings.exportIncludeBinaries) })
-      const filename = `langqueue-backup-${new Date().toISOString().slice(0, 10)}.json`
-      await downloadJson(filename, data)
-      showToast({ variant: 'success', message: 'Exported to Downloads' })
+      const data = await exportLibrary({ includeBinaries: Boolean(settings.exportIncludeBinaries) });
+      const filename = `langqueue-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      await downloadJson(filename, data);
+      showToast({ variant: 'success', message: 'Exported to Downloads' });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Export failed'
-      showToast({ variant: 'error', message })
+      const message = err instanceof Error ? err.message : 'Export failed';
+      showToast({ variant: 'error', message });
     } finally {
-      setExporting(false)
+      setExporting(false);
     }
   }
 
   async function handleImportFile(file: File) {
-    if (!loadedRef.current) return
-    setImporting(true)
-    setImportSummary(null)
+    if (!loadedRef.current) {
+      return;
+    }
+    setImporting(true);
+    setImportSummary(null);
     try {
-      const text = await file.text()
-      const parsed = JSON.parse(text)
-      const results = await importLibrary(parsed)
-      const promptStats = results.prompts
-      const chainStats = results.chains
-      const summaryParts: string[] = []
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const results = await importLibrary(parsed);
+      const promptStats = results.prompts;
+      const chainStats = results.chains;
+      const summaryParts: string[] = [];
       if (promptStats) {
         summaryParts.push(
           `prompts imported ${promptStats.imported}, replaced ${promptStats.replaced}, skipped ${promptStats.skipped}`
-        )
+        );
       }
       if (chainStats) {
         summaryParts.push(
           `chains imported ${chainStats.imported}, replaced ${chainStats.replaced}, skipped ${chainStats.skipped}`
-        )
+        );
       }
       if (results.attachments) {
-        summaryParts.push(`attachments imported ${results.attachments.imported}`)
+        summaryParts.push(`attachments imported ${results.attachments.imported}`);
       }
-      const summary = summaryParts.join(' • ') || 'No items imported'
-      setImportSummary(summary)
-      showToast({ variant: 'success', message: 'Import completed' })
+      const summary = summaryParts.join(' • ') || 'No items imported';
+      setImportSummary(summary);
+      showToast({ variant: 'success', message: 'Import completed' });
       chrome.runtime.sendMessage({ type: 'PROMPTS_IMPORTED' }).catch(() => {
         // best-effort notification
-      })
+      });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Import failed'
-      showToast({ variant: 'error', message })
-      setImportSummary(null)
+      const message = err instanceof Error ? err.message : 'Import failed';
+      showToast({ variant: 'error', message });
+      setImportSummary(null);
     } finally {
-      setImporting(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      setImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   }
 
   const statusTone = status?.toLowerCase().includes('fail')
     ? 'text-rose-700 border-rose-300 bg-rose-50'
-    : 'text-[#3f6954] border-[#b5c9be] bg-[#eef4f0]'
+    : 'text-[#3f6954] border-[#b5c9be] bg-[#eef4f0]';
 
   return (
     <div className="popup-shell">
@@ -189,8 +209,10 @@ export default function Settings({ onBack }: SettingsProps) {
         accept="application/json"
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) void handleImportFile(file)
+          const file = e.target.files?.[0];
+          if (file) {
+            void handleImportFile(file);
+          }
         }}
       />
       <header className="popup-header">
@@ -349,7 +371,7 @@ export default function Settings({ onBack }: SettingsProps) {
                   </div>
                   <button
                   className="compact-button whitespace-nowrap"
-                  onClick={() => { void chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html#import') }) }}
+                  onClick={() => { void chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html#import') }); }}
                 >
                   Open importer
                 </button>
@@ -372,5 +394,5 @@ export default function Settings({ onBack }: SettingsProps) {
         </footer>
       </fieldset>
     </div>
-  )
+  );
 }

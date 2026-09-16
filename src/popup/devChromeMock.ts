@@ -1,4 +1,4 @@
-const timestamp = Date.now()
+const timestamp = Date.now();
 
 const previewStorage: Record<string, unknown> = {
   langqueue_prompts: {
@@ -74,47 +74,51 @@ const previewStorage: Record<string, unknown> = {
     insertionMode: 'overwrite',
     multimodalEnabled: true,
   },
-}
+};
 
-const runtimeListeners = new Set<(message: unknown) => void>()
+const runtimeListeners = new Set<(message: unknown) => void>();
 
 function selectStorageValues(keys?: string | string[] | Record<string, unknown> | null): Record<string, unknown> {
-  if (keys == null) return { ...previewStorage }
-  if (typeof keys === 'string') return { [keys]: previewStorage[keys] }
+  if (keys == null) {
+    return { ...previewStorage };
+  }
+  if (typeof keys === 'string') {
+    return { [keys]: previewStorage[keys] };
+  }
   if (Array.isArray(keys)) {
-    return Object.fromEntries(keys.map((key) => [key, previewStorage[key]]))
+    return Object.fromEntries(keys.map((key) => [key, previewStorage[key]]));
   }
   return Object.fromEntries(
     Object.entries(keys).map(([key, fallback]) => [key, previewStorage[key] ?? fallback])
-  )
+  );
 }
 
 export function installDevChromeMock(): void {
   if (globalThis.chrome?.runtime?.onMessage && globalThis.chrome?.storage?.local && globalThis.chrome?.tabs) {
-    return
+    return;
   }
 
   const mockChrome = {
     runtime: {
       onMessage: {
         addListener(listener: (message: unknown) => void) {
-          runtimeListeners.add(listener)
+          runtimeListeners.add(listener);
         },
         removeListener(listener: (message: unknown) => void) {
-          runtimeListeners.delete(listener)
+          runtimeListeners.delete(listener);
         },
       },
       getURL(path: string) {
-        return '/' + path
+        return '/' + path;
       },
       async sendMessage(message: unknown) {
-        const request = message as { type?: string; payload?: { settings?: unknown } }
+        const request = message as { type?: string; payload?: { settings?: unknown } };
         if (request?.type === 'SAVE_SETTINGS') {
-          previewStorage.langqueue_settings = structuredClone(request.payload?.settings)
-          return { ok: true }
+          previewStorage.langqueue_settings = structuredClone(request.payload?.settings);
+          return { ok: true };
         }
-        runtimeListeners.forEach((listener) => listener(message))
-        return undefined
+        runtimeListeners.forEach((listener) => listener(message));
+        return undefined;
       },
     },
     storage: {
@@ -123,16 +127,16 @@ export function installDevChromeMock(): void {
           keys?: string | string[] | Record<string, unknown> | null,
           callback?: (items: Record<string, unknown>) => void
         ) {
-          const result = selectStorageValues(keys)
-          callback?.(result)
-          return result
+          const result = selectStorageValues(keys);
+          callback?.(result);
+          return result;
         },
         async set(items: Record<string, unknown>) {
-          Object.assign(previewStorage, items)
+          Object.assign(previewStorage, items);
         },
         async remove(keys: string | string[]) {
-          const keysToRemove = Array.isArray(keys) ? keys : [keys]
-          keysToRemove.forEach((key) => delete previewStorage[key])
+          const keysToRemove = Array.isArray(keys) ? keys : [keys];
+          keysToRemove.forEach((key) => delete previewStorage[key]);
         },
       },
     },
@@ -141,35 +145,39 @@ export function installDevChromeMock(): void {
         _queryInfo: chrome.tabs.QueryInfo,
         callback: (tabs: chrome.tabs.Tab[]) => void
       ) {
-        callback([{ id: 1, url: 'https://chatgpt.com/' } as chrome.tabs.Tab])
+        callback([{ id: 1, url: 'https://chatgpt.com/' } as chrome.tabs.Tab]);
       },
       async create(properties: { url?: string }) {
-        if (properties.url) window.open(properties.url, '_blank')
-        return {} as chrome.tabs.Tab
+        if (properties.url) {
+          window.open(properties.url, '_blank');
+        }
+        return {} as chrome.tabs.Tab;
       },
       async sendMessage(_tabId: number, message: { type?: string }) {
         if (message.type === 'COMPAT_CHECK') {
-          return { ok: true, result: { ready: true } }
+          return { ok: true, result: { ready: true } };
         }
         if (message.type === 'INSERT_AND_SEND_PROMPT') {
-          return { ok: true, result: { ok: true, sendAttempted: true } }
+          return { ok: true, result: { ok: true, sendAttempted: true } };
         }
-        if (message.type === 'RUN_CHAIN') return { ok: true, result: { ok: true } }
+        if (message.type === 'RUN_CHAIN') {
+          return { ok: true, result: { ok: true } };
+        }
         if (message.type === 'INJECT_PROMPT') {
-          return { ok: true, result: { ok: true, sendAttempted: false } }
+          return { ok: true, result: { ok: true, sendAttempted: false } };
         }
-        return undefined
+        return undefined;
       },
     },
-  }
+  };
 
   if (typeof globalThis.chrome === 'undefined') {
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
       value: mockChrome as unknown as typeof chrome,
-    })
-    return
+    });
+    return;
   }
 
-  Object.assign(globalThis.chrome, mockChrome)
+  Object.assign(globalThis.chrome, mockChrome);
 }

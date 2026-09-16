@@ -41,7 +41,9 @@ function createStorageContexts(initial = {}) {
           Object.assign(records, structuredClone(values));
         },
         async remove(keys) {
-          for (const key of keys) delete records[key];
+          for (const key of keys) {
+            delete records[key];
+          }
         },
       },
     },
@@ -65,10 +67,18 @@ function createStorageContexts(initial = {}) {
       File,
       crypto,
       require(path) {
-        if (path === './model') return { CURRENT_SCHEMA_VERSION: 3, CURRENT_CHAINS_SCHEMA_VERSION: 2 };
-        if (path === './attachments') return {
+        if (path === './model') {
+          return { CURRENT_SCHEMA_VERSION: 3, CURRENT_CHAINS_SCHEMA_VERSION: 2 };
+        }
+        if (path === './attachments') {
+          return {
           inferAttachmentKind: () => 'file',
-          listAttachmentIds: async () => { if (shouldFailCleanup) throw new Error("Cleanup failed"); return [...attachments.keys()]; },
+          listAttachmentIds: async () => {
+            if (shouldFailCleanup) {
+              throw new Error("Cleanup failed");
+            }
+            return [...attachments.keys()];
+          },
           getAttachmentMeta: async (id) => attachments.get(id) ?? null,
           prepareAttachmentImports: attachmentExports.prepareAttachmentImports,
           saveAttachmentFile: async (file, id) => {
@@ -81,6 +91,7 @@ function createStorageContexts(initial = {}) {
             return { ...ref, dataBase64: Buffer.from(bytes).toString('base64') };
           }),
         };
+        }
         throw new Error(`Unexpected import: ${path}`);
       },
     });

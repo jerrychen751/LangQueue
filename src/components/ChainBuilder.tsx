@@ -1,202 +1,234 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Trash2, X, Save, Plus, Paperclip } from 'lucide-react'
-import { saveChain } from '../library/storage'
-import { useToast } from './useToast'
-import type { AttachmentRef, PromptChain } from '../library/model'
-import { createAttachmentDraft } from '../library/attachments'
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, Trash2, X, Save, Plus, Paperclip } from 'lucide-react';
+import { saveChain } from '../library/storage';
+import { useToast } from './useToast';
+import type { AttachmentRef, PromptChain } from '../library/model';
+import { createAttachmentDraft } from '../library/attachments';
 
 type ChainBuilderProps = {
-  open: boolean
-  initialChain?: PromptChain
-  onClose: () => void
-  onSaved?: () => void | Promise<void>
-}
+  open: boolean;
+  initialChain?: PromptChain;
+  onClose: () => void;
+  onSaved?: () => void | Promise<void>;
+};
 
 type ChainItem = {
-  id: string
-  content: string
-  attachments: AttachmentRef[]
-}
+  id: string;
+  content: string;
+  attachments: AttachmentRef[];
+};
 
-const DEFAULT_STEP_COUNT = 2
+const DEFAULT_STEP_COUNT = 2;
 
 function createEmptyItem(): ChainItem {
   return {
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     content: '',
     attachments: [],
-  }
+  };
 }
 
 function createDefaultItems(): ChainItem[] {
-  return Array.from({ length: DEFAULT_STEP_COUNT }, () => createEmptyItem())
+  return Array.from({ length: DEFAULT_STEP_COUNT }, () => createEmptyItem());
 }
 
 export default function ChainBuilder({ open, initialChain, onClose, onSaved }: ChainBuilderProps) {
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const lastActiveRef = useRef<HTMLElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const titleRef = useRef<HTMLInputElement | null>(null)
-  const pendingAttachments = useRef(new Map<string, File>())
-  const savingRef = useRef(false)
-  const draftGeneration = useRef(0)
-  const filePickerGeneration = useRef<number | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const lastActiveRef = useRef<HTMLElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const titleRef = useRef<HTMLInputElement | null>(null);
+  const pendingAttachments = useRef(new Map<string, File>());
+  const savingRef = useRef(false);
+  const draftGeneration = useRef(0);
+  const filePickerGeneration = useRef<number | null>(null);
 
-  const [items, setItems] = useState<ChainItem[]>(() => createDefaultItems())
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [pendingAttachmentStepId, setPendingAttachmentStepId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [title, setTitle] = useState('')
-  const { showToast } = useToast()
+  const [items, setItems] = useState<ChainItem[]>(() => createDefaultItems());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingAttachmentStepId, setPendingAttachmentStepId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState('');
+  const { showToast } = useToast();
 
   const handleClose = useCallback(() => {
-    if (savingRef.current) return
-    pendingAttachments.current.clear()
-    onClose()
-    setTimeout(() => lastActiveRef.current?.focus(), 0)
-  }, [onClose])
+    if (savingRef.current) {
+      return;
+    }
+    pendingAttachments.current.clear();
+    onClose();
+    setTimeout(() => lastActiveRef.current?.focus(), 0);
+  }, [onClose]);
 
   useEffect(() => {
-    draftGeneration.current += 1
-    filePickerGeneration.current = null
-    savingRef.current = false
-    const drafts = pendingAttachments.current
-    drafts.clear()
-    if (!open) return
-    lastActiveRef.current = (document.activeElement as HTMLElement) ?? null
+    draftGeneration.current += 1;
+    filePickerGeneration.current = null;
+    savingRef.current = false;
+    const drafts = pendingAttachments.current;
+    drafts.clear();
+    if (!open) {
+      return;
+    }
+    lastActiveRef.current = (document.activeElement as HTMLElement) ?? null;
     // reset transient states when opened
-    setSaving(false)
-    setTitle(initialChain?.title || '')
+    setSaving(false);
+    setTitle(initialChain?.title || '');
     const defaults = initialChain ? initialChain.steps.map((step) => ({
       ...createEmptyItem(), content: step.content, attachments: step.attachments.map((attachment) => ({ ...attachment })),
-    })) : createDefaultItems()
-    setItems(defaults)
-    setEditingId(null)
-    setPendingAttachmentStepId(null)
-    const focusTimer = window.setTimeout(() => titleRef.current?.focus(), 0)
+    })) : createDefaultItems();
+    setItems(defaults);
+    setEditingId(null);
+    setPendingAttachmentStepId(null);
+    const focusTimer = window.setTimeout(() => titleRef.current?.focus(), 0);
     return () => {
-      window.clearTimeout(focusTimer)
-      draftGeneration.current += 1
-      drafts.clear()
-    }
-  }, [open, initialChain])
+      window.clearTimeout(focusTimer);
+      draftGeneration.current += 1;
+      drafts.clear();
+    };
+  }, [open, initialChain]);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      return;
+    }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        e.stopPropagation()
-        handleClose()
+        e.stopPropagation();
+        handleClose();
       }
       if (e.key === 'Tab' && dialogRef.current) {
         const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )).filter((element) => !element.matches(':disabled'))
+        )).filter((element) => !element.matches(':disabled'));
         if (focusable.length === 0) {
-          e.preventDefault()
-          return
+          e.preventDefault();
+          return;
         }
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
+          e.preventDefault();
+          last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
+          e.preventDefault();
+          first.focus();
         }
       }
     }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, handleClose])
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [open, handleClose]);
 
   function addStep() {
-    if (savingRef.current) return
-    const next = createEmptyItem()
-    setItems((prev) => [...prev, next])
-    setEditingId(next.id)
+    if (savingRef.current) {
+      return;
+    }
+    const next = createEmptyItem();
+    setItems((prev) => [...prev, next]);
+    setEditingId(next.id);
   }
 
   function updateItem(id: string, content: string) {
-    if (savingRef.current) return
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, content } : item)))
+    if (savingRef.current) {
+      return;
+    }
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, content } : item)));
   }
 
   function removeAttachment(stepId: string, attachmentId: string) {
-    if (savingRef.current) return
-    pendingAttachments.current.delete(attachmentId)
+    if (savingRef.current) {
+      return;
+    }
+    pendingAttachments.current.delete(attachmentId);
     setItems((prev) => prev.map((item) => (
       item.id === stepId
         ? { ...item, attachments: item.attachments.filter((entry) => entry.id !== attachmentId) }
         : item
-    )))
+    )));
   }
 
   function addAttachmentsToStep(stepId: string, files: FileList | null) {
-    if (savingRef.current || filePickerGeneration.current !== draftGeneration.current) return
-    filePickerGeneration.current = null
-    if (!files || files.length === 0) return
-    setSaving(true)
+    if (savingRef.current || filePickerGeneration.current !== draftGeneration.current) {
+      return;
+    }
+    filePickerGeneration.current = null;
+    if (!files || files.length === 0) {
+      return;
+    }
+    setSaving(true);
     try {
-      const selected = Array.from(files).map((file) => ({ file, ref: createAttachmentDraft(file) }))
+      const selected = Array.from(files).map((file) => ({ file, ref: createAttachmentDraft(file) }));
       const next = selected.map(({ file, ref }) => {
-        pendingAttachments.current.set(ref.id, file)
-        return ref
-      })
+        pendingAttachments.current.set(ref.id, file);
+        return ref;
+      });
       setItems((prev) => prev.map((item) => (
         item.id === stepId ? { ...item, attachments: [...item.attachments, ...next] } : item
-      )))
-      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` })
+      )));
+      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` });
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to add attachment' })
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to add attachment' });
     } finally {
-      setSaving(false)
-      setPendingAttachmentStepId(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      setSaving(false);
+      setPendingAttachmentStepId(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   }
 
   function removeItem(index: number) {
-    if (savingRef.current) return
-    for (const attachment of items[index].attachments) pendingAttachments.current.delete(attachment.id)
-    setItems((prev) => prev.filter((_, i) => i !== index))
+    if (savingRef.current) {
+      return;
+    }
+    for (const attachment of items[index].attachments) {
+      pendingAttachments.current.delete(attachment.id);
+    }
+    setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
   function moveUp(index: number) {
-    if (savingRef.current) return
-    if (index <= 0) return
+    if (savingRef.current) {
+      return;
+    }
+    if (index <= 0) {
+      return;
+    }
     setItems((prev) => {
-      const next = prev.slice()
-      const t = next[index - 1]
-      next[index - 1] = next[index]
-      next[index] = t
-      return next
-    })
+      const next = prev.slice();
+      const t = next[index - 1];
+      next[index - 1] = next[index];
+      next[index] = t;
+      return next;
+    });
   }
 
   function moveDown(index: number) {
-    if (savingRef.current) return
-    if (index >= items.length - 1) return
+    if (savingRef.current) {
+      return;
+    }
+    if (index >= items.length - 1) {
+      return;
+    }
     setItems((prev) => {
-      const next = prev.slice()
-      const t = next[index + 1]
-      next[index + 1] = next[index]
-      next[index] = t
-      return next
-    })
+      const next = prev.slice();
+      const t = next[index + 1];
+      next[index + 1] = next[index];
+      next[index] = t;
+      return next;
+    });
   }
 
-  const allFilled = items.length > 0 && items.every((it) => it.content.trim().length > 0)
-  const canSave = allFilled && title.trim().length > 0 && !saving
+  const allFilled = items.length > 0 && items.every((it) => it.content.trim().length > 0);
+  const canSave = allFilled && title.trim().length > 0 && !saving;
 
   async function handleSaveChain() {
-    if (!canSave || savingRef.current) return
-    const generation = draftGeneration.current
-    savingRef.current = true
-    setSaving(true)
+    if (!canSave || savingRef.current) {
+      return;
+    }
+    const generation = draftGeneration.current;
+    savingRef.current = true;
+    setSaving(true);
     try {
-      const now = Date.now()
+      const now = Date.now();
       await saveChain({
         ...initialChain,
         id: initialChain?.id || '',
@@ -204,38 +236,50 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
         steps: items.map((it) => ({ content: it.content, attachments: it.attachments })),
         createdAt: initialChain?.createdAt ?? now,
         updatedAt: now,
-      }, new Map(pendingAttachments.current))
-      if (draftGeneration.current !== generation) return
-      pendingAttachments.current.clear()
-      showToast({ variant: 'success', message: initialChain ? 'Chain updated' : 'Chain saved to library' })
-      try {
-        await onSaved?.()
-      } catch {
-        if (draftGeneration.current === generation) showToast({ variant: 'info', message: 'Chain saved, but the library could not refresh. Reopen the popup to refresh it.' })
+      }, new Map(pendingAttachments.current));
+      if (draftGeneration.current !== generation) {
+        return;
       }
-      if (draftGeneration.current !== generation) return
-      savingRef.current = false
-      setTitle('')
-      handleClose()
+      pendingAttachments.current.clear();
+      showToast({ variant: 'success', message: initialChain ? 'Chain updated' : 'Chain saved to library' });
+      try {
+        await onSaved?.();
+      } catch {
+        if (draftGeneration.current === generation) {
+          showToast({ variant: 'info', message: 'Chain saved, but the library could not refresh. Reopen the popup to refresh it.' });
+        }
+      }
+      if (draftGeneration.current !== generation) {
+        return;
+      }
+      savingRef.current = false;
+      setTitle('');
+      handleClose();
     } catch (err) {
-      if (draftGeneration.current !== generation) return
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to save chain' })
+      if (draftGeneration.current !== generation) {
+        return;
+      }
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to save chain' });
     } finally {
       if (draftGeneration.current === generation) {
-        savingRef.current = false
-        setSaving(false)
+        savingRef.current = false;
+        setSaving(false);
       }
     }
   }
 
-  if (!open) return null
+  if (!open) {
+    return null;
+  }
 
   return (
     <div
       className="modal-backdrop"
       aria-hidden={!open}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleClose()
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
       }}
     >
       <div
@@ -252,8 +296,10 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
             multiple
             className="hidden"
             onChange={(e) => {
-              if (!pendingAttachmentStepId) return
-              void addAttachmentsToStep(pendingAttachmentStepId, e.target.files)
+              if (!pendingAttachmentStepId) {
+                return;
+              }
+              void addAttachmentsToStep(pendingAttachmentStepId, e.target.files);
             }}
           />
           <div className="modal-header">
@@ -277,7 +323,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                 ) : (
                   <ol className="divide-y divide-[#d9dfe1]">
                     {items.map((it, idx) => {
-                      const isEditing = it.content.trim().length === 0 || editingId === it.id
+                      const isEditing = it.content.trim().length === 0 || editingId === it.id;
                       return (
                         <li key={it.id} className="px-3 py-3">
                           <div className="flex items-start gap-2">
@@ -289,9 +335,15 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                                   placeholder={`Step ${idx + 1} prompt`}
                                   aria-label={`Step ${idx + 1} prompt`}
                                   onChange={(e) => updateItem(it.id, e.target.value)}
-                                  onFocus={() => { if (!savingRef.current) setEditingId(it.id) }}
+                                  onFocus={() => {
+                                    if (!savingRef.current) {
+                                      setEditingId(it.id);
+                                    }
+                                  }}
                                   onBlur={() => {
-                                    if (!savingRef.current && editingId === it.id) setEditingId(null)
+                                    if (!savingRef.current && editingId === it.id) {
+                                      setEditingId(null);
+                                    }
                                   }}
                                   className="form-input min-h-[72px] w-full resize-none rounded-[4px] px-3 py-2 text-sm"
                                 />
@@ -299,7 +351,11 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                                 <button
                                   type="button"
                                   className="w-full rounded-[3px] px-1 py-1 text-left hover:bg-[#edf2f3]"
-                                  onClick={() => { if (!savingRef.current) setEditingId(it.id) }}
+                                  onClick={() => {
+                                    if (!savingRef.current) {
+                                      setEditingId(it.id);
+                                    }
+                                  }}
                                   title={it.content}
                                 >
                                   <div className="truncate text-sm text-[#1c272c]">{it.content}</div>
@@ -310,10 +366,12 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                               <button
                                 className="icon-button h-7 w-7"
                                 onClick={() => {
-                                  if (savingRef.current) return
-                                  filePickerGeneration.current = draftGeneration.current
-                                  setPendingAttachmentStepId(it.id)
-                                  fileInputRef.current?.click()
+                                  if (savingRef.current) {
+                                    return;
+                                  }
+                                  filePickerGeneration.current = draftGeneration.current;
+                                  setPendingAttachmentStepId(it.id);
+                                  fileInputRef.current?.click();
                                 }}
                                 aria-label="Add attachment"
                               >
@@ -362,7 +420,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                             </div>
                           ) : null}
                         </li>
-                      )
+                      );
                     })}
                   </ol>
                 )}
@@ -385,7 +443,11 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                 value={title}
                 placeholder="Chain title"
                 aria-label="Chain title"
-                onChange={(e) => { if (!savingRef.current) setTitle(e.target.value) }}
+                onChange={(e) => {
+                  if (!savingRef.current) {
+                    setTitle(e.target.value);
+                  }
+                }}
                 className="form-input w-full rounded-[4px] px-3 py-2.5 text-xs"
               />
               <div className="flex items-center justify-end gap-2">
@@ -405,5 +467,5 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
         </fieldset>
       </div>
     </div>
-  )
+  );
 }

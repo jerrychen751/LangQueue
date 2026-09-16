@@ -1,94 +1,109 @@
-import { useEffect, useRef, useState } from 'react'
-import { FileText, FolderOpen, Plus } from 'lucide-react'
-import Logo from '../components/Logo'
-import PromptModal from '../components/PromptModal'
-import { useToast } from '../components/useToast'
-import { importPromptDrafts } from '../library/storage'
-import { findSkillSupportPaths, isPromptFilePath, parsePromptFile, type ParsedPromptFile } from '../library/promptFiles'
+import { useEffect, useRef, useState } from 'react';
+import { FileText, FolderOpen, Plus } from 'lucide-react';
+import Logo from '../components/Logo';
+import PromptModal from '../components/PromptModal';
+import { useToast } from '../components/useToast';
+import { importPromptDrafts } from '../library/storage';
+import { findSkillSupportPaths, isPromptFilePath, parsePromptFile, type ParsedPromptFile } from '../library/promptFiles';
 
 export default function Onboarding() {
-  const [importOnly, setImportOnly] = useState(() => window.location.hash === '#import')
-  const isMac = navigator.platform.includes('Mac')
-  const folderInputRef = useRef<HTMLInputElement | null>(null)
-  const filesInputRef = useRef<HTMLInputElement | null>(null)
-  const [candidates, setCandidates] = useState<ParsedPromptFile[]>([])
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [ignored, setIgnored] = useState({ support: 0, unsupported: 0, empty: 0 })
-  const [reading, setReading] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [summary, setSummary] = useState<{ imported: number; skipped: number } | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [createdTitle, setCreatedTitle] = useState<string | null>(null)
-  const { showToast } = useToast()
+  const [importOnly, setImportOnly] = useState(() => window.location.hash === '#import');
+  const isMac = navigator.platform.includes('Mac');
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const filesInputRef = useRef<HTMLInputElement | null>(null);
+  const [candidates, setCandidates] = useState<ParsedPromptFile[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [ignored, setIgnored] = useState({ support: 0, unsupported: 0, empty: 0 });
+  const [reading, setReading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [summary, setSummary] = useState<{ imported: number; skipped: number } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [createdTitle, setCreatedTitle] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    folderInputRef.current?.setAttribute('webkitdirectory', '')
-    const syncHash = () => setImportOnly(window.location.hash === '#import')
-    window.addEventListener('hashchange', syncHash)
-    return () => window.removeEventListener('hashchange', syncHash)
-  }, [])
+    folderInputRef.current?.setAttribute('webkitdirectory', '');
+    const syncHash = () => setImportOnly(window.location.hash === '#import');
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, []);
 
   async function handleFilesPicked(list: FileList | null) {
-    if (!list || list.length === 0) return
-    setReading(true)
-    setSummary(null)
-    const files = Array.from(list)
-    const support = findSkillSupportPaths(files.map((file) => file.webkitRelativePath || file.name))
-    const parsed: ParsedPromptFile[] = []
-    let unsupported = 0
-    let empty = 0
+    if (!list || list.length === 0) {
+      return;
+    }
+    setReading(true);
+    setSummary(null);
+    const files = Array.from(list);
+    const support = findSkillSupportPaths(files.map((file) => file.webkitRelativePath || file.name));
+    const parsed: ParsedPromptFile[] = [];
+    let unsupported = 0;
+    let empty = 0;
     try {
       for (const file of files) {
-        const path = file.webkitRelativePath || file.name
-        if (support.has(path)) continue
+        const path = file.webkitRelativePath || file.name;
+        if (support.has(path)) {
+          continue;
+        }
         if (!isPromptFilePath(path) || file.size > 1024 * 1024) {
-          unsupported += 1
-          continue
+          unsupported += 1;
+          continue;
         }
-        const candidate = parsePromptFile(path, await file.text())
+        const candidate = parsePromptFile(path, await file.text());
         if (!candidate) {
-          empty += 1
-          continue
+          empty += 1;
+          continue;
         }
-        parsed.push(candidate)
+        parsed.push(candidate);
       }
     } catch (error) {
-      showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Files could not be read' })
+      showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Files could not be read' });
     } finally {
-      if (folderInputRef.current) folderInputRef.current.value = ''
-      if (filesInputRef.current) filesInputRef.current.value = ''
-      setReading(false)
+      if (folderInputRef.current) {
+        folderInputRef.current.value = '';
+      }
+      if (filesInputRef.current) {
+        filesInputRef.current.value = '';
+      }
+      setReading(false);
     }
-    parsed.sort((a, b) => a.path.localeCompare(b.path))
-    setCandidates(parsed)
-    setSelected(new Set(parsed.filter((candidate) => candidate.suggested).map((candidate) => candidate.path)))
-    setIgnored({ support: support.size, unsupported, empty })
-    if (parsed.length === 0) showToast({ variant: 'info', message: 'No Markdown or text prompt files in that selection' })
+    parsed.sort((a, b) => a.path.localeCompare(b.path));
+    setCandidates(parsed);
+    setSelected(new Set(parsed.filter((candidate) => candidate.suggested).map((candidate) => candidate.path)));
+    setIgnored({ support: support.size, unsupported, empty });
+    if (parsed.length === 0) {
+      showToast({ variant: 'info', message: 'No Markdown or text prompt files in that selection' });
+    }
   }
 
   function toggle(path: string) {
     setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
   }
 
   async function handleImport() {
-    const drafts = candidates.filter((candidate) => selected.has(candidate.path))
-    if (drafts.length === 0 || importing) return
-    setImporting(true)
+    const drafts = candidates.filter((candidate) => selected.has(candidate.path));
+    if (drafts.length === 0 || importing) {
+      return;
+    }
+    setImporting(true);
     try {
-      const result = await importPromptDrafts(drafts)
-      setSummary(result)
-      setCandidates([])
-      setSelected(new Set())
-      chrome.runtime.sendMessage({ type: 'PROMPTS_IMPORTED' }).catch(() => {})
+      const result = await importPromptDrafts(drafts);
+      setSummary(result);
+      setCandidates([]);
+      setSelected(new Set());
+      chrome.runtime.sendMessage({ type: 'PROMPTS_IMPORTED' }).catch(() => {});
     } catch (error) {
-      showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Import failed' })
+      showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Import failed' });
     } finally {
-      setImporting(false)
+      setImporting(false);
     }
   }
 
@@ -96,8 +111,8 @@ export default function Onboarding() {
     ignored.support > 0 ? `${ignored.support} skill support file${ignored.support === 1 ? '' : 's'}` : '',
     ignored.unsupported > 0 ? `${ignored.unsupported} hidden or unsupported file${ignored.unsupported === 1 ? '' : 's'}` : '',
     ignored.empty > 0 ? `${ignored.empty} without prompt text` : '',
-  ].filter(Boolean)
-  const selectedCount = selected.size
+  ].filter(Boolean);
+  const selectedCount = selected.size;
 
   return (
     <div className="onboarding-page">
@@ -193,7 +208,7 @@ export default function Onboarding() {
             <button className="primary-button" onClick={handleImport} disabled={selectedCount === 0 || importing}>
               {importing ? 'Importing…' : `Import ${selectedCount} prompt${selectedCount === 1 ? '' : 's'}`}
             </button>
-            <button className="secondary-button" onClick={() => { setCandidates([]); setSelected(new Set()) }} disabled={importing}>
+            <button className="secondary-button" onClick={() => { setCandidates([]); setSelected(new Set()); }} disabled={importing}>
               Cancel
             </button>
             <span className="review-hint">A file whose title already exists in the library is skipped.</span>
@@ -222,10 +237,10 @@ export default function Onboarding() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSaved={(saved) => {
-          setCreatedTitle(saved.title)
-          setModalOpen(false)
+          setCreatedTitle(saved.title);
+          setModalOpen(false);
         }}
       />
     </div>
-  )
+  );
 }

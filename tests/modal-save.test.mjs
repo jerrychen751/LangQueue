@@ -23,7 +23,9 @@ function createModal(name) {
     useRef(value) { const index = cursor++; hooks[index] ??= { current: value }; return hooks[index]; },
     useState(value) {
       const index = cursor++;
-      if (!(index in hooks)) hooks[index] = typeof value === 'function' ? value() : value;
+      if (!(index in hooks)) {
+        hooks[index] = typeof value === 'function' ? value() : value;
+      }
       return [hooks[index], (next) => { hooks[index] = typeof next === 'function' ? next(hooks[index]) : next; }];
     },
     useEffect(callback, deps) {
@@ -43,12 +45,24 @@ function createModal(name) {
     navigator: { platform: 'Mac' }, document: { activeElement: null },
     window: { setTimeout: () => 0, clearTimeout() {}, addEventListener: (name, handler) => handlers.set(name, handler), removeEventListener: (name) => handlers.delete(name) },
     require(path) {
-      if (path === 'react') return react;
-      if (path === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
-      if (path === 'lucide-react') return {};
-      if (path === '../library/storage') return { savePrompt: save, updatePrompt: save, saveChain: save };
-      if (path === './useToast') return { useToast: () => ({ showToast() {} }) };
-      if (path === '../library/attachments') return { createAttachmentDraft(file) { return { id: 'picked-file', name: file.name, size: file.size, mimeType: file.type }; } };
+      if (path === 'react') {
+        return react;
+      }
+      if (path === 'react/jsx-runtime') {
+        return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
+      }
+      if (path === 'lucide-react') {
+        return {};
+      }
+      if (path === '../library/storage') {
+        return { savePrompt: save, updatePrompt: save, saveChain: save };
+      }
+      if (path === './useToast') {
+        return { useToast: () => ({ showToast() {} }) };
+      }
+      if (path === '../library/attachments') {
+        return { createAttachmentDraft(file) { return { id: 'picked-file', name: file.name, size: file.size, mimeType: file.type }; } };
+      }
       throw new Error(path);
     },
   });
@@ -57,15 +71,23 @@ function createModal(name) {
     props = next;
     cursor = 0;
     const tree = exports.default(props);
-    while (effects.length) effects.shift()();
+    while (effects.length) {
+      effects.shift()();
+    }
     return tree;
   }
   function find(tree, predicate) {
-    if (!tree || typeof tree !== 'object') return null;
-    if (predicate(tree)) return tree;
+    if (!tree || typeof tree !== 'object') {
+      return null;
+    }
+    if (predicate(tree)) {
+      return tree;
+    }
     for (const child of [tree.props?.children].flat(Infinity)) {
       const found = find(child, predicate);
-      if (found) return found;
+      if (found) {
+        return found;
+      }
     }
     return null;
   }

@@ -1,144 +1,160 @@
-import { useEffect, useRef, useState } from 'react'
-import { X, Loader2, Paperclip, Trash2 } from 'lucide-react'
-import type { AttachmentRef, Prompt } from '../library/model'
-import { savePrompt, updatePrompt } from '../library/storage'
-import { useToast } from './useToast'
-import { createAttachmentDraft } from '../library/attachments'
+import { useEffect, useRef, useState } from 'react';
+import { X, Loader2, Paperclip, Trash2 } from 'lucide-react';
+import type { AttachmentRef, Prompt } from '../library/model';
+import { savePrompt, updatePrompt } from '../library/storage';
+import { useToast } from './useToast';
+import { createAttachmentDraft } from '../library/attachments';
 
 type PromptModalProps = {
-  open: boolean
-  initialPrompt?: Prompt
-  onClose: () => void
-  onSaved?: (saved: Prompt) => void
-}
+  open: boolean;
+  initialPrompt?: Prompt;
+  onClose: () => void;
+  onSaved?: (saved: Prompt) => void;
+};
 
 function generateClientId(): string {
-  return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
 export default function PromptModal({ open, initialPrompt, onClose, onSaved }: PromptModalProps) {
-  const isEditing = Boolean(initialPrompt)
-  const titleRef = useRef<HTMLInputElement | null>(null)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const lastActiveRef = useRef<HTMLElement | null>(null)
-  const contentRef = useRef<HTMLTextAreaElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const pendingAttachments = useRef(new Map<string, File>())
-  const savingRef = useRef(false)
-  const draftGeneration = useRef(0)
-  const filePickerGeneration = useRef<number | null>(null)
-  const handleSaveRef = useRef<() => Promise<void>>(async () => {})
-  const { showToast } = useToast()
+  const isEditing = Boolean(initialPrompt);
+  const titleRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const lastActiveRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingAttachments = useRef(new Map<string, File>());
+  const savingRef = useRef(false);
+  const draftGeneration = useRef(0);
+  const filePickerGeneration = useRef<number | null>(null);
+  const handleSaveRef = useRef<() => Promise<void>>(async () => {});
+  const { showToast } = useToast();
 
-  const [title, setTitle] = useState(initialPrompt?.title ?? '')
-  const [content, setContent] = useState(initialPrompt?.content ?? '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [attachments, setAttachments] = useState<AttachmentRef[]>(initialPrompt?.attachments ?? [])
+  const [title, setTitle] = useState(initialPrompt?.title ?? '');
+  const [content, setContent] = useState(initialPrompt?.content ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentRef[]>(initialPrompt?.attachments ?? []);
 
   useEffect(() => {
-    draftGeneration.current += 1
-    filePickerGeneration.current = null
-    savingRef.current = false
-    setSaving(false)
-    const drafts = pendingAttachments.current
-    drafts.clear()
-    if (!open) return
-    lastActiveRef.current = (document.activeElement as HTMLElement) ?? null
-    // Reset fields when opening for a different prompt
-    setTitle(initialPrompt?.title ?? '')
-    setContent(initialPrompt?.content ?? '')
-    setAttachments(initialPrompt?.attachments ?? [])
-    setError(null)
-    // Focus the title
-    setTimeout(() => titleRef.current?.focus(), 0)
-    return () => {
-      draftGeneration.current += 1
-      drafts.clear()
+    draftGeneration.current += 1;
+    filePickerGeneration.current = null;
+    savingRef.current = false;
+    setSaving(false);
+    const drafts = pendingAttachments.current;
+    drafts.clear();
+    if (!open) {
+      return;
     }
-  }, [open, initialPrompt])
+    lastActiveRef.current = (document.activeElement as HTMLElement) ?? null;
+    // Reset fields when opening for a different prompt
+    setTitle(initialPrompt?.title ?? '');
+    setContent(initialPrompt?.content ?? '');
+    setAttachments(initialPrompt?.attachments ?? []);
+    setError(null);
+    // Focus the title
+    setTimeout(() => titleRef.current?.focus(), 0);
+    return () => {
+      draftGeneration.current += 1;
+      drafts.clear();
+    };
+  }, [open, initialPrompt]);
 
   function close() {
-    if (savingRef.current) return
-    pendingAttachments.current.clear()
-    onClose()
+    if (savingRef.current) {
+      return;
+    }
+    pendingAttachments.current.clear();
+    onClose();
     // Restore focus
-    setTimeout(() => lastActiveRef.current?.focus(), 0)
+    setTimeout(() => lastActiveRef.current?.focus(), 0);
   }
 
   function handleFilesPicked(files: FileList | null) {
-    if (savingRef.current || filePickerGeneration.current !== draftGeneration.current) return
-    filePickerGeneration.current = null
-    if (!files || files.length === 0) return
-    setSaving(true)
+    if (savingRef.current || filePickerGeneration.current !== draftGeneration.current) {
+      return;
+    }
+    filePickerGeneration.current = null;
+    if (!files || files.length === 0) {
+      return;
+    }
+    setSaving(true);
     try {
-      const selected = Array.from(files).map((file) => ({ file, ref: createAttachmentDraft(file) }))
+      const selected = Array.from(files).map((file) => ({ file, ref: createAttachmentDraft(file) }));
       const next = selected.map(({ file, ref }) => {
-        pendingAttachments.current.set(ref.id, file)
-        return ref
-      })
-      setAttachments((prev) => [...prev, ...next])
-      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` })
+        pendingAttachments.current.set(ref.id, file);
+        return ref;
+      });
+      setAttachments((prev) => [...prev, ...next]);
+      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add attachment.')
+      setError(err instanceof Error ? err.message : 'Failed to add attachment.');
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      setSaving(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setSaving(false);
     }
   }
 
   function removeAttachment(id: string) {
-    if (savingRef.current) return
-    pendingAttachments.current.delete(id)
-    setAttachments((prev) => prev.filter((item) => item.id !== id))
+    if (savingRef.current) {
+      return;
+    }
+    pendingAttachments.current.delete(id);
+    setAttachments((prev) => prev.filter((item) => item.id !== id));
   }
 
   async function handleSave() {
-    if (savingRef.current) return
+    if (savingRef.current) {
+      return;
+    }
     // Read latest values from DOM refs to avoid stale state when saving via hotkeys
-    const t = (titleRef.current?.value ?? title).trim()
-    const rawContent = contentRef.current?.value ?? content
-    const trimmedContent = rawContent.trim()
+    const t = (titleRef.current?.value ?? title).trim();
+    const rawContent = contentRef.current?.value ?? content;
+    const trimmedContent = rawContent.trim();
     if (!t) {
-      setError('Title is required.')
-      titleRef.current?.focus()
-      return
+      setError('Title is required.');
+      titleRef.current?.focus();
+      return;
     }
     if (t.length < 3) {
-      setError('Title must be at least 3 characters.')
-      titleRef.current?.focus()
-      return
+      setError('Title must be at least 3 characters.');
+      titleRef.current?.focus();
+      return;
     }
     if (!trimmedContent && attachments.length === 0) {
-      setError('Add prompt content or at least one attachment.')
-      contentRef.current?.focus()
-      return
+      setError('Add prompt content or at least one attachment.');
+      contentRef.current?.focus();
+      return;
     }
-    const generation = draftGeneration.current
-    savingRef.current = true
-    setSaving(true)
-    setError(null)
+    const generation = draftGeneration.current;
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
     try {
       if (isEditing && initialPrompt) {
         await updatePrompt(initialPrompt.id, {
           title: t,
           content: rawContent,
           attachments,
-        }, new Map(pendingAttachments.current))
-        if (draftGeneration.current !== generation) return
-        pendingAttachments.current.clear()
+        }, new Map(pendingAttachments.current));
+        if (draftGeneration.current !== generation) {
+          return;
+        }
+        pendingAttachments.current.clear();
         const saved: Prompt = {
           ...initialPrompt,
           title: t,
           content: rawContent,
           attachments,
           updatedAt: Date.now(),
-        }
-        onSaved?.(saved)
-        savingRef.current = false
-        close()
+        };
+        onSaved?.(saved);
+        savingRef.current = false;
+        close();
       } else {
-        const now = Date.now()
+        const now = Date.now();
         const newPrompt: Prompt = {
           id: generateClientId(),
           title: t,
@@ -147,73 +163,83 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
           usageCount: 0,
           createdAt: now,
           updatedAt: now,
+        };
+        await savePrompt(newPrompt, new Map(pendingAttachments.current));
+        if (draftGeneration.current !== generation) {
+          return;
         }
-        await savePrompt(newPrompt, new Map(pendingAttachments.current))
-        if (draftGeneration.current !== generation) return
-        pendingAttachments.current.clear()
-        onSaved?.(newPrompt)
-        showToast({ variant: 'success', message: 'Prompt saved' })
-        savingRef.current = false
-        close()
+        pendingAttachments.current.clear();
+        onSaved?.(newPrompt);
+        showToast({ variant: 'success', message: 'Prompt saved' });
+        savingRef.current = false;
+        close();
       }
     } catch (err: unknown) {
-      if (draftGeneration.current !== generation) return
-      const message = err instanceof Error ? err.message : 'Failed to save prompt.'
-      setError(message)
+      if (draftGeneration.current !== generation) {
+        return;
+      }
+      const message = err instanceof Error ? err.message : 'Failed to save prompt.';
+      setError(message);
     } finally {
       if (draftGeneration.current === generation) {
-        savingRef.current = false
-        setSaving(false)
+        savingRef.current = false;
+        setSaving(false);
       }
     }
   }
 
-  handleSaveRef.current = handleSave
+  handleSaveRef.current = handleSave;
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      return;
+    }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        e.stopPropagation()
-        if (savingRef.current) return
-        pendingAttachments.current.clear()
-        onClose()
+        e.stopPropagation();
+        if (savingRef.current) {
+          return;
+        }
+        pendingAttachments.current.clear();
+        onClose();
       }
       // Global save shortcut: Cmd/Ctrl + Shift + Enter
       if ((e.key === 'Enter' || e.key === 'NumpadEnter') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        e.stopPropagation()
+        e.preventDefault();
+        e.stopPropagation();
         // Trigger save regardless of focused field
         if (!savingRef.current) {
           // Call asynchronously to avoid re-entrancy in key handler
-          Promise.resolve().then(() => handleSaveRef.current())
+          Promise.resolve().then(() => handleSaveRef.current());
         }
       }
       if (e.key === 'Tab' && dialogRef.current) {
         // Simple focus trap
         const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )).filter((element) => !element.matches(':disabled'))
+        )).filter((element) => !element.matches(':disabled'));
         if (focusable.length === 0) {
-          e.preventDefault()
-          return
+          e.preventDefault();
+          return;
         }
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
+          e.preventDefault();
+          last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
+          e.preventDefault();
+          first.focus();
         }
       }
     }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, onClose])
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [open, onClose]);
 
-  if (!open) return null
+  if (!open) {
+    return null;
+  }
 
   return (
     <div
@@ -221,7 +247,9 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
       aria-hidden={!open}
       onMouseDown={(e) => {
         // Close when clicking the backdrop (overlay) area only
-        if (e.target === e.currentTarget) close()
+        if (e.target === e.currentTarget) {
+          close();
+        }
       }}
     >
       <div
@@ -257,7 +285,11 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
                 id="prompt-title"
                 ref={titleRef}
                 value={title}
-                onChange={(e) => { if (!savingRef.current) setTitle(e.target.value) }}
+                onChange={(e) => {
+                  if (!savingRef.current) {
+                    setTitle(e.target.value);
+                  }
+                }}
                 className="form-input w-full rounded-[4px] px-3 py-2.5 text-sm"
                 placeholder="Enter a clear, descriptive title"
               />
@@ -269,7 +301,11 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
                 id="prompt-content"
                 ref={contentRef}
                 value={content}
-                onChange={(e) => { if (!savingRef.current) setContent(e.target.value) }}
+                onChange={(e) => {
+                  if (!savingRef.current) {
+                    setContent(e.target.value);
+                  }
+                }}
                 className="form-input min-h-[120px] w-full resize-none rounded-[4px] px-3 py-2.5 text-sm leading-6"
                 rows={4}
                 placeholder="Write the prompt that you want to reuse."
@@ -283,7 +319,7 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
                 multiple
                 className="hidden"
                 onChange={(e) => {
-                  void handleFilesPicked(e.target.files)
+                  void handleFilesPicked(e.target.files);
                 }}
               />
               <div className="mb-2 flex items-center justify-between">
@@ -292,9 +328,11 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
                   type="button"
                   className="compact-button inline-flex items-center gap-1.5"
                   onClick={() => {
-                    if (savingRef.current) return
-                    filePickerGeneration.current = draftGeneration.current
-                    fileInputRef.current?.click()
+                    if (savingRef.current) {
+                      return;
+                    }
+                    filePickerGeneration.current = draftGeneration.current;
+                    fileInputRef.current?.click();
                   }}
                   disabled={saving}
                 >
@@ -347,5 +385,5 @@ export default function PromptModal({ open, initialPrompt, onClose, onSaved }: P
         </fieldset>
       </div>
     </div>
-  )
+  );
 }

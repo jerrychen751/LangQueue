@@ -1,14 +1,14 @@
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import Onboarding from './Onboarding'
-import { ToastProvider } from '../components/ToastProvider'
-import '../index.css'
-import './onboarding.css'
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import Onboarding from './Onboarding';
+import { ToastProvider } from '../components/ToastProvider';
+import '../index.css';
+import './onboarding.css';
 
 async function bootstrap() {
   if (import.meta.env.DEV && !globalThis.chrome?.runtime?.onMessage) {
-    const { installDevChromeMock } = await import('../popup/devChromeMock')
-    installDevChromeMock()
+    const { installDevChromeMock } = await import('../popup/devChromeMock');
+    installDevChromeMock();
   }
 
   createRoot(document.getElementById('root')!).render(
@@ -17,7 +17,7 @@ async function bootstrap() {
         <Onboarding />
       </ToastProvider>
     </React.StrictMode>
-  )
+  );
 }
 
-bootstrap()
+bootstrap();
