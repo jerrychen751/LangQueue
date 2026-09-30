@@ -33,7 +33,7 @@ function createFixture(path, dependencies = {}) {
     addEventListener(type, listener) { const list = this.listeners.get(type) || []; list.push(listener); this.listeners.set(type, list); }
     dispatch(type, values = {}) {
       for (const listener of this.listeners.get(type) || []) {
-        listener({ isTrusted: false, target: this, button: 0, preventDefault() {}, stopPropagation() {}, ...values });
+        listener({ isTrusted: false, target: this, button: 0, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {}, ...values });
       }
     }
     querySelector(selector) { return this.querySelectorAll(selector)[0] || new Element(selector); }
@@ -111,7 +111,7 @@ test('controller ignores synthetic library input and selection but keeps runtime
   let inserted = 0;
   const fixture = createFixture('src/content/controller.ts', {
     './prompt_editor/prompt_editor': { createPromptEditor: () => ({}) },
-    './shortcut_suggestions': { createShortcutSuggestions: () => ({ isOpen: () => true, selectCurrent() { selected++; } }) },
+    './shortcut_suggestions': { createShortcutSuggestions: () => ({ isOpen: () => true, getSelected: () => ({}), selectCurrent() { selected++; } }) },
     './execution/queue': { createQueue: () => ({}) },
     './execution/chain_executor': { createChainExecutor: () => ({}) },
     './execution/status_panel': { createQueuePanel: () => ({}) },
@@ -133,6 +133,37 @@ test('controller ignores synthetic library input and selection but keeps runtime
   await Promise.resolve();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(inserted, 1);
+});
+
+test('shortcut list keys stop at the list, and Enter with no match or a modifier stays with the editor', async () => {
+  let selected = 0;
+  let hidden = 0;
+  let suggestion = {};
+  const fixture = createFixture('src/content/controller.ts', {
+    './prompt_editor/prompt_editor': { createPromptEditor: () => ({}) },
+    './shortcut_suggestions': { createShortcutSuggestions: () => ({ isOpen: () => true, getSelected: () => suggestion, selectCurrent() { selected++; }, hide() { hidden++; } }) },
+    './execution/queue': { createQueue: () => ({}) },
+    './execution/chain_executor': { createChainExecutor: () => ({}) },
+    './execution/status_panel': { createQueuePanel: () => ({}) },
+    './execution/step_execution': { getConversationHref: () => 'https://chatgpt.com/c/one', createExecutionCoordinator: () => ({}) },
+    './library_requests': { getSettings: async () => ({}), searchPrompts: () => [] },
+    './page_tweaks': { applyTweaks() {} },
+    './composer/composer_text': { getInputText: element => element.value },
+    './composer/insert_prompt': { async insertComposerPrompt() { return { ok: true }; } },
+    '../messaging/requests': requests,
+  });
+  const input = new fixture.Element('textarea');
+  fixture.exports.initController({ getInputElement: () => input, isGenerating: () => false });
+  let stopped = 0;
+  const dispatchKeydown = values => fixture.document.dispatch('keydown', { key: 'Enter', target: input, isTrusted: true, stopImmediatePropagation() { stopped++; }, ...values });
+  dispatchKeydown({});
+  assert.deepEqual([selected, stopped], [1, 1]);
+  dispatchKeydown({ shiftKey: true });
+  dispatchKeydown({ isComposing: true });
+  assert.deepEqual([selected, stopped], [1, 1]);
+  suggestion = undefined;
+  dispatchKeydown({});
+  assert.deepEqual([selected, stopped, hidden], [1, 1, 1]);
 });
 
 test('prompt promptEditor allows file-only edits and resets attachment state for new prompts', async () => {

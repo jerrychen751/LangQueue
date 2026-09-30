@@ -244,26 +244,35 @@ export function initController(adapter: Adapter) {
     if (!event.isTrusted) {
       return;
     }
-    if (shortcutSuggestions.isOpen()) {
+    // IME candidate keys and modified keys stay with the editor
+    if (shortcutSuggestions.isOpen() && !event.isComposing && event.keyCode !== 229 && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      // Gemini still sends on Enter after preventDefault, so a key the list uses must not reach the page
       if (event.key === 'ArrowDown') {
         shortcutSuggestions.moveSelection(1);
         event.preventDefault();
+        event.stopImmediatePropagation();
         return;
       }
       if (event.key === 'ArrowUp') {
         shortcutSuggestions.moveSelection(-1);
         event.preventDefault();
+        event.stopImmediatePropagation();
         return;
       }
-      if (event.key === 'Tab' || event.key === 'Enter') {
+      if ((event.key === 'Tab' || event.key === 'Enter') && shortcutSuggestions.getSelected()) {
         shortcutSuggestions.selectCurrent();
         event.preventDefault();
+        event.stopImmediatePropagation();
         return;
       }
       if (event.key === 'Escape') {
         shortcutSuggestions.hide();
         event.preventDefault();
+        event.stopImmediatePropagation();
         return;
+      }
+      if (event.key === 'Enter') {
+        shortcutSuggestions.hide();
       }
     }
 
