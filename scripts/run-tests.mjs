@@ -1,12 +1,15 @@
 import { build } from 'vite';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const directory = await mkdtemp(join(tmpdir(), 'langqueue-tests-'));
+// Bundles stay inside the repository so their external imports, such as playwright-core, resolve from node_modules
+await mkdir(join('node_modules', '.tmp'), { recursive: true });
+const directory = await mkdtemp(resolve('node_modules', '.tmp', 'langqueue-tests-'));
 try {
-  const files = (await readdir('tests')).filter((file) => file.endsWith('.test.mjs'));
+  // `npm test -- site-replay` runs only the test files whose names contain an argument
+  const filters = process.argv.slice(2);
+  const files = (await readdir('tests')).filter((file) => file.endsWith('.test.mjs') && (!filters.length || filters.some((filter) => file.includes(filter))));
   await build({
     configFile: false,
     logLevel: 'error',
