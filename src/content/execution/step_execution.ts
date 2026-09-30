@@ -48,7 +48,8 @@ export function isConversationReady(href = getConversationHref()) {
     return /^\/chat\/[^/]+\/?$/.test(pathname);
   }
   if (/(^|\.)gemini\.google\.com$/.test(hostname)) {
-    return /^\/app\/[^/]+\/?$/.test(pathname);
+    // Signed-in secondary accounts add /u/<n>, and Gem chats live at /gem/<gem>/<id>
+    return /^\/(?:u\/\d+\/)?(?:app|gem\/[^/]+)\/[^/]+\/?$/.test(pathname);
   }
   return false;
 }

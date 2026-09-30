@@ -439,6 +439,9 @@ for (const href of [
   'https://claude.ai/project/example-project',
   'https://gemini.google.com/',
   'https://gemini.google.com/app',
+  'https://gemini.google.com/u/1/app',
+  'https://gemini.google.com/gem/brainstormer',
+  'https://gemini.google.com/gems/view',
 ]) {
   test(`fresh chat refuses queue and chain without changing its draft: ${href}`, async () => {
     const previousLocation = globalThis.location;
@@ -469,6 +472,8 @@ for (const href of [
   'https://chatgpt.com/g/example-gpt/c/existing-conversation',
   'https://claude.ai/chat/existing-conversation',
   'https://gemini.google.com/app/existing-conversation',
+  'https://gemini.google.com/u/1/app/existing-conversation',
+  'https://gemini.google.com/gem/brainstormer/existing-conversation',
 ]) {
   test(`established conversation still starts execution: ${href}`, async () => {
     const previousLocation = globalThis.location;
