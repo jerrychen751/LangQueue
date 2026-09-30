@@ -64,3 +64,8 @@ test('missing responses and rejected transports never look like empty data', asy
   await assert.rejects(fixture.api.getSettings(), /Disconnected/);
   await assert.rejects(fixture.api.logUsage('prompt', 'chatgpt'), /Disconnected/);
 });
+
+test('an orphaned page script after an extension update asks for a page reload', async () => {
+  const requests = loadModule('src/messaging/requests.ts', { chrome: { runtime: { sendMessage: async () => { throw new Error('Extension context invalidated.'); } } } });
+  await assert.rejects(requests.callBackground('GET_SETTINGS', undefined), /Reload this page/);
+});

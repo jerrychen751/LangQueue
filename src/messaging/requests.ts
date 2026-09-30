@@ -28,7 +28,17 @@ function readResponse<Result>(response: RequestResponse<Result> | undefined): Re
 }
 
 export async function callBackground<K extends keyof BackgroundRequests>(type: K, payload: BackgroundRequests[K]['payload']): Promise<BackgroundRequests[K]['result']> {
-  return readResponse<BackgroundRequests[K]['result']>(await chrome.runtime.sendMessage({ type, payload }));
+  let response: RequestResponse<BackgroundRequests[K]['result']> | undefined;
+  try {
+    response = await chrome.runtime.sendMessage({ type, payload });
+  } catch (error) {
+    // An extension update orphans the script already in this page, and only a page reload loads the new one
+    if (error instanceof Error && error.message.includes('Extension context invalidated')) {
+      throw new Error('LangQueue was updated. Reload this page to keep using it.');
+    }
+    throw error;
+  }
+  return readResponse<BackgroundRequests[K]['result']>(response);
 }
 
 export async function sendToTab<K extends keyof TabRequests>(tabId: number, type: K, payload: TabRequests[K]['payload']): Promise<TabRequests[K]['result']> {
