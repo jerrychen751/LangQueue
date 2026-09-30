@@ -51,16 +51,7 @@ class GeminiAdapter extends Adapter {
       return true;
     }
 
-    // Response footer without .complete means still generating
-    if (document.querySelector('.response-footer:not(.complete)')) {
-      return true;
-    }
-
-    // Animated footer on the actively streaming response
-    if (document.querySelector('.response-footer.animated')) {
-      return true;
-    }
-
+    // Finished responses keep `.response-footer.animated` without `.complete`, so footer classes cannot signal generation
     return false;
   }
 

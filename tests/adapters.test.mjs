@@ -230,3 +230,14 @@ test('ChatGPT sends through the current Send button and detects its Stop state',
   assert.equal(adapter.isGenerating(), true);
   assert.equal(adapter.clickSend(input), false);
 });
+
+test('Gemini treats a finished response footer as idle', () => {
+  const { body, form } = createFixture();
+  body.append(new FakeElement('div', { class: 'response-footer animated gap' }));
+  const button = new FakeButton({ 'aria-label': 'Send message' });
+  form.append(button);
+  const adapter = createGeminiAdapter();
+  assert.equal(adapter.isGenerating(), false);
+  button.attributes = { 'aria-label': 'Stop response', class: 'send-button stop' };
+  assert.equal(adapter.isGenerating(), true);
+});
