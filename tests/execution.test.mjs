@@ -62,15 +62,16 @@ test('waits for delayed generation before completing', async context => {
   let completed = false;
   const pending = runStep(adapter).then(() => { completed = true; });
   await Promise.resolve();
-  for (let elapsed = 1; elapsed <= 16; elapsed++) {
+  // Send waits one poll (2 ms) before clicking, so generation runs from 7 ms to 17 ms
+  for (let elapsed = 1; elapsed <= 18; elapsed++) {
     await new Promise(resolve => setImmediate(resolve));
     context.mock.timers.tick(1);
     await Promise.resolve();
     await Promise.resolve();
-    if (elapsed < 15) {
+    if (elapsed < 17) {
       assert.equal(completed, false);
     }
-    if (elapsed === 6) {
+    if (elapsed === 8) {
       assert.equal(adapter.generating, true);
     }
   }
@@ -154,7 +155,7 @@ test('queue exposes errors and allows retry after send was rejected', async () =
   adapter.clickSend = () => false;
   const queue = createQueue(adapter, () => adapter.input);
   queue.enqueue({ content: 'prompt' });
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await waitForQueue(queue, snapshot => snapshot.status === 'failed');
   assert.equal(queue.getSnapshot().error, 'SEND_FAILED');
   assert.equal(queue.getSnapshot().canRetry, true);
   queue.cancel();
@@ -165,7 +166,7 @@ test('queue prevents retry after a send throws with uncertain outcome', async ()
   adapter.clickSend = () => { throw new Error('Page disappeared'); };
   const queue = createQueue(adapter, () => adapter.input);
   queue.enqueue({ content: 'prompt' });
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await waitForQueue(queue, snapshot => snapshot.status === 'failed');
   assert.equal(queue.getSnapshot().items[0].sent, true);
   assert.equal(queue.getSnapshot().canRetry, false);
   queue.cancel();
@@ -199,10 +200,7 @@ test('queue response timeout keeps the sent item and stops later work', async co
   queue.enqueue({ content: 'first' });
   queue.enqueue({ content: 'second' });
   await new Promise(resolve => setImmediate(resolve));
-  context.mock.timers.tick(1800001);
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  await advanceTimers(context, 1800401);
   assert.equal(queue.getSnapshot().status, 'failed');
   assert.equal(queue.size(), 2);
   assert.equal(queue.getSnapshot().canRetry, false);
@@ -279,13 +277,7 @@ test('queue still waits after two minutes before sending or completing', async c
   adapter.generating = false;
   adapter.clickSend = () => { adapter.generating = true; adapter.sends++; return true; };
   await new Promise(resolve => setImmediate(resolve));
-  context.mock.timers.tick(200);
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise(resolve => setImmediate(resolve));
-  context.mock.timers.tick(120001);
-  await Promise.resolve();
-  await Promise.resolve();
+  await advanceTimers(context, 120401);
   assert.equal(queue.getSnapshot().status, 'awaiting_response');
   queue.cancel();
   await Promise.resolve();
@@ -405,7 +397,7 @@ test('chain preserves drafts entered between steps', async context => {
   const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
   await Promise.resolve();
   await new Promise(resolve => setImmediate(resolve));
-  context.mock.timers.tick(1500);
+  await advanceTimers(context, 2500);
   assert.equal(await pending, false);
   assert.equal(adapter.input.value, 'my new draft');
   assert.equal(adapter.sends, 1);
@@ -430,7 +422,7 @@ test('chain stops on navigation during its inter-step delay', async context => {
     const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
     await Promise.resolve();
     await new Promise(resolve => setImmediate(resolve));
-    context.mock.timers.tick(1500);
+    await advanceTimers(context, 2500);
     assert.equal(await pending, false);
     assert.equal(adapter.sends, 1);
     assert.match(chain.getSnapshot().error, /CONVERSATION_CHANGED/);
@@ -509,7 +501,7 @@ test('a fresh-chat rejection recovers when new work is queued in an established 
     globalThis.location.href = 'https://chatgpt.com/c/established';
     queue.stopForNavigation();
     assert.equal(queue.enqueue({ content: 'new prompt' }), true);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await waitForQueue(queue, snapshot => !snapshot.items.length);
     assert.equal(adapter.sends, 1);
     assert.equal(queue.getSnapshot().status, 'idle');
     assert.equal(queue.getSnapshot().error, null);
@@ -524,7 +516,7 @@ test('adding new work does not reset an existing failed queue item', async () =>
   adapter.clickSend = () => { adapter.sends++; return false; };
   const queue = createQueue(adapter, () => adapter.input);
   queue.enqueue({ content: 'failed prompt' });
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await waitForQueue(queue, snapshot => snapshot.status === 'failed');
   assert.equal(queue.getSnapshot().status, 'failed');
   queue.enqueue({ content: 'next prompt' });
   assert.equal(queue.getSnapshot().status, 'failed');
@@ -540,8 +532,7 @@ test('readiness timeout leaves the queue retryable and retry sends prepared text
   adapter.getSendButton = () => null;
   const queue = createQueue(adapter, () => adapter.input);
   queue.enqueue({ content: 'prepared prompt' });
-  context.mock.timers.tick(5000);
-  await new Promise(resolve => setImmediate(resolve));
+  await advanceTimers(context, 5400);
   assert.equal(queue.getSnapshot().error, 'SEND_FAILED');
   assert.equal(queue.getSnapshot().canRetry, true);
   assert.equal(adapter.sends, 0);
@@ -557,7 +548,7 @@ test('readiness timeout leaves the queue retryable and retry sends prepared text
     return true;
   };
   queue.retry();
-  await new Promise(resolve => setImmediate(resolve));
+  await advanceTimers(context, 1000);
   assert.equal(adapter.sends, 1);
   assert.equal(queue.size(), 0);
 });
@@ -567,7 +558,7 @@ test('a thrown SEND_FAILED never enables queue retry after an attempted click', 
   adapter.clickSend = () => { adapter.sends++; throw new Error('SEND_FAILED'); };
   const queue = createQueue(adapter, () => adapter.input);
   queue.enqueue({ content: 'prompt' });
-  await new Promise(resolve => setImmediate(resolve));
+  await waitForQueue(queue, snapshot => snapshot.status === 'failed');
   assert.match(queue.getSnapshot().error, /SEND_UNCERTAIN/);
   assert.equal(queue.getSnapshot().canRetry, false);
   queue.retry();

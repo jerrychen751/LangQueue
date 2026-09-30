@@ -106,6 +106,8 @@ export async function sendPromptWhenReady(
     }
   }
   while (true) {
+    // Editors such as ProseMirror read a direct DOM write after the current task, so an immediate click submits the previous draft
+    await waitForExecutionDelay(timing.pollMs, signal);
     assertSendContext();
     if (adapter.getSendButton(input as HTMLTextAreaElement)) {
       assertSendContext();
@@ -124,7 +126,6 @@ export async function sendPromptWhenReady(
     if (Date.now() - startedAt >= timing.timeoutMs) {
       throw new Error('SEND_FAILED');
     }
-    await waitForExecutionDelay(timing.pollMs, signal);
   }
 }
 

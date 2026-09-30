@@ -36,6 +36,17 @@ test('delayed Send availability clicks once after it becomes enabled', async con
   assert.equal(fixture.getAttempts(), 1);
 });
 
+test('an available Send waits one poll so the editor can read the new text', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const fixture = createFixture();
+  fixture.adapter.ready = true;
+  const pending = fixture.send();
+  assert.equal(fixture.adapter.sends, 0);
+  context.mock.timers.tick(2);
+  await pending;
+  assert.equal(fixture.adapter.sends, 1);
+});
+
 test('readiness timeout never marks or attempts a send', async context => {
   context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
   const fixture = createFixture();
