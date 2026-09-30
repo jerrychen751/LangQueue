@@ -71,7 +71,7 @@ export default function FilterBar({ initialQuery = '', initialSort = 'recent', a
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="search-input h-10 w-full rounded-[4px] py-2 pl-9 pr-3 text-xs"
-          placeholder="Find a prompt"
+          placeholder="Search"
           aria-label="Search prompts"
         />
       </div>
@@ -85,7 +85,7 @@ export default function FilterBar({ initialQuery = '', initialSort = 'recent', a
         <option value="alpha">A–Z</option>
         <option value="mostUsed">Most used</option>
       </select>
-      <button className="icon-button h-10 w-10" onClick={clearAll} title="Clear search and sort" aria-label="Clear search and sort">
+      <button className="icon-button h-10 w-10" onClick={clearAll} title="Reset" aria-label="Clear search and sort">
         <X size={14} />
       </button>
     </div>

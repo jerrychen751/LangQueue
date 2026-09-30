@@ -41,11 +41,11 @@ export function PromptCard({
             className="min-w-0 flex-1 text-left"
             onClick={async () => onInsert(prompt)}
             disabled={!canInsert}
-            title={canInsert ? 'Insert prompt' : 'Open ChatGPT, Gemini, or Claude to enable insert'}
+            title={canInsert ? 'Insert' : 'Open ChatGPT, Gemini, or Claude'}
             aria-label={`Insert ${prompt.title || 'prompt'}`}
           >
-            <div className="prompt-index">PROMPT {promptNumber}</div>
-            <div className="prompt-title break-words" title={prompt.title}>
+            <div className="prompt-index">{promptNumber}</div>
+            <div className="prompt-title break-words">
               {prompt.title || 'Untitled'}
             </div>
             <div className="prompt-copy">{prompt.content}</div>
@@ -56,7 +56,7 @@ export function PromptCard({
             <button
               className="card-action"
               onClick={() => onEdit(prompt)}
-              title="Edit prompt"
+              title="Edit"
               aria-label={`Edit ${prompt.title || 'prompt'}`}
             >
               <Pencil size={13} />
@@ -64,7 +64,7 @@ export function PromptCard({
             <button
               className="card-action"
               onClick={() => setConfirmOpen(true)}
-              title="Delete prompt"
+              title="Delete"
               aria-label={`Delete ${prompt.title || 'prompt'}`}
             >
               <Trash2 size={13} />
@@ -95,7 +95,7 @@ export function PromptCard({
                 await onInsert(prompt);
               }
             }}
-            title={canInsert ? 'Send prompt' : 'Open a supported chat page to enable send'}
+            title={canInsert ? 'Send' : 'Open ChatGPT, Gemini, or Claude'}
             aria-label={`Send ${prompt.title || 'prompt'}`}
             disabled={!canInsert}
           >
@@ -106,8 +106,8 @@ export function PromptCard({
       <DeleteConfirmation
         open={confirmOpen}
         busy={deleting}
-        title="Delete this prompt?"
-        description="This action cannot be undone."
+        title="Delete prompt?"
+        description="This cannot be undone."
         confirmLabel={deleting ? 'Deleting…' : 'Delete'}
         onCancel={() => {
           if (!deletingRef.current) {
@@ -125,7 +125,7 @@ export function PromptCard({
             setConfirmOpen(false);
             showToast({ variant: 'success', message: 'Prompt deleted' });
           } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete prompt. Try again.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete prompt.' });
           } finally {
             deletingRef.current = false;
             setDeleting(false);

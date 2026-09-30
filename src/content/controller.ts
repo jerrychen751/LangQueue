@@ -56,12 +56,12 @@ export function initController(adapter: Adapter) {
           return;
         }
         if (expectedHref !== getConversationHref()) {
-          executionPanel.showMessage('The conversation changed while settings loaded. Select the prompt again in the intended conversation.');
+          executionPanel.showMessage('Conversation changed. Select the prompt again.');
           return;
         }
         const input = adapter.getInputElement();
         if (!input || input !== expectedInput || getInputText(input) !== expectedText) {
-          executionPanel.showMessage('The draft changed while settings loaded. Select the prompt again when ready.');
+          executionPanel.showMessage('Draft changed. Select the prompt again.');
           return;
         }
         if (item.kind === 'prompt') {
@@ -69,12 +69,12 @@ export function initController(adapter: Adapter) {
             settings.multimodalEnabled === false ? [] : item.attachments || [], 'overwrite', false, expectedHref);
           if (!result.ok) {
             // Stop text insertion when the attachment or composer check fails
-            executionPanel.showMessage(result.reason || 'Prompt insertion failed. Check the composer before trying again.');
+            executionPanel.showMessage(result.reason || 'Insert failed.');
             return;
           }
           shortcutSuggestions.hide();
           void logUsage(item.id, mapPlatform(adapter.id)).catch(() => {
-            executionPanel.showMessage('The prompt was inserted, but its usage count could not be saved. Do not insert it again just to update the count.');
+            executionPanel.showMessage('Prompt inserted, but its usage count wasn\'t saved.');
           });
           return;
         }
@@ -151,7 +151,7 @@ export function initController(adapter: Adapter) {
           settingsLoaded = false;
           settingsErrorShown = true;
           const detail = error instanceof Error ? ` Details: ${error.message}` : '';
-          executionPanel.showMessage(`Settings are unavailable. Your draft was kept. Try the action again to reload settings; if it still fails, reload the extension.${detail}`);
+          executionPanel.showMessage(`Settings unavailable. Try again, or reload the extension.${detail}`);
         }
         return false;
       } finally {
@@ -218,7 +218,7 @@ export function initController(adapter: Adapter) {
       shortcutSuggestions.hide();
       searchErrorShown = true;
       const detail = error instanceof Error ? ` Details: ${error.message}` : '';
-      executionPanel.showMessage(`The prompt library could not be loaded. Type your shortcut again to retry; if it still fails, reload the extension.${detail}`);
+      executionPanel.showMessage(`Library unavailable. Try again, or reload the extension.${detail}`);
     }
   }
 
@@ -290,15 +290,15 @@ export function initController(adapter: Adapter) {
           return;
         }
         if (getConversationHref() !== expectedHref || adapter.getInputElement() !== input || getInputText(input) !== text) {
-          executionPanel.showMessage('The composer changed while settings loaded. Your draft was kept; queue it again when ready.');
+          executionPanel.showMessage('Draft changed. Queue it again.');
           return;
         }
         setInputText(input, '');
         if (!queue.enqueue({ content: text })) {
           setInputText(input, text);
           executionPanel.showMessage(queue.getSnapshot().error === 'CONVERSATION_REQUIRED'
-            ? 'Start a conversation first, then run the queue or chain. Your draft was kept.'
-            : 'Cancellation is still finishing. Your draft is preserved; send it again when cancellation finishes.');
+            ? 'Start a conversation first.'
+            : 'Still cancelling. Try again in a moment.');
         }
       });
     }
@@ -419,7 +419,7 @@ export function initController(adapter: Adapter) {
       }
       const input = adapter.getInputElement();
       if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
-        executionPanel.showMessage('The draft changed while settings loaded. Start the chain again when ready.');
+        executionPanel.showMessage('Draft changed. Start the chain again.');
         return { ok: false, reason: 'COMPOSER_CHANGED' };
       }
       if (!isConversationReady()) {

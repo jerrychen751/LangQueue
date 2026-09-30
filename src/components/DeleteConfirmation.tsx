@@ -13,8 +13,8 @@ type DeleteConfirmationProps = {
 
 export default function DeleteConfirmation({
   open,
-  title = 'Confirm deletion',
-  description = 'This action cannot be undone.',
+  title = 'Delete?',
+  description = 'This cannot be undone.',
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
   onConfirm,
@@ -79,8 +79,7 @@ export default function DeleteConfirmation({
         }
       }} />
       <div ref={dialogRef} role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={busy} className="relative z-[101] w-[340px] rounded-[6px] border border-[#bcc7ca] bg-white p-5 text-[#1c272c] shadow-lg">
-        <div className="popup-kicker text-rose-700">Confirm action</div>
-        <div id={titleId} className="dialog-title mt-1">{title}</div>
+        <div id={titleId} className="dialog-title">{title}</div>
         <div id={descriptionId} className="mt-2 text-xs leading-5 text-[#6f7c82]">{description}</div>
         <div className="mt-4 flex items-center justify-end gap-2">
           <button type="button" disabled={busy} ref={cancelRef} className="secondary-button min-h-10" onClick={onCancel}>

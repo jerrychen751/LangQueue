@@ -11,7 +11,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
   shadow.append(style);
   const panel = document.createElement('section');
   panel.setAttribute('aria-label', 'LangQueue execution');
-  panel.innerHTML = `<header><span>LangQueue</span><button type="button" class="toggle" aria-expanded="true">Hide details</button></header><div class="body"><p class="status" role="status" aria-live="polite"></p><p class="message" role="alert"></p><ol></ol><div class="actions"><button type="button" class="retry">Retry unsent prompt</button><button type="button" class="cancel">Cancel queue</button><button type="button" class="cancel-chain">Cancel chain</button><button type="button" class="dismiss">Dismiss</button></div><p class="note">Queued prompts stay in this tab until you reload or leave.</p></div>`;
+  panel.innerHTML = `<header><span>LangQueue</span><button type="button" class="toggle" aria-expanded="true">Hide</button></header><div class="body"><p class="status" role="status" aria-live="polite"></p><p class="message" role="alert"></p><ol></ol><div class="actions"><button type="button" class="retry">Retry</button><button type="button" class="cancel">Cancel queue</button><button type="button" class="cancel-chain">Cancel chain</button><button type="button" class="dismiss">Dismiss</button></div></div>`;
   shadow.append(panel);
   document.documentElement.append(host);
   const status = panel.querySelector<HTMLElement>('.status')!;
@@ -31,57 +31,56 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
     const progress = currentProgress.totalSteps ? currentProgress : null;
     const runningChain = chain.isRunning();
     const labels: Record<string, string> = {
-      idle: 'Ready', waiting: 'Waiting for the composer', uploading: 'Uploading attachments',
-      sending: 'Sending prompt', awaiting_response: 'Waiting for the response', failed: 'Queue stopped',
-      cancelled: 'Cancelled', starting: 'Starting chain', delayed: 'Waiting before the next step',
-      completed: 'Chain completed', error: 'Chain stopped',
+      idle: 'Ready', waiting: 'Waiting', uploading: 'Uploading', sending: 'Sending', awaiting_response: 'Responding',
+      failed: 'Stopped', cancelled: 'Cancelled', starting: 'Starting', delayed: 'Waiting', completed: 'Done', error: 'Stopped',
     };
     const errors: Record<string, string> = {
-      QUEUE_CANCELLED: 'Queue cancelled. Check the composer before sending again.',
-      QUEUE_CANCELLED_ATTACHMENTS: 'Queue cancelled. Check and clear any attachments left in the composer before sending again.',
-      CONVERSATION_REQUIRED: 'Start a conversation first, then run the queue or chain. Your draft was kept.',
-      CONVERSATION_CHANGED: 'Execution stopped because the conversation changed. Return to the original conversation to retry unsent work, or remove the queued items.',
-      COMPOSER_CHANGED: 'The composer contains a new draft. Save or clear that draft, then retry.',
-      COMPOSER_BUSY: 'Finish or cancel the current queue before starting a chain.',
-      INPUT_NOT_FOUND: 'The chat input is unavailable. Return to the conversation, then retry.',
-      SEND_FAILED: 'The prompt could not be sent. Check the composer, then retry.',
-      MODEL_IDLE_TIMEOUT: 'The chat did not become ready in time. Check the conversation before continuing.',
-      RESPONSE_TIMEOUT: 'The response did not finish in time. Check the conversation before continuing.',
-      GENERATION_START_TIMEOUT: 'Sending was attempted, but no response was detected. Check the conversation before removing this item.',
-      ATTACHMENT_UPLOAD_TIMEOUT: 'Attachment upload could not be confirmed. Check the files in the composer before retrying.',
-      ATTACHMENT_UPLOAD_FAILED: 'An attachment could not be uploaded. Check the files in the composer before retrying.',
+      QUEUE_CANCELLED: 'Queue cancelled.',
+      QUEUE_CANCELLED_ATTACHMENTS: 'Queue cancelled. Attachments may still be in the composer.',
+      CONVERSATION_REQUIRED: 'Start a conversation first.',
+      CONVERSATION_CHANGED: 'Conversation changed. Go back to it to retry.',
+      COMPOSER_CHANGED: 'Clear the new draft to retry.',
+      COMPOSER_BUSY: 'Finish the queue first.',
+      INPUT_NOT_FOUND: 'Chat input not found.',
+      SEND_FAILED: 'Send failed.',
+      MODEL_IDLE_TIMEOUT: 'Chat wasn\'t ready in time.',
+      RESPONSE_TIMEOUT: 'Response timed out.',
+      GENERATION_START_TIMEOUT: 'No response detected. It may have been sent.',
+      ATTACHMENT_UPLOAD_TIMEOUT: 'Upload not confirmed. Check the attachments.',
+      ATTACHMENT_UPLOAD_FAILED: 'Upload failed.',
     };
     host.hidden = !snapshot.items.length && !notice && !progress && !snapshot.error;
     status.textContent = runningChain && progress
-      ? `Chain · Step ${progress.stepIndex + 1} of ${progress.totalSteps} · ${labels[progress.status] || progress.status}`
-      : snapshot.items.length ? `Queue · ${snapshot.items.length} ${snapshot.items.length === 1 ? 'prompt' : 'prompts'} · ${labels[snapshot.status] || snapshot.status}`
+      ? `Chain · ${progress.stepIndex + 1}/${progress.totalSteps} · ${labels[progress.status] || progress.status}`
+      : snapshot.items.length ? `Queue · ${snapshot.items.length} · ${labels[snapshot.status] || snapshot.status}`
       : snapshot.error ? `Queue · ${labels[snapshot.status] || snapshot.status}`
-      : progress ? `Chain · ${labels[progress.status] || progress.status}` : notice ? 'LangQueue notice' : 'Queue cleared';
+      : progress ? `Chain · ${labels[progress.status] || progress.status}` : '';
+    status.hidden = !status.textContent;
     const error = snapshot.error || (!snapshot.items.length ? progress?.error : undefined);
     const errorCode = error?.split(/[: ]/, 1)[0];
     const detail = error ? errors[errorCode || ''] || error.replaceAll('_', ' ') : '';
     const recovery = snapshot.items[0]?.attachmentAttempted && snapshot.status === 'failed'
-      ? ' Check and clear attachments in the composer, then remove this item and add it again.'
-      : error?.includes('may have been sent') ? ' The prompt may have been sent. Check the conversation before restarting.' : '';
+      ? ' Clear the attachments, then remove and re-add this item.'
+      : error?.includes('may have been sent') && !detail.includes('may have been sent') ? ' It may have been sent.' : '';
     message.textContent = notice || detail + recovery;
     message.hidden = !message.textContent;
     list.replaceChildren();
     for (const item of snapshot.items) {
       const row = document.createElement('li');
       const text = document.createElement('p');
-      text.textContent = item.content || 'Attachment prompt';
+      text.textContent = item.content || 'Attachments';
       text.title = item.content;
       row.append(text);
       if (item.sent) {
         const sent = document.createElement('span');
         sent.className = 'sent';
-        sent.textContent = 'Send attempted. This item will not be resent.';
+        sent.textContent = 'Sent · won\'t resend';
         row.append(sent);
       }
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'remove';
-      remove.textContent = 'Remove';
+      remove.textContent = '×';
       remove.disabled = snapshot.running && item.id === snapshot.items[0]?.id;
       remove.setAttribute('aria-label', `Remove queued prompt: ${item.content.slice(0, 80)}`);
       remove.addEventListener('click', (event) => {
@@ -117,7 +116,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
     if (!event.isTrusted) {
       return;
     }
-    notice = 'Cancelling. Any upload already in progress must settle before the composer is released.';
+    notice = 'Cancelling…';
     chain.cancel();
     render();
   });
@@ -134,7 +133,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
       return;
     }
     body.hidden = !body.hidden;
-    toggle.textContent = body.hidden ? 'Show details' : 'Hide details';
+    toggle.textContent = body.hidden ? 'Show' : 'Hide';
     toggle.setAttribute('aria-expanded', String(!body.hidden));
   });
   queue.subscribe(render);
@@ -148,7 +147,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
   function showMessage(text: string) {
     notice = text;
     body.hidden = false;
-    toggle.textContent = 'Hide details';
+    toggle.textContent = 'Hide';
     toggle.setAttribute('aria-expanded', 'true');
     render();
   }

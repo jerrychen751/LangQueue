@@ -96,7 +96,7 @@ test('failed insertion keeps the popup open without copying or logging usage', a
   assert.equal(popup.getUses(), 0);
   assert.equal(popup.toasts.length, 1);
   assert.equal(popup.toasts[0].variant, 'error');
-  assert.match(popup.toasts[0].message, /Check the chat composer/);
+  assert.match(popup.toasts[0].message, /Check the composer/);
 });
 
 test('a chain-only library keeps its edit and run actions visible', () => {
@@ -172,17 +172,17 @@ test('prompt confirmation waits for deletion and ignores duplicate attempts', as
   const pending = new Promise(resolve => { finishDelete = resolve; });
   const props = { onDelete: () => { deletes++; return pending; } };
   const popup = createPopup('PromptCard');
-  popup.find(popup.render(props), node => node.props.title === 'Delete prompt').props.onClick();
-  const confirmation = popup.find(popup.render(props), node => node.props.title === 'Delete this prompt?');
+  popup.find(popup.render(props), node => node.props.title === 'Delete').props.onClick();
+  const confirmation = popup.find(popup.render(props), node => node.props.title === 'Delete prompt?');
   const deleting = confirmation.props.onConfirm();
   await confirmation.props.onConfirm();
   confirmation.props.onCancel();
   assert.equal(deletes, 1);
   assert.equal(popup.toasts.length, 0);
-  assert.equal(popup.find(popup.render(props), node => node.props.title === 'Delete this prompt?').props.open, true);
+  assert.equal(popup.find(popup.render(props), node => node.props.title === 'Delete prompt?').props.open, true);
   finishDelete();
   await deleting;
-  assert.equal(popup.find(popup.render(props), node => node.props.title === 'Delete this prompt?').props.open, false);
+  assert.equal(popup.find(popup.render(props), node => node.props.title === 'Delete prompt?').props.open, false);
   assert.equal(popup.toasts[0].variant, 'success');
 });
 
@@ -194,9 +194,9 @@ test('failed deletion keeps confirmation open and allows retry', async () => {
     }
   } };
   const popup = createPopup('PromptCard');
-  popup.find(popup.render(props), node => node.props.title === 'Delete prompt').props.onClick();
-  await popup.find(popup.render(props), node => node.props.title === 'Delete this prompt?').props.onConfirm();
-  const confirmation = popup.find(popup.render(props), node => node.props.title === 'Delete this prompt?');
+  popup.find(popup.render(props), node => node.props.title === 'Delete').props.onClick();
+  await popup.find(popup.render(props), node => node.props.title === 'Delete prompt?').props.onConfirm();
+  const confirmation = popup.find(popup.render(props), node => node.props.title === 'Delete prompt?');
   assert.equal(confirmation.props.open, true);
   assert.equal(popup.toasts[0].variant, 'error');
   await confirmation.props.onConfirm();

@@ -40,43 +40,33 @@ export function createPromptEditor(callbacks: {
   const title = document.createElement('div');
   title.className = 'title';
   title.id = 'prompt-editor-title';
-  title.textContent = 'Edit Shortcut';
+  title.textContent = 'Edit shortcut';
   const closeBtn = document.createElement('button');
   closeBtn.className = 'close';
   closeBtn.type = 'button';
-  closeBtn.setAttribute('aria-label', 'Close prompt editor');
+  closeBtn.setAttribute('aria-label', 'Close');
   closeBtn.innerHTML = '&times;';
   header.append(title, closeBtn);
 
   const body = document.createElement('div');
   body.className = 'body';
-  const nameLabel = document.createElement('label');
-  nameLabel.className = 'label';
-  nameLabel.htmlFor = 'shortcut-name';
-  nameLabel.textContent = 'Shortcut name';
   const nameInput = document.createElement('input');
   nameInput.className = 'input';
   nameInput.id = 'shortcut-name';
-  nameInput.placeholder = 'e.g., draft-email';
+  nameInput.placeholder = 'Shortcut name';
+  nameInput.setAttribute('aria-label', 'Shortcut name');
 
-  const instructionsLabel = document.createElement('label');
-  instructionsLabel.className = 'label';
-  instructionsLabel.htmlFor = 'shortcut-instructions';
-  instructionsLabel.textContent = 'Instructions';
   const instructionsArea = document.createElement('textarea');
   instructionsArea.className = 'textarea';
   instructionsArea.id = 'shortcut-instructions';
-  instructionsArea.placeholder = 'Write the prompt instructions here';
+  instructionsArea.placeholder = 'Instructions';
+  instructionsArea.setAttribute('aria-label', 'Instructions');
 
   const errorEl = document.createElement('div');
   errorEl.className = 'error';
   errorEl.setAttribute('role', 'alert');
-  const shortcutHintEl = document.createElement('div');
-  shortcutHintEl.className = 'hint';
-  const isMac = navigator.userAgent.toLowerCase().includes('mac');
-  shortcutHintEl.textContent = isMac ? '⌘ + Enter to save' : 'Ctrl + Enter to save';
 
-  body.append(nameLabel, nameInput, instructionsLabel, instructionsArea, errorEl, shortcutHintEl);
+  body.append(nameInput, instructionsArea, errorEl);
 
   const footer = document.createElement('div');
   footer.className = 'footer';
@@ -91,6 +81,7 @@ export function createPromptEditor(callbacks: {
   const saveBtn = document.createElement('button');
   saveBtn.className = 'btn btn-primary';
   saveBtn.textContent = 'Save';
+  saveBtn.title = navigator.userAgent.toLowerCase().includes('mac') ? '⌘ + Enter' : 'Ctrl + Enter';
   footer.append(deleteBtn, cancelBtn, saveBtn);
 
   dialog.append(header, body, footer);
@@ -160,12 +151,12 @@ export function createPromptEditor(callbacks: {
     const rawContent = instructionsArea.value;
     const trimmedContent = rawContent.trim();
     if (!titleVal) {
-      setError('Shortcut name is required.');
+      setError('Name required.');
       nameInput.focus();
       return;
     }
     if (!trimmedContent && !hasAttachments) {
-      setError('Instructions are required.');
+      setError('Instructions required.');
       instructionsArea.focus();
       return;
     }

@@ -86,7 +86,7 @@ export default function App() {
             showToast({ message: `Sending step ${stepIndex + 1}/${totalSteps}` });
           }
           if (status === 'completed' && stepIndex === totalSteps - 1) {
-            showToast({ variant: 'success', message: 'Chain completed!' });
+            showToast({ variant: 'success', message: 'Chain complete' });
           }
           if (status === 'error') {
             showToast({ variant: 'error', message: `Chain error: ${error ?? 'Unknown error'}` });
@@ -229,7 +229,7 @@ export default function App() {
     try {
       await handleRefresh();
     } catch {
-      showToast({ variant: 'info', message: 'Prompt deleted, but library counts could not refresh. Reopen the popup to refresh them.' });
+      showToast({ variant: 'info', message: 'Prompt deleted, but counts could not refresh.' });
     }
   }
 
@@ -244,14 +244,14 @@ export default function App() {
         showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Insertion failed';
-        showToast({ variant: 'error', message: `${message}. Check the chat composer and finish or cancel any active queue before trying again.` });
+        showToast({ variant: 'error', message: `${message}. Check the composer and any active queue.` });
         return;
       }
       try {
         await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id });
         await handleRefresh();
       } catch {
-        showToast({ variant: 'info', message: 'Prompt inserted, but usage counts could not refresh. Check the composer before inserting again.' });
+        showToast({ variant: 'info', message: 'Prompt inserted, but usage counts could not refresh.' });
         return;
       }
       window.close();
@@ -289,15 +289,12 @@ export default function App() {
           <div className="logo-frame">
             <Logo size={22} ariaLabel="LangQueue" />
           </div>
-          <div>
-            <div className="popup-kicker">Prompt operations</div>
-            <div className="popup-title">LangQueue</div>
-          </div>
+          <div className="popup-title mt-0">LangQueue</div>
           <div className="ml-auto flex items-center gap-2">
             <div
               className="platform-status"
               data-ready={!checking && compatible}
-              title={checking ? 'Detecting compatibility' : compatible ? `Ready on ${platformName}` : 'Open a supported chat page'}
+              title={!checking && !compatible ? 'Open ChatGPT, Gemini, or Claude' : undefined}
             >
               <span className={`status-dot ${checking ? 'animate-pulse' : ''}`} aria-hidden />
               <span>{checking ? 'Detecting' : compatible ? platformName : 'Offline'}</span>
@@ -319,35 +316,27 @@ export default function App() {
       </header>
 
       <main className="popup-scroll">
-        {loading ? (
-          <div className="section-label">Loading library</div>
-        ) : prompts.length > 0 ? (
+        {!loading && prompts.length > 0 ? (
           <div className="section-label">
-            <span>Prompt library</span>
+            <span>Prompts</span>
             <span className="section-count">{visiblePrompts.length} / {prompts.length}</span>
           </div>
         ) : null}
         {!loading && prompts.length === 0 ? (
           <div className="empty-panel">
             <div>
-              <div className="popup-kicker text-[#527d8c]">No saved prompts</div>
-              <div className="mt-2 text-lg font-semibold">Save your first reusable prompt.</div>
-              <div className="mt-2 text-xs leading-5 text-[#6f7c82]">Create it once, then insert it into any supported chat.</div>
+              <div className="text-base font-semibold">No prompts yet</div>
               <button
                 onClick={handleCreate}
-                className="primary-button mt-5"
+                className="primary-button mt-4"
               >
-                <Plus size={16} /> Create your first prompt
+                <Plus size={16} /> New prompt
               </button>
             </div>
           </div>
         ) : !loading && visiblePrompts.length === 0 ? (
           <div className="empty-panel">
-            <div>
-              <div className="popup-kicker text-[#527d8c]">No match</div>
-              <div className="mt-2 text-base font-semibold">Try another search.</div>
-              <div className="mt-2 text-xs text-[#6f7c82]">Search checks prompt titles and content.</div>
-            </div>
+            <div className="text-base font-semibold">No matches</div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3">
@@ -386,12 +375,12 @@ export default function App() {
         {!loading && (
           <section className="mt-6">
             <div className="section-label">
-              <span>Prompt chains</span>
+              <span>Chains</span>
               <span className="section-count">{chains.length}</span>
             </div>
             {chains.length === 0 ? (
               <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-4 text-xs text-[#6f7c82]">
-                No saved chains yet. Choose New chain to build a sequence.
+                No chains yet
               </div>
             ) : (
               <ul className="space-y-2">
@@ -409,7 +398,7 @@ export default function App() {
                         className="compact-button"
                         aria-label={`Run chain ${c.title}`}
                         disabled={!compatible || Boolean(startingChain) || !c.steps.length}
-                        title={!compatible ? 'Open a supported chat to run this chain' : !c.steps.length ? 'Add steps before running this chain' : 'Run this chain in the active chat'}
+                        title={!compatible ? 'Open ChatGPT, Gemini, or Claude' : !c.steps.length ? 'Chain has no steps' : undefined}
                         onClick={async () => {
                           if (!compatible || !c.steps.length || startingChainRef.current) {
                             return;
@@ -418,9 +407,9 @@ export default function App() {
                           setStartingChain(c.id);
                           try {
                             await runChainOnTab(c.steps);
-                            showToast({ variant: 'success', message: 'Chain started. Follow its progress in the chat.' });
+                            showToast({ variant: 'success', message: 'Chain started' });
                           } catch (error) {
-                            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not start chain. Check the active chat and try again.' });
+                            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not start chain.' });
                           } finally {
                             startingChainRef.current = false;
                             setStartingChain(null);
@@ -459,10 +448,7 @@ export default function App() {
 
       {loading ? (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f2f4f3]/90 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3">
-            <div className="loading-orbit" aria-label="Loading" />
-            <div className="popup-kicker">Loading library</div>
-          </div>
+          <div className="loading-orbit" aria-label="Loading" />
         </div>
       ) : null}
 
@@ -522,8 +508,8 @@ export default function App() {
         open={Boolean(deleteChainTarget)}
         busy={deletingChain}
         title="Delete chain?"
-        description={deleteChainTarget ? `"${deleteChainTarget.title}" will be removed from your library.` : 'This action cannot be undone.'}
-        confirmLabel={deletingChain ? 'Deleting…' : 'Delete chain'}
+        description={deleteChainTarget ? `"${deleteChainTarget.title}" will be permanently deleted.` : 'This cannot be undone.'}
+        confirmLabel={deletingChain ? 'Deleting…' : 'Delete'}
         onCancel={() => {
           if (!deletingChainRef.current) {
             setDeleteChainTarget(null);
@@ -543,10 +529,10 @@ export default function App() {
             try {
               await handleRefresh();
             } catch {
-              showToast({ variant: 'info', message: 'Chain deleted, but library counts could not refresh. Reopen the popup to refresh them.' });
+              showToast({ variant: 'info', message: 'Chain deleted, but counts could not refresh.' });
             }
           } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete chain. Try again.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete chain.' });
           } finally {
             deletingChainRef.current = false;
             setDeletingChain(false);

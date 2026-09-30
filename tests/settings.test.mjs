@@ -214,7 +214,7 @@ test('load failure leaves controls disabled and retry can hydrate without saving
   let tree = app.render();
   assert.equal(app.find(tree, (node) => node.type === 'fieldset').props.disabled, true);
   assert.ok(app.find(tree, (node) => node.props.role === 'alert'));
-  const retry = app.find(tree, (node) => node.props.children === 'Retry loading').props.onClick();
+  const retry = app.find(tree, (node) => node.props.children === 'Retry').props.onClick();
   app.loads[1].resolve({ insertionMode: 'append' });
   await retry;
   tree = app.render();

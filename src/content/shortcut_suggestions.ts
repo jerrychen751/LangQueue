@@ -279,7 +279,7 @@ export function createShortcutSuggestions(callbacks: ShortcutSuggestionsCallback
     if (state.items.length === 0) {
       const empty = document.createElement('li');
       empty.className = 'lq-empty';
-      empty.textContent = 'No shortcuts found.';
+      empty.textContent = 'No matches';
       list.appendChild(empty);
       applyScrollLimit();
       return;

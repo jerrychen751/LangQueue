@@ -241,12 +241,12 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
         return;
       }
       pendingAttachments.current.clear();
-      showToast({ variant: 'success', message: initialChain ? 'Chain updated' : 'Chain saved to library' });
+      showToast({ variant: 'success', message: initialChain ? 'Chain updated' : 'Chain saved' });
       try {
         await onSaved?.();
       } catch {
         if (draftGeneration.current === generation) {
-          showToast({ variant: 'info', message: 'Chain saved, but the library could not refresh. Reopen the popup to refresh it.' });
+          showToast({ variant: 'info', message: 'Chain saved. Reopen the popup to refresh.' });
         }
       }
       if (draftGeneration.current !== generation) {
@@ -303,11 +303,8 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
             }}
           />
           <div className="dialog-header">
-            <div>
-              <div className="popup-kicker">Sequential workflow</div>
-              <div id="chain-builder-title" className="dialog-title mt-1">
-                {initialChain ? 'Edit prompt chain' : 'Build prompt chain'}
-              </div>
+            <div id="chain-builder-title" className="dialog-title">
+              {initialChain ? 'Edit chain' : 'New chain'}
             </div>
             <button className="icon-button" onClick={handleClose} aria-label="Close">
               <X size={16} />
@@ -316,11 +313,8 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
 
           <div className="space-y-3 p-4">
             <div className="settings-panel">
-              <div className="settings-heading border-b border-[#d9dfe1]">Chain sequence</div>
               <div className="max-h-[330px] overflow-auto">
-                {items.length === 0 ? (
-                  <div className="p-4 text-xs text-[#6f7c82]">Add a step to start the chain.</div>
-                ) : (
+                {items.length === 0 ? null : (
                   <ol className="divide-y divide-[#d9dfe1]">
                     {items.map((it, idx) => {
                       const isEditing = it.content.trim().length === 0 || editingId === it.id;
@@ -332,7 +326,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                               {isEditing ? (
                                 <textarea
                                   value={it.content}
-                                  placeholder={`Step ${idx + 1} prompt`}
+                                  placeholder="Prompt"
                                   aria-label={`Step ${idx + 1} prompt`}
                                   onChange={(e) => updateItem(it.id, e.target.value)}
                                   onFocus={() => {
@@ -425,7 +419,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                   </ol>
                 )}
               </div>
-              <div className="border-t border-[#d9dfe1] px-3 py-2.5">
+              <div className={`${items.length === 0 ? '' : 'border-t border-[#d9dfe1] '}px-3 py-2.5`}>
                 <button
                   className="compact-button inline-flex items-center gap-2"
                   onClick={addStep}
@@ -456,7 +450,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                   onClick={handleSaveChain}
                   disabled={!canSave}
                 >
-                  <Save size={15} /> {saving ? 'Saving…' : initialChain ? 'Save changes' : 'Save chain'}
+                  <Save size={15} /> {saving ? 'Saving…' : 'Save'}
                 </button>
                 <button className="secondary-button min-h-10" onClick={handleClose} disabled={saving}>
                   Cancel

@@ -72,7 +72,7 @@ export default function Onboarding() {
     setSelected(new Set(parsed.filter((candidate) => candidate.suggested).map((candidate) => candidate.path)));
     setIgnored({ support: support.size, unsupported, empty });
     if (parsed.length === 0) {
-      showToast({ variant: 'info', message: 'No Markdown or text prompt files in that selection' });
+      showToast({ variant: 'info', message: 'No Markdown or text files found' });
     }
   }
 
@@ -110,7 +110,7 @@ export default function Onboarding() {
   const ignoredParts = [
     ignored.support > 0 ? `${ignored.support} skill support file${ignored.support === 1 ? '' : 's'}` : '',
     ignored.unsupported > 0 ? `${ignored.unsupported} hidden or unsupported file${ignored.unsupported === 1 ? '' : 's'}` : '',
-    ignored.empty > 0 ? `${ignored.empty} without prompt text` : '',
+    ignored.empty > 0 ? `${ignored.empty} empty` : '',
   ].filter(Boolean);
   const selectedCount = selected.size;
 
@@ -123,34 +123,26 @@ export default function Onboarding() {
         <div className="logo-frame">
           <Logo size={22} ariaLabel="LangQueue" />
         </div>
-        <div>
-          <div className="popup-kicker">{importOnly ? 'Library import' : 'Welcome'}</div>
-          <div className="popup-title">LangQueue</div>
-        </div>
+        <div className="popup-title mt-0">LangQueue</div>
       </header>
 
-      <h1 className="onboarding-title">{importOnly ? 'Import prompts from files' : 'Set up your prompt library'}</h1>
-      <p className="onboarding-lede">
-        {importOnly
-          ? 'Pick Markdown or text files and each one becomes a prompt in your library.'
-          : 'LangQueue keeps reusable prompts in local Chrome storage and inserts them into ChatGPT, Claude, and Gemini. Start with the prompts you already have, or write a new one.'}
-      </p>
+      <h1 className="onboarding-title">{importOnly ? 'Import prompts' : 'Set up your library'}</h1>
+      {importOnly ? null : <p className="onboarding-lede">Reusable prompts for ChatGPT, Claude, and Gemini.</p>}
 
       <div className="onboarding-choices">
         <section className="onboarding-card">
-          <div className="popup-kicker">Import</div>
-          <h2>Import from Claude or ChatGPT skills</h2>
+          <h2>Import skills or files</h2>
           <p>
-            Choose a skills folder such as <code>~/.claude/skills</code> from Claude Code or <code>~/.codex/skills</code> from Codex and ChatGPT, or pick individual Markdown prompt files. Each skill's <code>SKILL.md</code> becomes one prompt, titled from its frontmatter <code>name</code>, and its scripts and reference files are left out.
+            Pick a skills folder like <code>~/.claude/skills</code> or <code>~/.codex/skills</code>, or Markdown files. Each <code>SKILL.md</code> becomes one prompt.
           </p>
           {isMac ? (
             <p>
-              Hidden folders such as <code>.claude</code> appear in the picker after you press <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>.</kbd>
+              Press <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>.</kbd> in the picker to show hidden folders.
             </p>
           ) : null}
           <div className="onboarding-actions">
             <button className="primary-button" onClick={() => folderInputRef.current?.click()} disabled={reading || importing}>
-              <FolderOpen size={15} /> {reading ? 'Reading files…' : 'Choose a folder'}
+              <FolderOpen size={15} /> {reading ? 'Reading…' : 'Choose folder'}
             </button>
             <button className="secondary-button" onClick={() => filesInputRef.current?.click()} disabled={reading || importing}>
               <FileText size={15} /> Choose files
@@ -160,18 +152,14 @@ export default function Onboarding() {
 
         {importOnly ? null : (
           <section className="onboarding-card">
-            <div className="popup-kicker">Create</div>
-            <h2>Write your first prompt</h2>
-            <p>
-              Save a prompt once. Insert it later from the toolbar popup, or type <code>$</code> in a supported chat to search your library.
-            </p>
+            <h2>Write a prompt</h2>
             <div className="onboarding-actions">
               <button className="primary-button" onClick={() => setEditorOpen(true)}>
                 <Plus size={15} /> New prompt
               </button>
             </div>
             {createdTitle ? (
-              <div className="onboarding-note">Saved "{createdTitle}". Open ChatGPT, Claude, or Gemini and type $ to insert it.</div>
+              <div className="onboarding-note">Saved "{createdTitle}". Type $ in a chat to insert it.</div>
             ) : null}
           </section>
         )}
@@ -180,10 +168,7 @@ export default function Onboarding() {
       {candidates.length > 0 ? (
         <section className="onboarding-card onboarding-review">
           <div className="review-header">
-            <div>
-              <div className="popup-kicker">Review</div>
-              <h2>{candidates.length} file{candidates.length === 1 ? '' : 's'} ready</h2>
-            </div>
+            <h2>{candidates.length} file{candidates.length === 1 ? '' : 's'} found</h2>
             <div className="review-tools">
               <button className="compact-button" onClick={() => setSelected(new Set(candidates.map((candidate) => candidate.path)))}>Select all</button>
               <button className="compact-button" onClick={() => setSelected(new Set())}>Select none</button>
@@ -211,26 +196,22 @@ export default function Onboarding() {
             <button className="secondary-button" onClick={() => { setCandidates([]); setSelected(new Set()); }} disabled={importing}>
               Cancel
             </button>
-            <span className="review-hint">A file whose title already exists in the library is skipped.</span>
+            <span className="review-hint">Duplicate titles are skipped.</span>
           </div>
         </section>
       ) : null}
 
       {summary ? (
         <section className="onboarding-card onboarding-review" role="status">
-          <div className="popup-kicker">Done</div>
           <h2>Imported {summary.imported} prompt{summary.imported === 1 ? '' : 's'}</h2>
-          <p>
-            {summary.skipped > 0 ? `${summary.skipped} skipped because the library already has a prompt with that title. ` : ''}
-            Open ChatGPT, Claude, or Gemini and type <code>$</code> to insert one, or open the toolbar popup to browse the library.
-          </p>
+          {summary.skipped > 0 ? <p>{summary.skipped} skipped as duplicates.</p> : null}
         </section>
       ) : null}
 
       <footer className="onboarding-hints">
         <span><kbd>{isMac ? '⌘' : 'Ctrl'}</kbd> <kbd>⇧</kbd> <kbd>L</kbd> opens the library</span>
-        <span><kbd>$</kbd> in a chat searches your prompts</span>
-        <span>Everything stays in local Chrome storage</span>
+        <span><kbd>$</kbd> in a chat inserts a prompt</span>
+        <span>Stored locally in Chrome</span>
       </footer>
 
       <PromptEditor

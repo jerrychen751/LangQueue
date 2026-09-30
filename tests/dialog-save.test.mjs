@@ -182,7 +182,7 @@ test('chain save blocks duplicate starts and close paths until its transaction s
   dialog.render();
   let tree = dialog.render();
   for (const placeholder of ['Step 1 prompt', 'Step 2 prompt', 'Chain title']) {
-    dialog.find(tree, (node) => node.props.placeholder === placeholder).props.onChange({ target: { value: placeholder } });
+    dialog.find(tree, (node) => [node.props['aria-label'], node.props.placeholder].includes(placeholder)).props.onChange({ target: { value: placeholder } });
   }
   tree = dialog.render();
   const save = dialog.find(tree, (node) => node.props.onClick?.name === 'handleSaveChain');
@@ -234,9 +234,9 @@ test('pending chain saves reject title, step text, and step additions', async ()
   const dialog = renderDialog('ChainBuilder');
   dialog.render();
   let tree = dialog.render();
-  const step = dialog.find(tree, (node) => node.props.placeholder === 'Step 1 prompt');
+  const step = dialog.find(tree, (node) => node.props['aria-label'] === 'Step 1 prompt');
   for (const placeholder of ['Step 1 prompt', 'Step 2 prompt', 'Chain title']) {
-    dialog.find(tree, (node) => node.props.placeholder === placeholder).props.onChange({ target: { value: placeholder } });
+    dialog.find(tree, (node) => [node.props['aria-label'], node.props.placeholder].includes(placeholder)).props.onChange({ target: { value: placeholder } });
   }
   tree = dialog.render();
   const saving = dialog.find(tree, (node) => node.props.onClick?.name === 'handleSaveChain').props.onClick();
@@ -298,5 +298,5 @@ test('removing the last attachment keeps an empty prompt from saving', async () 
   await dialog.find(tree, node => node.type === 'button' && node.props.onClick?.name === 'handleSave').props.onClick();
   assert.equal(dialog.getSaveCalls(), 0);
   tree = dialog.render();
-  assert.equal(dialog.find(tree, node => node.props.role === 'alert').props.children, 'Add prompt content or at least one attachment.');
+  assert.equal(dialog.find(tree, node => node.props.role === 'alert').props.children, 'Add text or a file.');
 });

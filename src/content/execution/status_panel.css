@@ -7,20 +7,20 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .body { padding: 14px 16px; }
 p { margin: 0; }
 .status { font-weight: 600; }
-.message { margin-top: 10px; padding: 10px; border-radius: 6px; color: #75521e; background: #fff4df; overflow-wrap: anywhere; }
+.message { padding: 10px; border-radius: 6px; color: #75521e; background: #fff4df; overflow-wrap: anywhere; }
 ol { list-style: none; padding: 0; margin: 12px 0; max-height: 240px; overflow-y: auto; }
-li { padding: 10px 0; border-top: 1px solid #d9dfe1; }
+li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid #d9dfe1; }
 li p { white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 button { font: inherit; cursor: pointer; color: #1c272c; background: #f2f4f3; border: 1px solid #cfd6d8; border-radius: 6px; padding: 6px 10px; transition: background 150ms; }
 button:hover { background: #e7ecee; }
 button:focus-visible { outline: 2px solid #527d8c; outline-offset: 3px; }
 .toggle { border: 0; background: transparent; font-size: 12px; font-weight: 400; padding: 4px; color: #46555c; }
-.remove { margin-top: 7px; font-size: 12px; padding: 3px 8px; }
+.remove { grid-column: 2; grid-row: 1; font-size: 16px; line-height: 1; padding: 2px 6px; border-color: transparent; background: transparent; color: #6f7c82; }
+.status:not([hidden]) + .message { margin-top: 10px; }
 .sent { display: block; margin-top: 6px; font-size: 12px; color: #75521e; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .retry { background: #527d8c; border-color: #527d8c; color: #f7fafb; }
 .retry:hover { background: #426c7a; }
-.note { margin-top: 12px; color: #6f7c82; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
 button:disabled { opacity: 0.5; cursor: default; }
 button:disabled:hover { background: #f2f4f3; }

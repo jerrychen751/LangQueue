@@ -124,7 +124,7 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
       return;
     }
     if (!trimmedContent && attachments.length === 0) {
-      setError('Add prompt content or at least one attachment.');
+      setError('Add text or a file.');
       contentRef.current?.focus();
       return;
     }
@@ -261,11 +261,8 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
       >
         <fieldset disabled={saving} className="contents">
           <div className="dialog-header">
-            <div>
-              <div className="popup-kicker">{isEditing ? 'Revise library item' : 'Add library item'}</div>
-              <div id="prompt-editor-title" className="dialog-title mt-1">
-                {isEditing ? 'Edit prompt' : 'New prompt'}
-              </div>
+            <div id="prompt-editor-title" className="dialog-title">
+              {isEditing ? 'Edit prompt' : 'New prompt'}
             </div>
             <button className="icon-button" onClick={close} aria-label="Close">
               <X size={16} />
@@ -291,12 +288,11 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
                   }
                 }}
                 className="form-input w-full rounded-[4px] px-3 py-2.5 text-sm"
-                placeholder="Enter a clear, descriptive title"
               />
             </div>
 
             <div>
-              <label htmlFor="prompt-content" className="field-label">Prompt content</label>
+              <label htmlFor="prompt-content" className="field-label">Prompt</label>
               <textarea
                 id="prompt-content"
                 ref={contentRef}
@@ -308,7 +304,6 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
                 }}
                 className="form-input min-h-[120px] w-full resize-none rounded-[4px] px-3 py-2.5 text-sm leading-6"
                 rows={4}
-                placeholder="Write the prompt that you want to reuse."
               />
             </div>
 
@@ -322,28 +317,23 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
                   void handleFilesPicked(e.target.files);
                 }}
               />
-              <div className="mb-2 flex items-center justify-between">
-                <label className="field-label mb-0">Attachments</label>
-                <button
-                  type="button"
-                  className="compact-button inline-flex items-center gap-1.5"
-                  onClick={() => {
-                    if (savingRef.current) {
-                      return;
-                    }
-                    filePickerGeneration.current = draftGeneration.current;
-                    fileInputRef.current?.click();
-                  }}
-                  disabled={saving}
-                >
-                  <Paperclip size={12} />
-                  Add files
-                </button>
-              </div>
-              {attachments.length === 0 ? (
-                <div className="rounded-[4px] border border-dashed border-[#bdc7ca] px-3 py-3 text-[11px] text-[#6f7c82]">No attachments selected.</div>
-              ) : (
-                <ul className="max-h-24 space-y-1.5 overflow-auto">
+              <button
+                type="button"
+                className="compact-button inline-flex items-center gap-1.5"
+                onClick={() => {
+                  if (savingRef.current) {
+                    return;
+                  }
+                  filePickerGeneration.current = draftGeneration.current;
+                  fileInputRef.current?.click();
+                }}
+                disabled={saving}
+              >
+                <Paperclip size={12} />
+                Add files
+              </button>
+              {attachments.length === 0 ? null : (
+                <ul className="mt-2 max-h-24 space-y-1.5 overflow-auto">
                   {attachments.map((attachment) => (
                     <li key={attachment.id} className="flex items-center justify-between gap-2 rounded-[4px] border border-[#cfd6d8] bg-[#f8f9f9] px-3 py-2 text-[11px]">
                       <div className="min-w-0">
@@ -366,10 +356,7 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
 
           </div>
 
-          <div className="flex items-center gap-2 border-t border-[#d9dfe1] p-4">
-            <div className="mr-auto text-[10px] text-[#6f7c82]">
-              <span className="font-mono">{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Enter</span>
-            </div>
+          <div className="flex items-center justify-end gap-2 border-t border-[#d9dfe1] p-4">
             <button className="secondary-button min-h-10" onClick={close} disabled={saving}>
               Cancel
             </button>
@@ -377,6 +364,7 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
               className="primary-button min-h-10"
               onClick={handleSave}
               disabled={saving}
+              title={`${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Enter`}
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : null}
               Save

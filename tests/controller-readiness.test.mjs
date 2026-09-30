@@ -124,7 +124,7 @@ test('search failure displays an error while successful empty search remains emp
   fixture.search(true);
   await settle();
   assert.equal(fixture.shown.length, 0);
-  assert.match(fixture.notices.at(-1), /library could not be loaded/);
+  assert.match(fixture.notices.at(-1), /Library unavailable/);
   assert.match(fixture.notices.at(-1), /Details: read failed/);
   fixture.search(false);
   await settle();
@@ -139,7 +139,7 @@ test('usage failure reports success of insertion without retrying it', async () 
   fixture.select();
   await settle();
   assert.equal(fixture.inserted.length, 1);
-  assert.match(fixture.notices.at(-1), /prompt was inserted.*usage count could not be saved/);
+  assert.match(fixture.notices.at(-1), /Prompt inserted.*usage count wasn.t saved/);
 });
 
 test('a stale settings read cannot overwrite a newer disabled-attachments preference', async () => {
