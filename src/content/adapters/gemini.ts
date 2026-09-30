@@ -109,11 +109,17 @@ class GeminiAdapter extends Adapter {
     if (!composer.isConnected || !area.isConnected) {
       return failure;
     }
+    let openedMenu = false;
     if (button.getAttribute('aria-expanded') !== 'true') {
       if (Array.from(document.querySelectorAll('[role="menu"]')).some(isVisible)) {
         return failure;
       }
+      // Gemini never draws this menu in a hidden tab, so the upload can only fail there
+      if (document.visibilityState === 'hidden') {
+        return { ok: false, error: 'Gemini uploads need this tab on screen. Show the tab, then retry.' };
+      }
       button.click();
+      openedMenu = true;
     }
     const started = Date.now();
     while (Date.now() - started < 1500) {
@@ -139,6 +145,9 @@ class GeminiAdapter extends Adapter {
         }
       }
       await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    if (openedMenu && button.getAttribute('aria-expanded') === 'true') {
+      button.click();
     }
     return failure;
   }

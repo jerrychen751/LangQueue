@@ -15,7 +15,7 @@ class Button {
   expanded = 'false';
   clicks = 0;
   getAttribute(name) { return name === 'aria-expanded' ? this.expanded : null; }
-  click() { this.clicks++; this.expanded = 'true'; this.onClick(); }
+  click() { this.clicks++; this.expanded = this.expanded === 'true' ? 'false' : 'true'; this.onClick(); }
 }
 
 function createFixture() {
@@ -88,6 +88,17 @@ test('Gemini times out when the opened menu never creates an uploader', async co
   const pending = fixture.adapter.attachFiles(fixture.files);
   context.mock.timers.tick(1501);
   assert.equal((await pending).ok, false);
+  assert.equal(fixture.button.clicks, 2);
+  assert.equal(fixture.button.expanded, 'false');
+});
+
+test('Gemini explains that uploads need a visible tab instead of opening a menu it will not draw', async () => {
+  const fixture = createFixture();
+  globalThis.document.visibilityState = 'hidden';
+  const result = await fixture.adapter.attachFiles(fixture.files);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /on screen/);
+  assert.equal(fixture.button.clicks, 0);
 });
 
 test('Gemini rechecks navigation after waiting for uploader initialization', async context => {
