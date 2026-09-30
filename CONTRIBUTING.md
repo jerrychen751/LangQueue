@@ -38,6 +38,26 @@ Individual commands are available when narrowing a failure:
 
 The manifest validator checks packaging; it cannot prove that a site's DOM selectors still work. Use a test conversation for live checks and send only text or attachments you intend to transmit.
 
+## Check the live sites
+
+ChatGPT, Claude, and Gemini change their pages without notice, and the regression tests cannot see those changes. `npm test` includes `tests/site-replay.test.mjs`, which loads scrubbed captures of each site from `tests/fixtures/sites/` into headless Chrome and checks that each adapter still finds the composer, the send button, the generating state, and finished uploads that worked when the page was captured. It needs Google Chrome installed. `npm test -- site-replay` runs only those tests; any argument limits the run to test files whose names contain it.
+
+`npm run check:sites` runs the same checks against the live sites. It uses a separate Chrome profile at `~/.langqueue-site-check` (override with `LANGQUEUE_CHECK_PROFILE`, and the browser with `CHROME_PATH`). Sign in once:
+
+```bash
+npm run check:sites -- --login
+```
+
+Sign in to all three sites in the window that opens, then quit Chrome. Later runs reuse that session:
+
+- `npm run check:sites` types a prompt on each site, checks that it reads back and that the send button is found, then clears it. It sends nothing.
+- `npm run check:sites -- --send` also sends a short prompt, attaches a small text file and a 1×1 PNG, and sends again. It sends from your accounts.
+- `--site claude` limits a run to one site. `--send --capture` also rewrites that site's fixtures in `tests/fixtures/sites/`. Captures keep text only around the composer and replace emails, UUIDs, and images from other hosts, but search new captures for your name, email, and conversation titles before committing them.
+
+If a site shows a sign-in page or a Cloudflare "Verify you are human" check, the run says so. Open the profile with `--login --site <site>`, sign in or pass the check, quit Chrome, and run again. Cloudflare sometimes challenges the checked browser, more often after several runs close together.
+
+A failed line names the lookup that broke. The run also prints the directory where it saved a screenshot and the page HTML for each failing site. The `check-sites` Claude Code skill in `.claude/skills/` describes how to repair an adapter from there, and lists the extension checks that still need a person or an agent in the browser.
+
 With the Vite server running, open `/tests/fixtures/composer.html` to check real textarea and contenteditable behavior. The fixture reports `PASS: 14/14` when multiline insertion, Windows line endings, and paragraph append work. Its send controls are local stubs; it never sends to an AI provider.
 
 Queues and chains require an established conversation. Start a conversation with a manual message before running a sequence. Automatic execution stops if the conversation URL changes. Appending into a rich editor preserves visible text and line breaks while converting its existing formatting to plain text.
