@@ -42,7 +42,7 @@ function setContentEditableValue(el: HTMLElement, value: string) {
   const range = document.createRange();
   range.selectNodeContents(el);
   range.deleteContents();
-  range.insertNode(buildLineBreakFragment(value));
+  range.insertNode(buildParagraphFragment(value));
   const after = document.createRange();
   after.selectNodeContents(el);
   after.collapse(false);
@@ -51,17 +51,14 @@ function setContentEditableValue(el: HTMLElement, value: string) {
   dispatchFrameworkInput(el, value, inputType);
 }
 
-function buildLineBreakFragment(value: string): DocumentFragment {
+// ProseMirror (ChatGPT, Claude) and Quill (Gemini) keep one <p> per line, so a bare <br> gets rebuilt into extra empty paragraphs
+function buildParagraphFragment(value: string): DocumentFragment {
   const fragment = document.createDocumentFragment();
-  const lines = value.split(/\r\n|\r|\n/);
-  lines.forEach((line, index) => {
-    if (line) {
-      fragment.appendChild(document.createTextNode(line));
-    }
-    if (index < lines.length - 1) {
-      fragment.appendChild(document.createElement('br'));
-    }
-  });
+  for (const line of value.split(/\r\n|\r|\n/)) {
+    const paragraph = document.createElement('p');
+    paragraph.appendChild(line ? document.createTextNode(line) : document.createElement('br'));
+    fragment.appendChild(paragraph);
+  }
   return fragment;
 }
 
@@ -72,12 +69,19 @@ export function getInputText(el: InputElement | null): string {
   if (el instanceof HTMLTextAreaElement) {
     return el.value || '';
   }
-  const text = el.innerText || '';
-  const paragraph = el.firstElementChild;
-  if (text === '\n' && el.childNodes.length === 1 && paragraph?.tagName === 'P' && paragraph.childNodes.length === 1 && paragraph.firstElementChild?.tagName === 'BR') {
-    return '';
+  const blocks = Array.from(el.children);
+  if (blocks.length && el.childNodes.length === blocks.length && blocks.every(block => block.tagName === 'P')) {
+    // innerText puts a blank line between paragraphs, and a paragraph's closing <br> only keeps an empty line visible
+    return blocks.map(block => {
+      const text = (block as HTMLElement).innerText || '';
+      return block.lastChild?.nodeName === 'BR' && text.endsWith('\n') ? text.slice(0, -1) : text;
+    }).join('\n');
   }
-  return text;
+  return el.innerText || '';
+}
+
+export function isSameComposerText(actual: string, expected: string) {
+  return actual.replace(/\s+/g, ' ').trim() === expected.replace(/\s+/g, ' ').trim();
 }
 
 export function setInputText(el: InputElement, value: string) {

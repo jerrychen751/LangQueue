@@ -1,6 +1,6 @@
 import type { Adapter } from '../adapters/adapter';
 import { isInputReady } from '../adapters/page_dom';
-import { appendInputText, getInputText, setInputText } from '../composer/composer_text';
+import { appendInputText, getInputText, isSameComposerText, setInputText } from '../composer/composer_text';
 import { fetchAttachmentFiles } from '../library_requests';
 import type { AttachmentRef } from '../../library/model';
 
@@ -98,7 +98,7 @@ export async function sendPromptWhenReady(
     if (!input.isConnected || adapter.getInputElement() !== input) {
       throw new Error('COMPOSER_CHANGED: the chat input changed. Check your draft before retrying.');
     }
-    if (getInputText(input) !== expectedText) {
+    if (!isSameComposerText(getInputText(input), expectedText)) {
       throw new Error('COMPOSER_CHANGED: save or clear your draft, then retry.');
     }
     if (adapter.isGenerating()) {
@@ -143,7 +143,7 @@ export async function executeStep(
   assertExecutionContext(signal, href);
   const initialText = getInputText(getInput() || adapter.getInputElement());
   onStatus('waiting');
-  if (allowedInput !== undefined && initialText !== '' && initialText !== allowedInput) {
+  if (allowedInput !== undefined && initialText !== '' && !isSameComposerText(initialText, allowedInput)) {
     throw new Error('COMPOSER_CHANGED: save or clear your draft, then retry.');
   }
   let startedAt = Date.now();
@@ -175,7 +175,7 @@ export async function executeStep(
     throw new Error('INPUT_NOT_FOUND');
   }
   const currentText = getInputText(input);
-  if (currentText !== initialText || (allowedInput !== undefined && currentText !== '' && currentText !== allowedInput)) {
+  if (currentText !== initialText || (allowedInput !== undefined && currentText !== '' && !isSameComposerText(currentText, allowedInput))) {
     throw new Error('COMPOSER_CHANGED: save or clear your draft, then retry.');
   }
   if (mode === 'append') {

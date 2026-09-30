@@ -108,16 +108,16 @@ test('a click throwing SEND_FAILED retains uncertainty and is never repeated', a
 
 test('file-only send accepts an empty paragraph placeholder and still detects a new draft', async () => {
   for (const changed of [false, true]) {
-    const br = { tagName: 'BR' };
-    const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br };
-    const input = { isConnected: true, innerText: '\n', childNodes: [paragraph], firstElementChild: paragraph };
+    const paragraph = { tagName: 'P', innerText: '\n', lastChild: { nodeName: 'BR' } };
+    const input = { isConnected: true, innerText: '\n', children: [paragraph], childNodes: [paragraph] };
     let sends = 0;
     const adapter = {
       getInputElement: () => input,
       isGenerating: () => false,
       getSendButton() {
         if (changed) {
-          input.innerText = 'New draft';
+          paragraph.innerText = 'New draft';
+          paragraph.lastChild = { nodeName: '#text' };
         }
         return {};
       },
@@ -134,14 +134,15 @@ test('file-only send accepts an empty paragraph placeholder and still detects a 
 });
 
 test('empty placeholder normalization preserves whitespace and multiple paragraphs', () => {
-  const br = { tagName: 'BR' };
-  const paragraph = { tagName: 'P', childNodes: [br], firstElementChild: br };
-  for (const text of [' ', '\t', '\n\n', 'prompt\n']) {
-    assert.equal(getInputText({ innerText: text, childNodes: [paragraph], firstElementChild: paragraph }), text);
+  const createEmptyParagraph = () => ({ tagName: 'P', innerText: '\n', lastChild: { nodeName: 'BR' } });
+  const createEditor = (...children) => ({ innerText: '', children: children.filter(child => child.tagName), childNodes: children });
+  for (const text of [' ', '\t']) {
+    assert.equal(getInputText(createEditor({ tagName: 'P', innerText: text, lastChild: { nodeName: '#text' } })), text);
   }
-  assert.equal(getInputText({ innerText: '\n', childNodes: [{ nodeType: 3 }], firstElementChild: null }), '\n');
-  assert.equal(getInputText({ innerText: '\n', childNodes: [paragraph, paragraph], firstElementChild: paragraph }), '\n');
-  assert.equal(getInputText({ innerText: '\n', childNodes: [br], firstElementChild: br }), '\n');
+  assert.equal(getInputText(createEditor(createEmptyParagraph())), '');
+  assert.equal(getInputText(createEditor(createEmptyParagraph(), createEmptyParagraph())), '\n');
+  assert.equal(getInputText({ innerText: '\n', children: [], childNodes: [{ nodeType: 3 }] }), '\n');
+  assert.equal(getInputText({ innerText: '\n', children: [{ tagName: 'BR' }], childNodes: [{ tagName: 'BR' }] }), '\n');
   const textarea = new FakeTextarea();
   textarea.value = '\n';
   assert.equal(getInputText(textarea), '\n');
