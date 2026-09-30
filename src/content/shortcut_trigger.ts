@@ -21,11 +21,15 @@ export type ShortcutContext =
 
 const TRIGGER_RE = /\$([^\s]*)$/;
 const ZERO_WIDTH_RE = /[\u200B-\u200D\u2060\uFEFF]/g;
-const SPACE_CHARS = new Set([' ', '\u00A0']);
+const SPACE_CHARS = new Set([' ', '\u00A0', '\n']);
 
 function getShortcutMatch(text: string): { query: string; shortcutIndex: number } | null {
   const match = TRIGGER_RE.exec(text);
   if (!match || typeof match.index !== 'number') {
+    return null;
+  }
+  // A digit after `$` is a price such as $5, not a shortcut
+  if (/^\d/.test(match[1] ?? '')) {
     return null;
   }
   const shortcutIndex = match.index;
@@ -87,7 +91,11 @@ export function detectShortcutContext(input: InputElement | null): ShortcutConte
     const beforeRange = range.cloneRange();
     beforeRange.selectNodeContents(input);
     beforeRange.setEnd(range.endContainer, range.endOffset);
-    const textBefore = beforeRange.toString();
+    // Range text runs paragraphs and <br> lines together, so a $ opening a later line would look mid-word
+    const fragment = beforeRange.cloneContents();
+    fragment.querySelectorAll('br').forEach(lineBreak => lineBreak.replaceWith('\n'));
+    fragment.querySelectorAll('p, div, li').forEach(block => block.before('\n'));
+    const textBefore = fragment.textContent || '';
     const match = getShortcutMatch(textBefore);
     if (!match) {
       return null;
