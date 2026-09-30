@@ -53,12 +53,8 @@ class ClaudeAdapter extends Adapter {
       return true;
     }
 
-    // Generic fallbacks
-    const stopSelectors = [
-      'button[aria-label*="Stop" i]',
-      'button[aria-label*="Cancel" i]',
-    ];
-    if (this.anyVisible(stopSelectors)) {
+    // The composer's Send button turns into this Stop button; page-wide "Stop"/"Cancel" matches caught dialog buttons
+    if (document.querySelector('button[data-testid="chat-input-stop"]')) {
       return true;
     }
 
@@ -182,16 +178,6 @@ class ClaudeAdapter extends Adapter {
     }
     if (this.uploadAttempt === attempt) {
       this.uploadAttempt = null;
-    }
-    return false;
-  }
-
-  private anyVisible(selectors: string[]): boolean {
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      if (el && isVisible(el)) {
-        return true;
-      }
     }
     return false;
   }
