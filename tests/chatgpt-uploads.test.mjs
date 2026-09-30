@@ -21,7 +21,8 @@ function createFixture(context) {
   globalThis.location = { href: 'https://chatgpt.com/c/upload-test' };
   const fileInput = new FileInput();
   const send = new Button();
-  const tiles = [];
+  send.attributes['aria-label'] = 'Send';
+  const removes = [];
   const indicators = [];
   const form = {
     isConnected: true,
@@ -29,27 +30,29 @@ function createFixture(context) {
       if (selector.includes('type="file"')) {
         return [fileInput];
       }
-      if (selector.startsWith('button#composer-submit-button')) {
+      if (selector.includes('button[aria-label="Send"]')) {
         return [send];
       }
-      if (selector.startsWith('[role="group"]')) {
-        return tiles;
+      if (selector === 'button[aria-label^="Remove "]') {
+        return removes;
       }
       return indicators;
     },
-    querySelector() { return send; },
   };
   const input = { isConnected: true, closest: () => form };
   globalThis.document = { body: {}, documentElement: {} };
   const adapter = createChatGPTAdapter();
   adapter.getInputElement = () => input;
+  // A tile holds a Remove button; accepted files also show a preview surface labeled with the file name
   function addTile(name, accepted = true, visible = true) {
+    const preview = { getAttribute: () => name, getClientRects: () => [{}] };
     const tile = {
-      getAttribute: () => name,
+      images: [],
+      getAttribute: () => null,
       getClientRects: () => visible ? [{}] : [],
-      querySelectorAll: selector => accepted && selector === '[data-testid="library-file-icon"]' ? [{ getClientRects: () => [{}] }] : [],
+      querySelectorAll: selector => selector === 'img' ? tile.images : accepted ? [preview] : [],
     };
-    tiles.push(tile);
+    removes.push({ parentElement: tile, getAttribute: () => `Remove ${name}` });
     return tile;
   }
   async function tick(milliseconds) {
@@ -82,13 +85,13 @@ test('ChatGPT waits for delayed accepted tiles and enabled send, ignoring hidden
   assert.equal(await pending, true);
 });
 
-for (const state of ['missing', 'placeholder', 'hidden', 'wrong-name']) {
+for (const state of ['missing', 'rejected', 'hidden', 'wrong-name']) {
   test(`ChatGPT rejects ${state} attachment tiles`, async context => {
     const fixture = createFixture(context);
     const files = [{ name: 'notes.txt' }];
     await fixture.adapter.attachFiles(files);
     if (state !== 'missing') {
-      fixture.addTile(state === 'wrong-name' ? 'other.txt' : 'notes.txt', state !== 'placeholder', state !== 'hidden');
+      fixture.addTile(state === 'wrong-name' ? 'other.txt' : 'notes.txt', state !== 'rejected', state !== 'hidden');
     }
     const pending = fixture.adapter.waitForUploadsComplete({ files, pollMs: 5, timeoutMs: 20 });
     await fixture.tick(21);
@@ -139,6 +142,21 @@ for (const change of ['navigation', 'detached-form', 'replaced-input', 'replaced
   });
 }
 
+test('ChatGPT matches files that it renamed with a duplicate suffix', async context => {
+  const fixture = createFixture(context);
+  fixture.addTile('notes(1).txt');
+  const files = [{ name: 'notes.txt' }, { name: 'image.png' }];
+  await fixture.adapter.attachFiles(files);
+  let completed = false;
+  const pending = fixture.adapter.waitForUploadsComplete({ files, pollMs: 5, timeoutMs: 50 }).then(result => { completed = true; return result; });
+  fixture.addTile('notes(2).txt');
+  await fixture.tick(5);
+  assert.equal(completed, false);
+  fixture.addTile('image(1).png');
+  await fixture.tick(5);
+  assert.equal(await pending, true);
+});
+
 test('ChatGPT requires matching files and consumes successful upload attempts', async context => {
   const fixture = createFixture(context);
   const files = [{ name: 'notes.txt' }];
@@ -161,14 +179,13 @@ test('ChatGPT does not accept a stop button as an upload-ready send control', as
   assert.equal(await pending, false);
 });
 
-test('ChatGPT waits for loaded server images alongside document attachments', async context => {
+test('ChatGPT waits for image previews to load alongside document attachments', async context => {
   const fixture = createFixture(context);
   const files = [{ name: 'image.png' }, { name: 'notes.txt' }];
   await fixture.adapter.attachFiles(files);
   fixture.addTile('notes.txt');
-  const tile = fixture.addTile('image.png', false);
-  const image = { src: 'https://chatgpt.com/backend-api/estuary/content', complete: false, naturalWidth: 64, naturalHeight: 64, getClientRects: () => [{}] };
-  tile.querySelectorAll = selector => selector === 'button[aria-label="Open image: User uploaded image"] img' ? [image] : [];
+  const image = { complete: false, naturalWidth: 64, naturalHeight: 64 };
+  fixture.addTile('image.png').images.push(image);
   let completed = false;
   const pending = fixture.adapter.waitForUploadsComplete({ files, pollMs: 5, timeoutMs: 30 }).then(result => { completed = true; return result; });
   await fixture.tick(5);
@@ -178,28 +195,12 @@ test('ChatGPT waits for loaded server images alongside document attachments', as
   assert.equal(await pending, true);
 });
 
-for (const state of ['broken', 'hidden', 'blob', 'data', 'foreign-origin', 'wrong-path', 'outside-button']) {
-  test(`ChatGPT rejects ${state} image previews`, async context => {
-    const fixture = createFixture(context);
-    const files = [{ name: 'image.png' }];
-    await fixture.adapter.attachFiles(files);
-    const tile = fixture.addTile('image.png', false);
-    const image = { src: 'https://chatgpt.com/backend-api/estuary/content', complete: true, naturalWidth: state === 'broken' ? 0 : 64, naturalHeight: 64, getClientRects: () => state === 'hidden' ? [] : [{}] };
-    if (state === 'blob') {
-      image.src = 'blob:https://chatgpt.com/local-preview';
-    }
-    if (state === 'data') {
-      image.src = 'data:image/png;base64,fixture';
-    }
-    if (state === 'foreign-origin') {
-      image.src = 'https://example.com/backend-api/estuary/content';
-    }
-    if (state === 'wrong-path') {
-      image.src = 'https://chatgpt.com/local-preview.png';
-    }
-    tile.querySelectorAll = selector => state !== 'outside-button' && selector === 'button[aria-label="Open image: User uploaded image"] img' ? [image] : [];
-    const pending = fixture.adapter.waitForUploadsComplete({ files, pollMs: 5, timeoutMs: 20 });
-    await fixture.tick(21);
-    assert.equal(await pending, false);
-  });
-}
+test('ChatGPT rejects broken image previews', async context => {
+  const fixture = createFixture(context);
+  const files = [{ name: 'image.png' }];
+  await fixture.adapter.attachFiles(files);
+  fixture.addTile('image.png').images.push({ complete: true, naturalWidth: 0, naturalHeight: 0 });
+  const pending = fixture.adapter.waitForUploadsComplete({ files, pollMs: 5, timeoutMs: 20 });
+  await fixture.tick(21);
+  assert.equal(await pending, false);
+});

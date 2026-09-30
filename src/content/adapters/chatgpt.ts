@@ -6,6 +6,11 @@ import {
   setFilesOnInput,
 } from './page_dom';
 
+// ChatGPT renames a repeated upload in one conversation from `notes.txt` to `notes(1).txt`
+function removeDuplicateSuffix(name: string) {
+  return name.replace(/\(\d+\)(?=\.[^.]*$|$)/, '');
+}
+
 class ChatGPTAdapter extends Adapter {
   id = 'chatgpt' as const;
   private uploadAttempt: { input: HTMLTextAreaElement; form: Element; href: string; files: File[]; counts: Map<string, number> } | null = null;
@@ -68,6 +73,11 @@ class ChatGPTAdapter extends Adapter {
       return true;
     }
 
+    // The composer's submit button becomes a Stop button without a test id while streaming
+    if (this.getInputElement()?.closest('form')?.querySelector('button[aria-label="Stop"]')) {
+      return true;
+    }
+
     return false;
   }
 
@@ -82,6 +92,7 @@ class ChatGPTAdapter extends Adapter {
       'button.composer-submit-btn',
       'button[data-testid="send-button"]',
       'button[aria-label="Send message"]',
+      'button[aria-label="Send"]',
     ]);
   }
 
@@ -105,17 +116,18 @@ class ChatGPTAdapter extends Adapter {
       return { ok: true };
     }
     const composer = this.getInputElement();
-    const input = findEnabledFileInput(composer, ['input#upload-files[type="file"]']);
+    // The composer also holds photo-only inputs, so pick the one that accepts every file type
+    const input = findEnabledFileInput(composer, ['input[type="file"][aria-label="Attach files"]']);
     if (!input) {
       return { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' };
     }
-    const form = composer?.closest('form[data-type="unified-composer"]');
+    const form = composer?.closest('form[data-chatgpt-composer]');
     if (!composer || !form) {
       return { ok: false, error: 'Attachment acceptance cannot be checked in this chat layout. Attach the files manually in the chat composer.' };
     }
     const counts = new Map<string, number>();
-    for (const tile of form.querySelectorAll('[role="group"][aria-label]')) {
-      const name = tile.getAttribute('aria-label')!;
+    for (const remove of form.querySelectorAll('button[aria-label^="Remove "]')) {
+      const name = removeDuplicateSuffix(remove.getAttribute('aria-label')!.slice('Remove '.length));
       counts.set(name, (counts.get(name) || 0) + 1);
     }
     this.uploadAttempt = { input: composer, form, href: location.href, files: [...files], counts };
@@ -134,42 +146,35 @@ class ChatGPTAdapter extends Adapter {
     }
     const expected = new Map(attempt.counts);
     for (const file of files) {
-      expected.set(file.name, (expected.get(file.name) || 0) + 1);
+      const name = removeDuplicateSuffix(file.name);
+      expected.set(name, (expected.get(name) || 0) + 1);
     }
     const started = Date.now();
     while (Date.now() - started < (options?.timeoutMs ?? 60000)) {
-      if (this.uploadAttempt !== attempt || location.href !== attempt.href || !attempt.form.isConnected || !attempt.input.isConnected || this.getInputElement() !== attempt.input || attempt.input.closest('form[data-type="unified-composer"]') !== attempt.form) {
+      if (this.uploadAttempt !== attempt || location.href !== attempt.href || !attempt.form.isConnected || !attempt.input.isConnected || this.getInputElement() !== attempt.input || attempt.input.closest('form[data-chatgpt-composer]') !== attempt.form) {
         if (this.uploadAttempt === attempt) {
           this.uploadAttempt = null;
         }
         return false;
       }
       const accepted = new Map<string, number>();
-      for (const tile of attempt.form.querySelectorAll('[role="group"][aria-label]')) {
-        if (!tile.getClientRects().length) {
+      for (const remove of attempt.form.querySelectorAll('button[aria-label^="Remove "]')) {
+        const tile = remove.parentElement;
+        if (!tile?.getClientRects().length) {
           continue;
         }
-        const hasDocument = Array.from(tile.querySelectorAll('[data-testid="library-file-icon"]')).some(icon => icon.getClientRects().length > 0);
-        const hasImage = Array.from(tile.querySelectorAll<HTMLImageElement>('button[aria-label="Open image: User uploaded image"] img')).some(image => {
-          if (!image.getClientRects().length || !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) {
-            return false;
-          }
-          try {
-            const url = new URL(image.currentSrc || image.src, attempt.href);
-            return url.origin === new URL(attempt.href).origin && url.pathname === '/backend-api/estuary/content';
-          } catch {
-            return false;
-          }
-        });
-        if (!hasDocument && !hasImage) {
+        const name = remove.getAttribute('aria-label')!.slice('Remove '.length);
+        // A rejected file keeps its Remove button and error text but loses the preview surface labeled with its name
+        const hasPreview = [tile, ...tile.querySelectorAll('[aria-label]')].some(node => node.getAttribute('aria-label') === name && node.getClientRects().length > 0);
+        const imagesLoaded = Array.from(tile.querySelectorAll<HTMLImageElement>('img')).every(image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
+        if (!hasPreview || !imagesLoaded) {
           continue;
         }
-        const name = tile.getAttribute('aria-label')!;
-        accepted.set(name, (accepted.get(name) || 0) + 1);
+        const baseName = removeDuplicateSuffix(name);
+        accepted.set(baseName, (accepted.get(baseName) || 0) + 1);
       }
       const busy = Array.from(attempt.form.querySelectorAll('[aria-busy="true"], [aria-label*="Uploading" i], [class*="animate-spin"], [class*="upload" i][class*="progress" i]')).some(node => node.getClientRects().length > 0);
-      const send = findComposerSendButton(attempt.input, ['button#composer-submit-button']);
-      if (files.every(file => (accepted.get(file.name) || 0) >= expected.get(file.name)!) && !busy && send) {
+      if (files.every(file => (accepted.get(removeDuplicateSuffix(file.name)) || 0) >= expected.get(removeDuplicateSuffix(file.name))!) && !busy && this.getSendButton(attempt.input)) {
         this.uploadAttempt = null;
         return true;
       }

@@ -23,8 +23,8 @@ globalThis.DataTransfer = class {
 function createScope(inputs) {
   return {
     querySelectorAll(selector) {
-      if (selector.includes('#upload-files')) {
-        return inputs.filter(input => input.attributes.id === 'upload-files');
+      if (selector.includes('aria-label="Attach files"')) {
+        return inputs.filter(input => input.attributes['aria-label'] === 'Attach files');
       }
       if (selector.includes('data-testid="file-upload"')) {
         return inputs.filter(input => input.attributes['data-testid'] === 'file-upload');
@@ -50,7 +50,7 @@ function createFixture(createAdapter, local, outside = [], hasForm = true) {
 }
 
 for (const [name, createAdapter, recognized] of [
-  ['ChatGPT', createChatGPTAdapter, { id: 'upload-files' }],
+  ['ChatGPT', createChatGPTAdapter, { 'aria-label': 'Attach files' }],
   ['Claude', createClaudeAdapter, { 'data-testid': 'file-upload' }],
   ['Gemini', createGeminiAdapter, null],
 ]) {
@@ -110,7 +110,7 @@ for (const [name, createAdapter, recognized] of [
 }
 
 test('ChatGPT rejects a recognized uploader without an acceptance context before assigning files', async () => {
-  const external = new FakeFileInput({ id: 'upload-files' });
+  const external = new FakeFileInput({ 'aria-label': 'Attach files' });
   const adapter = createFixture(createChatGPTAdapter, [], [external], false);
   const result = await adapter.attachFiles([new File(['text'], 'sample.txt')]);
   assert.equal(result.ok, false);

@@ -216,3 +216,17 @@ test('Gemini ignores its auxiliary Quill clipboard when locating Send', () => {
   clipboard.attributes.class = 'another-editor';
   assert.equal(createGeminiAdapter().getSendButton(input), null);
 });
+
+test('ChatGPT sends through the current Send button and detects its Stop state', () => {
+  const { form } = createFixture();
+  const input = new FakeElement('div', { contenteditable: 'true', role: 'textbox' });
+  const send = new FakeButton({ 'aria-label': 'Send', type: 'submit' });
+  form.append(input, send);
+  const adapter = createChatGPTAdapter();
+  assert.equal(adapter.isGenerating(), false);
+  assert.equal(adapter.clickSend(input), true);
+  assert.equal(send.clicks, 1);
+  send.attributes = { 'aria-label': 'Stop', type: 'button' };
+  assert.equal(adapter.isGenerating(), true);
+  assert.equal(adapter.clickSend(input), false);
+});
