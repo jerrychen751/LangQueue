@@ -38,6 +38,18 @@ function runStep(adapter, signal = new AbortController().signal) {
   return executeStep(adapter, () => adapter.input, { content: 'prompt' }, 'overwrite', signal, () => {}, () => {}, timing);
 }
 
+// Mocked timers only fire timers that exist when the clock moves, so advance in steps and let awaited work schedule the next timer
+async function advanceTimers(context, milliseconds, step = 100) {
+  for (let elapsed = 0; elapsed < milliseconds; elapsed += step) {
+    context.mock.timers.tick(Math.min(step, milliseconds - elapsed));
+    await new Promise(resolve => setImmediate(resolve));
+  }
+}
+
+function waitForQueue(queue, isDone) {
+  return new Promise(resolve => queue.subscribe(snapshot => isDone(snapshot) && resolve()));
+}
+
 test('waits for delayed generation before completing', async context => {
   context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
   const adapter = createAdapter();
@@ -172,7 +184,7 @@ test('chain timeout stops before the next step and publishes a settled terminal 
   });
   const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
   await new Promise(resolve => setImmediate(resolve));
-  context.mock.timers.tick(120001);
+  await advanceTimers(context, 1800401);
   assert.equal(await pending, false);
   assert.match(chain.getSnapshot().error, /RESPONSE_TIMEOUT/);
   assert.equal(adapter.sends, 1);
@@ -562,4 +574,37 @@ test('a thrown SEND_FAILED never enables queue retry after an attempted click', 
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(adapter.sends, 1);
   queue.cancel();
+});
+
+test('chain skips step attachments when multimodal attachments are turned off', async () => {
+  const adapter = createAdapter();
+  let uploads = 0;
+  adapter.attachFiles = async () => { uploads++; return { ok: true }; };
+  let generationReads = 0;
+  adapter.isGenerating = () => generationReads-- > 0;
+  adapter.clickSend = () => { adapter.sends++; adapter.input.value = ''; generationReads = 1; return true; };
+  const chain = createChainExecutor(adapter, () => adapter.input);
+  assert.equal(await chain.run([{ content: 'prompt', attachments: [{ id: 'fixture', name: 'empty.txt', mimeType: 'text/plain' }] }], { multimodalEnabled: false }), true);
+  assert.equal(uploads, 0);
+  assert.equal(adapter.sends, 1);
+});
+
+test('cancelling between chain steps does not claim the finished step may have been sent', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const adapter = createAdapter();
+  let generationReads = 0;
+  adapter.isGenerating = () => generationReads-- > 0;
+  adapter.clickSend = () => { adapter.sends++; adapter.input.value = ''; generationReads = 1; return true; };
+  const chain = createChainExecutor(adapter, () => adapter.input);
+  chain.subscribe(progress => {
+    if (progress.status === 'delayed') {
+      chain.cancel();
+    }
+  });
+  const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
+  await advanceTimers(context, 1000);
+  assert.equal(await pending, false);
+  assert.equal(adapter.sends, 1);
+  assert.equal(chain.getSnapshot().status, 'cancelled');
+  assert.doesNotMatch(chain.getSnapshot().error, /may have been sent/);
 });

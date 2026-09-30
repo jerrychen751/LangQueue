@@ -56,9 +56,12 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
       for (; stepIndex < steps.length; stepIndex++) {
         assertExecutionContext(controller.signal, href);
         sent = false;
-        await executeStep(adapter, getInput, steps[stepIndex], mode, controller.signal, status => {
+        const step = settings.multimodalEnabled === false ? { ...steps[stepIndex], attachments: [] } : steps[stepIndex];
+        await executeStep(adapter, getInput, step, mode, controller.signal, status => {
           publish({ stepIndex, totalSteps, status });
-        }, () => { sent = true; }, undefined, stepIndex > 0 ? '' : undefined, href);
+        }, () => { sent = true; }, { timeoutMs: 1800000, startTimeoutMs: 15000, pollMs: 200 }, stepIndex > 0 ? '' : undefined, href);
+        // The step's response has finished, so a stop during the pause below cannot leave this prompt half-sent
+        sent = false;
         if (stepIndex < steps.length - 1) {
           publish({ stepIndex, totalSteps, status: 'delayed' });
           await waitForExecutionDelay(STEP_DELAY_MS, controller.signal);
