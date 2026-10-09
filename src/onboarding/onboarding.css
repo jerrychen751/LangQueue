@@ -79,6 +79,7 @@ body,
 }
 
 .onboarding-card code,
+.onboarding-card kbd,
 .onboarding-hints kbd {
   padding: 1px 5px;
   border-radius: 3px;
@@ -87,6 +88,7 @@ body,
   font-size: 12px;
 }
 
+.onboarding-card kbd,
 .onboarding-hints kbd {
   border: 1px solid var(--line);
   background: var(--surface);

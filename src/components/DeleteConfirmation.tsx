@@ -73,19 +73,19 @@ export default function DeleteConfirmation({
 
   return (
     <div className="fixed left-0 top-0 z-[100] flex h-[600px] w-popup items-center justify-center">
-      <div className="absolute inset-0 bg-[#1c272c]/30 backdrop-blur-sm" onClick={() => {
+      <div className="absolute inset-0 bg-[#1c272c]/[0.28] backdrop-blur-[2px]" onClick={() => {
         if (!busy) {
           onCancel();
         }
       }} />
-      <div ref={dialogRef} role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={busy} className="relative z-[101] w-[340px] rounded-[6px] border border-[#bcc7ca] bg-white p-5 text-[#1c272c] shadow-lg">
+      <div ref={dialogRef} role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={busy} className="relative z-[101] w-[340px] rounded-[6px] border border-[#bcc7ca] bg-white p-5 text-[#1c272c] shadow-[0_16px_40px_rgba(28,39,44,0.18)]">
         <div id={titleId} className="dialog-title">{title}</div>
         <div id={descriptionId} className="mt-2 text-xs leading-5 text-[#6f7c82]">{description}</div>
         <div className="mt-4 flex items-center justify-end gap-2">
           <button type="button" disabled={busy} ref={cancelRef} className="secondary-button min-h-10" onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button type="button" disabled={busy} className="inline-flex min-h-10 items-center justify-center rounded-[4px] bg-rose-700 px-4 text-xs font-bold text-white transition hover:bg-rose-600" onClick={onConfirm}>
+          <button type="button" disabled={busy} className="inline-flex min-h-10 items-center justify-center rounded-[4px] bg-rose-700 px-4 text-xs font-[650] text-white transition hover:bg-rose-600" onClick={onConfirm}>
             {confirmLabel}
           </button>
         </div>

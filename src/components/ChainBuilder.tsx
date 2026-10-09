@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Trash2, X, Save, Plus, Paperclip } from 'lucide-react';
+import { ArrowDown, ArrowUp, Trash2, X, Plus, Paperclip } from 'lucide-react';
 import { saveChain } from '../library/storage';
 import { useToast } from './useToast';
 import type { AttachmentRef, PromptChain } from '../library/model';
@@ -309,153 +309,158 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
             </button>
           </div>
 
-          <div className="space-y-3 p-4">
-            <div className="settings-panel">
-              <div className="max-h-[330px] overflow-auto">
-                {items.length === 0 ? null : (
-                  <ol className="divide-y divide-[#d9dfe1]">
-                    {items.map((it, idx) => {
-                      const isEditing = it.content.trim().length === 0 || editingId === it.id;
-                      return (
-                        <li key={it.id} className="px-3 py-3">
-                          <div className="flex items-start gap-2">
-                            <div className="chain-number h-7 w-7">{String(idx + 1).padStart(2, '0')}</div>
-                            <div className="flex-1 min-w-0">
-                              {isEditing ? (
-                                <textarea
-                                  value={it.content}
-                                  placeholder="Prompt"
-                                  aria-label={`Step ${idx + 1} prompt`}
-                                  onChange={(e) => updateItem(it.id, e.target.value)}
-                                  onFocus={() => {
-                                    if (!savingRef.current) {
-                                      setEditingId(it.id);
-                                    }
-                                  }}
-                                  onBlur={() => {
-                                    if (!savingRef.current && editingId === it.id) {
-                                      setEditingId(null);
-                                    }
-                                  }}
-                                  className="form-input min-h-[72px] w-full resize-none rounded-[4px] px-3 py-2 text-sm"
-                                />
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="w-full rounded-[3px] px-1 py-1 text-left hover:bg-[#edf2f3]"
-                                  onClick={() => {
-                                    if (!savingRef.current) {
-                                      setEditingId(it.id);
-                                    }
-                                  }}
-                                  title={it.content}
-                                >
-                                  <div className="truncate text-sm text-[#1c272c]">{it.content}</div>
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 pt-1">
-                              <button
-                                className="icon-button h-7 w-7"
-                                onClick={() => {
-                                  if (savingRef.current) {
-                                    return;
-                                  }
-                                  filePickerGeneration.current = draftGeneration.current;
-                                  setPendingAttachmentStepId(it.id);
-                                  fileInputRef.current?.click();
-                                }}
-                                aria-label="Add attachment"
-                              >
-                                <Paperclip size={14} />
-                              </button>
-                              <button
-                                className="icon-button h-7 w-7 disabled:opacity-30"
-                                onClick={() => moveUp(idx)}
-                                disabled={idx === 0}
-                                aria-label="Move up"
-                              >
-                                <ArrowUp size={14} />
-                              </button>
-                              <button
-                                className="icon-button h-7 w-7 disabled:opacity-30"
-                                onClick={() => moveDown(idx)}
-                                disabled={idx === items.length - 1}
-                                aria-label="Move down"
-                              >
-                                <ArrowDown size={14} />
-                              </button>
-                              <button
-                                className="icon-button h-7 w-7 text-rose-700 hover:border-rose-300 hover:bg-rose-50"
-                                onClick={() => removeItem(idx)}
-                                aria-label="Remove"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                          {it.attachments.length > 0 ? (
-                            <div className="ml-9 mt-2 flex flex-wrap gap-1">
-                              {it.attachments.map((attachment) => (
-                                <span key={attachment.id} className="inline-flex items-center gap-1 rounded-[3px] border border-[#cfd6d8] bg-[#f8f9f9] px-2 py-1 text-[10px]">
-                                  <span className="max-w-[150px] truncate">{attachment.name}</span>
-                                  <button
-                                    type="button"
-                                    className="rounded-[2px] p-0.5 hover:bg-[#e7ecee]"
-                                    onClick={() => removeAttachment(it.id, attachment.id)}
-                                    aria-label={`Remove attachment ${attachment.name}`}
-                                  >
-                                    <X size={10} />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
-              </div>
-              <div className={`${items.length === 0 ? '' : 'border-t border-[#d9dfe1] '}px-3 py-2.5`}>
-                <button
-                  className="compact-button inline-flex items-center gap-2"
-                  onClick={addStep}
-                  type="button"
-                >
-                  <Plus size={14} /> Add step
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-3">
+          <div className="space-y-4 p-4">
+            <div>
+              <label htmlFor="chain-title" className="field-label">Title</label>
               <input
+                id="chain-title"
                 ref={titleRef}
                 type="text"
                 value={title}
-                placeholder="Chain title"
                 aria-label="Chain title"
                 onChange={(e) => {
                   if (!savingRef.current) {
                     setTitle(e.target.value);
                   }
                 }}
-                className="form-input w-full rounded-[4px] px-3 py-2.5 text-xs"
+                className="form-input w-full rounded-[4px] px-3 py-2.5 text-sm"
               />
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  className="primary-button min-h-10 disabled:opacity-50"
-                  onClick={handleSaveChain}
-                  disabled={!canSave}
-                  title={canSave || saving ? undefined : 'Add a title and fill in every step'}
-                >
-                  <Save size={15} /> {saving ? 'Saving…' : 'Save'}
-                </button>
-                <button className="secondary-button min-h-10" onClick={handleClose} disabled={saving}>
-                  Cancel
-                </button>
+            </div>
+
+            <div>
+              <div className="field-label">Steps</div>
+              <div className="settings-panel">
+                <div className="max-h-[250px] overflow-auto">
+                  {items.length === 0 ? null : (
+                    <ol className="divide-y divide-[#d9dfe1]">
+                      {items.map((it, idx) => {
+                        const isEditing = it.content.trim().length === 0 || editingId === it.id;
+                        return (
+                          <li key={it.id} className="px-3 py-3">
+                            <div className="flex items-start gap-2">
+                              <div className="chain-number h-7 w-7">{String(idx + 1).padStart(2, '0')}</div>
+                              <div className="flex-1 min-w-0">
+                                {isEditing ? (
+                                  <textarea
+                                    value={it.content}
+                                    placeholder="Prompt"
+                                    aria-label={`Step ${idx + 1} prompt`}
+                                    onChange={(e) => updateItem(it.id, e.target.value)}
+                                    onFocus={() => {
+                                      if (!savingRef.current) {
+                                        setEditingId(it.id);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      if (!savingRef.current && editingId === it.id) {
+                                        setEditingId(null);
+                                      }
+                                    }}
+                                    className="form-input min-h-[72px] w-full resize-none rounded-[4px] px-3 py-2 text-sm"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="w-full rounded-[3px] px-1 py-1 text-left hover:bg-[#edf2f3]"
+                                    onClick={() => {
+                                      if (!savingRef.current) {
+                                        setEditingId(it.id);
+                                      }
+                                    }}
+                                    title={it.content}
+                                  >
+                                    <div className="truncate text-sm text-[#1c272c]">{it.content}</div>
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 pt-1">
+                                <button
+                                  className="icon-button h-7 w-7"
+                                  onClick={() => {
+                                    if (savingRef.current) {
+                                      return;
+                                    }
+                                    filePickerGeneration.current = draftGeneration.current;
+                                    setPendingAttachmentStepId(it.id);
+                                    fileInputRef.current?.click();
+                                  }}
+                                  aria-label="Add attachment"
+                                >
+                                  <Paperclip size={14} />
+                                </button>
+                                <button
+                                  className="icon-button h-7 w-7 disabled:opacity-30"
+                                  onClick={() => moveUp(idx)}
+                                  disabled={idx === 0}
+                                  aria-label="Move up"
+                                >
+                                  <ArrowUp size={14} />
+                                </button>
+                                <button
+                                  className="icon-button h-7 w-7 disabled:opacity-30"
+                                  onClick={() => moveDown(idx)}
+                                  disabled={idx === items.length - 1}
+                                  aria-label="Move down"
+                                >
+                                  <ArrowDown size={14} />
+                                </button>
+                                <button
+                                  className="icon-button h-7 w-7 text-rose-700 hover:border-rose-300 hover:bg-rose-50"
+                                  onClick={() => removeItem(idx)}
+                                  aria-label="Remove"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                            {it.attachments.length > 0 ? (
+                              <div className="ml-9 mt-2 flex flex-wrap gap-1">
+                                {it.attachments.map((attachment) => (
+                                  <span key={attachment.id} className="inline-flex items-center gap-1 rounded-[3px] border border-[#cfd6d8] bg-[#f8f9f9] px-2 py-1 text-[10px]">
+                                    <span className="max-w-[150px] truncate">{attachment.name}</span>
+                                    <button
+                                      type="button"
+                                      className="rounded-[2px] p-0.5 hover:bg-[#e7ecee]"
+                                      onClick={() => removeAttachment(it.id, attachment.id)}
+                                      aria-label={`Remove attachment ${attachment.name}`}
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                </div>
+                <div className={`${items.length === 0 ? '' : 'border-t border-[#d9dfe1] '}px-3 py-2.5`}>
+                  <button
+                    className="compact-button inline-flex items-center gap-2"
+                    onClick={addStep}
+                    type="button"
+                  >
+                    <Plus size={14} /> Add step
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 border-t border-[#d9dfe1] p-4">
+            <button className="secondary-button min-h-10" onClick={handleClose} disabled={saving}>
+              Cancel
+            </button>
+            <button
+              className="primary-button min-h-10 disabled:opacity-50"
+              onClick={handleSaveChain}
+              disabled={!canSave}
+              title={canSave || saving ? undefined : 'Add a title and fill in every step'}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
           </div>
         </fieldset>
       </div>

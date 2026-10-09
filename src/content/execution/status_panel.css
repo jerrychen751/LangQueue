@@ -2,25 +2,39 @@
 :host([hidden]) { display: none; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-section { width: 340px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid #cfd6d8; border-radius: 12px; background: #ffffff; color: #1c272c; box-shadow: 0 12px 36px #1c272c24; font: 13px/1.5 system-ui, sans-serif; }
-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #d9dfe1; font-weight: 650; }
-.body { padding: 14px 16px; }
+section { width: 340px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid #bcc7ca; border-radius: 6px; background: #f2f4f3; color: #1c272c; box-shadow: 0 16px 40px rgba(28, 39, 44, 0.18); font: 12.5px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-synthesis: none; scrollbar-color: rgba(95, 110, 117, 0.3) transparent; scrollbar-width: thin; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 10px 11px 14px; border-bottom: 1px solid #d9dfe1; background: #fbfcfc; }
+.title { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
+.body { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; }
 p { margin: 0; }
-.status { font-weight: 600; }
-.message { padding: 10px; border-radius: 6px; color: #75521e; background: #fff4df; overflow-wrap: anywhere; }
-ol { list-style: none; padding: 0; margin: 12px 0; max-height: 240px; overflow-y: auto; }
-li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid #d9dfe1; }
-li p { white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-button { font: inherit; cursor: pointer; color: #1c272c; background: #f2f4f3; border: 1px solid #cfd6d8; border-radius: 6px; padding: 6px 10px; transition: background 150ms; }
-button:hover { background: #e7ecee; }
-button:focus-visible { outline: 2px solid #527d8c; outline-offset: 3px; }
-.toggle { border: 0; background: transparent; font-size: 12px; font-weight: 400; padding: 4px; color: #46555c; }
-.remove { grid-column: 2; grid-row: 1; font-size: 16px; line-height: 1; padding: 2px 6px; border-color: transparent; background: transparent; color: #6f7c82; }
-.status:not([hidden]) + .message { margin-top: 10px; }
-.sent { display: block; margin-top: 6px; font-size: 12px; color: #75521e; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.retry { background: #527d8c; border-color: #527d8c; color: #f7fafb; }
-.retry:hover { background: #426c7a; }
+.status { display: flex; align-items: center; gap: 7px; min-height: 24px; color: #6f7c82; font-size: 9.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
+.count { color: #1c272c; letter-spacing: 0; }
+.state { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 3px 8px; border: 1px solid #cfd6d8; border-radius: 4px; color: #46555c; background: #ffffff; font-size: 10.5px; letter-spacing: 0; text-transform: none; }
+.state::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: #879297; }
+.state[data-tone="active"] { color: #426c7a; border-color: #b8c8ce; background: #eef3f5; }
+.state[data-tone="active"]::before { background: #527d8c; }
+.state[data-tone="done"] { color: #3f6954; border-color: #b5c9be; background: #eef4f0; }
+.state[data-tone="done"]::before { background: #4f7662; }
+.state[data-tone="error"] { color: #be123c; border-color: #fda4af; background: #fff1f2; }
+.state[data-tone="error"]::before { background: #be123c; }
+.message { padding: 8px 10px; border: 1px solid #cfd6d8; border-radius: 4px; color: #46555c; background: #ffffff; font-size: 11.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.message[data-tone="error"] { color: #be123c; border-color: #fda4af; background: #fff1f2; }
+ol { display: flex; flex-direction: column; gap: 6px; list-style: none; padding: 0; margin: 0; max-height: 240px; overflow-y: auto; scrollbar-color: rgba(95, 110, 117, 0.3) transparent; scrollbar-width: thin; }
+li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start; flex: 0 0 auto; padding: 8px 6px 8px 10px; border: 1px solid #cfd6d8; border-left-width: 3px; border-radius: 5px; background: #ffffff; box-shadow: 0 1px 2px rgba(20, 32, 37, 0.06); }
+li[data-current="true"] { border-left-color: #527d8c; }
+li p { padding-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sent { grid-column: 1; margin-top: 3px; color: #6f7c82; font-size: 10.5px; font-weight: 500; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid #527d8c; outline-offset: 2px; }
+.toggle { padding: 3px 6px; border: 0; border-radius: 3px; color: #6f7c82; background: transparent; font-size: 10.5px; font-weight: 600; transition: color 140ms ease, background 140ms ease; }
+.toggle:hover { color: #1c272c; background: #edf2f3; }
+.remove { display: grid; grid-column: 2; grid-row: 1; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: 3px; color: #6f7c82; background: transparent; font-size: 15px; line-height: 1; transition: color 140ms ease, background 140ms ease; }
+.remove:hover { color: #1c272c; background: #edf2f3; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { padding: 7px 11px; border: 1px solid #cfd6d8; border-radius: 4px; color: #46555c; background: #ffffff; font-size: 11px; font-weight: 600; transition: border-color 140ms ease, color 140ms ease, background 140ms ease; }
+.actions button:hover { border-color: #9eb1b8; color: #426c7a; background: #edf2f3; }
+.actions .retry { border-color: #527d8c; color: #f7fafb; background: #527d8c; }
+.actions .retry:hover { border-color: #426c7a; color: #f7fafb; background: #426c7a; }
+button:disabled { opacity: 0.45; cursor: default; }
+.remove:disabled:hover { color: #6f7c82; background: transparent; }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
-button:disabled { opacity: 0.5; cursor: default; }
-button:disabled:hover { background: #f2f4f3; }

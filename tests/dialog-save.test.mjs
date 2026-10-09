@@ -241,11 +241,11 @@ test('pending chain saves reject title, step text, and step additions', async ()
   tree = dialog.render();
   const saving = dialog.find(tree, (node) => node.props.onClick?.name === 'handleSaveChain').props.onClick();
   step.props.onChange({ target: { value: 'late change' } });
-  dialog.find(tree, (node) => node.props.placeholder === 'Chain title').props.onChange({ target: { value: 'late title' } });
+  dialog.find(tree, (node) => node.props['aria-label'] === 'Chain title').props.onChange({ target: { value: 'late title' } });
   dialog.find(tree, (node) => node.props.onClick?.name === 'addStep').props.onClick();
   tree = dialog.render();
   assert.equal(dialog.find(tree, (node) => node.type === 'fieldset').props.disabled, true);
-  assert.equal(dialog.find(tree, (node) => node.props.placeholder === 'Chain title').props.value, 'Chain title');
+  assert.equal(dialog.find(tree, (node) => node.props['aria-label'] === 'Chain title').props.value, 'Chain title');
   const items = dialog.hooks.find((hook) => Array.isArray(hook) && hook[0]?.content);
   assert.equal(items.length, 2);
   assert.equal(items[0].content, 'Step 1 prompt');

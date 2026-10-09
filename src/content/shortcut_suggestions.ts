@@ -66,10 +66,8 @@ const STYLES = `
     border-bottom: 1px solid #d9dfe1;
     color: var(--lq-text-muted);
     background: #fbfcfc;
-    font-size: 9.5px;
+    font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
   }
   .lq-create {
     display: flex;
