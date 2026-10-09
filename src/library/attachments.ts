@@ -9,28 +9,23 @@ export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 const ALLOWED_MIME_PATTERNS = [
   /^image\//i,
+  /^text\//i,
   /^application\/pdf$/i,
-  /^text\/plain$/i,
-  /^text\/markdown$/i,
-  /^text\/csv$/i,
+  /^application\/(json|xml|xhtml\+xml|rtf|epub\+zip|sql|toml|x-yaml|x-sh|x-tex|x-ipynb\+json)$/i,
   /^application\/msword$/i,
-  /^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document$/i,
+  /^application\/vnd\.ms-(excel|powerpoint)$/i,
+  /^application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)$/i,
+  /^application\/vnd\.oasis\.opendocument\.(text|spreadsheet|presentation)$/i,
 ] as const;
 
+// Browsers report no type, or a misleading one such as video/mp2t for .ts, for most code and data files, so the extension decides for those
 const ALLOWED_EXTENSIONS = new Set([
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'bmp',
-  'svg',
-  'pdf',
-  'txt',
-  'md',
-  'csv',
-  'doc',
-  'docx',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'epub',
+  'txt', 'md', 'markdown', 'log', 'tex',
+  'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml',
+  'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
+  'py', 'ipynb', 'java', 'c', 'h', 'cpp', 'hpp', 'cs', 'go', 'rs', 'rb', 'php', 'swift', 'kt', 'sh', 'sql',
 ]);
 
 type StoredAttachmentRecord = AttachmentRef & {

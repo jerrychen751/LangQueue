@@ -115,3 +115,14 @@ test('attachment preflight rejects metadata that file storage would normalize di
   assert.throws(() => api.prepareAttachmentImports([{ ...record, mimeType: '' }]), /Invalid/);
   assert.equal(getOpenCount(), 0);
 });
+
+test('common document, data, web, and code files are accepted and other types are refused', () => {
+  const { api } = createAttachmentStorage();
+  // Chrome reports video/mp2t for .ts and no type for most code files
+  for (const [name, type] of [['page.html', 'text/html'], ['data.json', 'application/json'], ['sheet.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], ['slides.pptx', ''], ['module.ts', 'video/mp2t'], ['script.py', ''], ['config.yaml', '']]) {
+    assert.equal(api.validateAttachmentFile({ name, type, size: 1 }), null, name);
+  }
+  for (const [name, type] of [['clip.mp4', 'video/mp4'], ['archive.zip', 'application/zip'], ['tool.exe', 'application/x-msdownload'], ['README', '']]) {
+    assert.equal(api.validateAttachmentFile({ name, type, size: 1 }), 'Unsupported file type.', name);
+  }
+});
