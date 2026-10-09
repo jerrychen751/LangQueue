@@ -262,7 +262,7 @@ function assertUniqueTitle(db: PromptsSchema, title: string, ignoreId?: string):
   }
   const exists = Object.values(db.promptsById).some((p) => p.title === normalized && p.id !== ignoreId);
   if (exists) {
-    throw new Error('A shortcut with that name already exists.');
+    throw new Error('That name is already taken.');
   }
   return normalized;
 }

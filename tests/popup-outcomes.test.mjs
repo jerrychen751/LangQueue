@@ -96,7 +96,7 @@ test('failed insertion keeps the popup open without copying or logging usage', a
   assert.equal(popup.getUses(), 0);
   assert.equal(popup.toasts.length, 1);
   assert.equal(popup.toasts[0].variant, 'error');
-  assert.match(popup.toasts[0].message, /Check the composer/);
+  assert.match(popup.toasts[0].message, /Composer unavailable/);
 });
 
 test('a chain-only library keeps its edit and run actions visible', () => {
@@ -159,11 +159,11 @@ test('duplicate insertion clicks share one pending operation', async () => {
   assert.equal(popup.getUses(), 1);
 });
 
-test('usage failure after insertion reports the completed insertion honestly', async () => {
+test('usage failure after insertion still closes the popup without a message', async () => {
   const popup = createPopup('App', { logUsage: async () => { throw new Error('Storage failed'); } });
   await popup.find(popup.render(), node => node.type === 'PromptCard').props.onInsert(popup.prompt);
-  assert.equal(popup.getCloses(), 0);
-  assert.match(popup.toasts.at(-1).message, /Prompt inserted, but usage counts/);
+  assert.equal(popup.getCloses(), 1);
+  assert.equal(popup.toasts.length, 0);
 });
 
 test('prompt confirmation waits for deletion and ignores duplicate attempts', async () => {
@@ -183,7 +183,7 @@ test('prompt confirmation waits for deletion and ignores duplicate attempts', as
   finishDelete();
   await deleting;
   assert.equal(popup.find(popup.render(props), node => node.props.title === 'Delete prompt?').props.open, false);
-  assert.equal(popup.toasts[0].variant, 'success');
+  assert.equal(popup.toasts.length, 0);
 });
 
 test('failed deletion keeps confirmation open and allows retry', async () => {
@@ -201,7 +201,7 @@ test('failed deletion keeps confirmation open and allows retry', async () => {
   assert.equal(popup.toasts[0].variant, 'error');
   await confirmation.props.onConfirm();
   assert.equal(deletes, 2);
-  assert.equal(popup.toasts[1].variant, 'success');
+  assert.equal(popup.toasts.length, 1);
 });
 
 test('chain deletion waits for storage, prevents duplicate work, and reports failure', async () => {

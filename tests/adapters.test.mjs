@@ -201,7 +201,7 @@ for (const [name, createAdapter] of [['ChatGPT', createChatGPTAdapter], ['Claude
     const send = new FakeButton({ 'aria-label': 'Send message' });
     send.click = () => { send.clicks++; throw new Error('SEND_FAILED'); };
     form.append(send);
-    assert.throws(() => createAdapter().clickSend(input), /may have been attempted/);
+    assert.throws(() => createAdapter().clickSend(input), /may have been sent/);
     assert.equal(send.clicks, 1);
   });
 }

@@ -103,7 +103,7 @@ export async function sendPromptWhenReady(
       throw new Error('COMPOSER_CHANGED: save or clear your draft, then retry.');
     }
     if (adapter.isGenerating()) {
-      throw new Error('The model started generating a response. Check the conversation before sending again.');
+      throw new Error('A response started before this was sent. Check the chat, then retry.');
     }
   }
   while (true) {
@@ -116,8 +116,8 @@ export async function sendPromptWhenReady(
       let sent: boolean;
       try {
         sent = adapter.clickSend(input as HTMLTextAreaElement);
-      } catch (cause) {
-        throw new Error(`SEND_UNCERTAIN: the prompt may have been sent. Check the conversation before sending again. ${cause instanceof Error ? cause.message : ''}`);
+      } catch {
+        throw new Error('SEND_UNCERTAIN: the prompt may have been sent.');
       }
       if (!sent) {
         throw new Error('SEND_FAILED');

@@ -27,19 +27,19 @@ export async function checkTabCompatibility(): Promise<boolean> {
 export async function sendPromptToTab(promptContent: string, attachments: AttachmentRef[] = []): Promise<void> {
   const tab = await getActiveTab();
   if (!tab?.id || !tab.url) {
-    throw new Error('No active tab');
+    throw new Error('Open ChatGPT, Gemini, or Claude first.');
   }
   const platform = detectPlatformFromUrl(tab.url);
   if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) {
-    throw new Error('Not on a compatible AI chat page');
+    throw new Error('Open ChatGPT, Gemini, or Claude first.');
   }
   try {
     const result = await sendToTab(tab.id, 'INJECT_PROMPT', { content: promptContent, attachments, expectedHref: tab.url });
     if (!result.ok) {
-      throw new Error(result.reason || 'Failed to inject prompt');
+      throw new Error(result.reason || 'Couldn\'t insert the prompt.');
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Injection failed';
+    const message = err instanceof Error ? err.message : 'Couldn\'t insert the prompt.';
     throw new Error(message);
   }
 }
@@ -47,20 +47,20 @@ export async function sendPromptToTab(promptContent: string, attachments: Attach
 export async function insertAndSendPromptToTab(content: string, attachments: AttachmentRef[] = []): Promise<void> {
   const tab = await getActiveTab();
   if (!tab?.id || !tab.url) {
-    throw new Error('No active tab');
+    throw new Error('Open ChatGPT, Gemini, or Claude first.');
   }
   const platform = detectPlatformFromUrl(tab.url);
   if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) {
-    throw new Error('Not on a compatible AI chat page');
+    throw new Error('Open ChatGPT, Gemini, or Claude first.');
   }
   let result: InsertPromptResult;
   try {
     result = await sendToTab(tab.id, 'INSERT_AND_SEND_PROMPT', { content, attachments, expectedHref: tab.url });
   } catch {
-    throw new Error('Sending could not be confirmed. Check the original conversation before trying again; the prompt may have been sent.');
+    throw new Error('Your prompt may have been sent. Check the chat before you try again.');
   }
   if (!result.ok) {
-    throw new Error((result.reason || 'Sending failed.') + (result.sendAttempted ? ' The prompt may have been sent. Check the conversation before trying again.' : ''));
+    throw new Error(result.sendAttempted ? 'Your prompt may have been sent. Check the chat before you try again.' : result.reason || 'Couldn\'t send the prompt.');
   }
 }
 
@@ -91,11 +91,11 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
   }
   const tab = await getActiveTab();
   if (!tab?.id || !tab.url) {
-    throw new Error('No active tab');
+    throw new Error('Open ChatGPT, Gemini, or Claude first.');
   }
   const platform = detectPlatformFromUrl(tab.url);
   if (!(platform === 'chatgpt' || platform === 'gemini' || platform === 'claude')) {
-    throw new Error('Not on a compatible AI chat page');
+    throw new Error('Open ChatGPT, Gemini, or Claude first.');
   }
 
   // Best-effort readiness check; proceed even if false, as content scripts may attach shortly after
@@ -112,19 +112,21 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
     const result = await sendToTab(tab.id, 'RUN_CHAIN', { steps, expectedHref: tab.url, insertionModeOverride });
     if (!result.ok) {
       throw new Error(result.reason === 'CONVERSATION_REQUIRED'
-      ? 'Start a conversation first, then run the chain. Your draft was kept.'
+      ? 'Send a message to start the chat, then run the chain.'
       : result.reason === 'SETTINGS_UNAVAILABLE'
-        ? 'Settings are unavailable. Try the action again to reload settings; if it still fails, reload the extension.'
+        ? 'LangQueue couldn\'t load on that page. Try again, or reload it.'
         : result.reason === 'COMPOSER_CHANGED'
-          ? 'The draft changed while settings loaded. Start the chain again when ready.'
+          ? 'Your draft changed. Run the chain again.'
           : result.reason === 'CONVERSATION_CHANGED'
-            ? 'The conversation changed before the chain started. Return to the intended conversation and try again.'
+            ? 'You switched chats. Open the one you want and run the chain again.'
             : result.reason === 'CANCELLED'
-              ? 'The chain was cancelled before it started. Your draft was kept.'
-              : result.reason || 'Failed to start chain');
+              ? 'Chain cancelled.'
+              : result.reason === 'COMPOSER_BUSY'
+                ? 'Finish or cancel the queue first.'
+                : 'Couldn\'t start the chain.');
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to start chain';
+    const message = err instanceof Error ? err.message : 'Couldn\'t start the chain.';
     throw new Error(message);
   }
 }

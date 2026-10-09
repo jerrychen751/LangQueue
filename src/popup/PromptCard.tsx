@@ -123,9 +123,8 @@ export function PromptCard({
           try {
             await onDelete(prompt);
             setConfirmOpen(false);
-            showToast({ variant: 'success', message: 'Prompt deleted' });
           } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete prompt.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Couldn\'t delete the prompt.' });
           } finally {
             deletingRef.current = false;
             setDeleting(false);

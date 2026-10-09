@@ -56,12 +56,12 @@ export function initController(adapter: Adapter) {
           return;
         }
         if (expectedHref !== getConversationHref()) {
-          executionPanel.showMessage('Conversation changed. Select the prompt again.');
+          executionPanel.showMessage('You switched chats. Pick the prompt again.');
           return;
         }
         const input = adapter.getInputElement();
         if (!input || input !== expectedInput || getInputText(input) !== expectedText) {
-          executionPanel.showMessage('Draft changed. Select the prompt again.');
+          executionPanel.showMessage('Your draft changed. Pick the prompt again.');
           return;
         }
         if (item.kind === 'prompt') {
@@ -69,13 +69,11 @@ export function initController(adapter: Adapter) {
             settings.multimodalEnabled === false ? [] : item.attachments || [], 'overwrite', false, expectedHref);
           if (!result.ok) {
             // Stop text insertion when the attachment or composer check fails
-            executionPanel.showMessage(result.reason || 'Insert failed.');
+            executionPanel.showMessage(result.reason || 'Couldn\'t insert the prompt.');
             return;
           }
           shortcutSuggestions.hide();
-          void logUsage(item.id, mapPlatform(adapter.id)).catch(() => {
-            executionPanel.showMessage('Prompt inserted, but its usage count wasn\'t saved.');
-          });
+          void logUsage(item.id, mapPlatform(adapter.id)).catch(() => {});
           return;
         }
         shortcutSuggestions.hide();
@@ -146,12 +144,11 @@ export function initController(adapter: Adapter) {
         }
         settingsErrorShown = false;
         return true;
-      } catch (error) {
+      } catch {
         if (version === settingsVersion) {
           settingsLoaded = false;
           settingsErrorShown = true;
-          const detail = error instanceof Error ? ` Details: ${error.message}` : '';
-          executionPanel.showMessage(`Settings unavailable. Try again, or reload the extension.${detail}`);
+          executionPanel.showMessage('LangQueue couldn\'t load. Try again, or reload this page.');
         }
         return false;
       } finally {
@@ -211,14 +208,13 @@ export function initController(adapter: Adapter) {
         executionPanel.showMessage('');
       }
       searchErrorShown = false;
-    } catch (error) {
+    } catch {
       if (token !== pendingSearchToken) {
         return;
       }
       shortcutSuggestions.hide();
       searchErrorShown = true;
-      const detail = error instanceof Error ? ` Details: ${error.message}` : '';
-      executionPanel.showMessage(`Library unavailable. Try again, or reload the extension.${detail}`);
+      executionPanel.showMessage('LangQueue couldn\'t load. Try again, or reload this page.');
     }
   }
 
@@ -299,14 +295,14 @@ export function initController(adapter: Adapter) {
           return;
         }
         if (getConversationHref() !== expectedHref || adapter.getInputElement() !== input || getInputText(input) !== text) {
-          executionPanel.showMessage('Draft changed. Queue it again.');
+          executionPanel.showMessage('Your draft changed. Press Enter again to queue it.');
           return;
         }
         setInputText(input, '');
         if (!queue.enqueue({ content: text })) {
           setInputText(input, text);
           executionPanel.showMessage(queue.getSnapshot().error === 'CONVERSATION_REQUIRED'
-            ? 'Start a conversation first.'
+            ? 'Send a message to start this chat first.'
             : 'Still cancelling. Try again in a moment.');
         }
       });
@@ -394,11 +390,11 @@ export function initController(adapter: Adapter) {
     const expectedInput = adapter.getInputElement();
     const expectedText = expectedInput ? getInputText(expectedInput) : null;
     if (!await ensureSettingsLoaded()) {
-      return { ok: false, sendAttempted: false, reason: 'Settings are unavailable. Try the action again to reload settings.' };
+      return { ok: false, sendAttempted: false, reason: 'LangQueue couldn\'t load on that page. Try again, or reload it.' };
     }
     const input = adapter.getInputElement();
     if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
-      return { ok: false, sendAttempted: false, reason: 'The draft changed while settings loaded. Try again when ready.' };
+      return { ok: false, sendAttempted: false, reason: 'Your draft changed. Try again.' };
     }
     const mode = settings.insertionMode || 'overwrite';
     const contentWithNL = !content || content.endsWith('\n') ? content || '' : content + '\n';
@@ -428,7 +424,7 @@ export function initController(adapter: Adapter) {
       }
       const input = adapter.getInputElement();
       if (input !== expectedInput || (input && getInputText(input) !== expectedText)) {
-        executionPanel.showMessage('Draft changed. Start the chain again.');
+        executionPanel.showMessage('Your draft changed. Run the chain again.');
         return { ok: false, reason: 'COMPOSER_CHANGED' };
       }
       if (!isConversationReady()) {

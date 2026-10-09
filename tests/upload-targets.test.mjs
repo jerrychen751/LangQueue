@@ -67,7 +67,7 @@ for (const [name, createAdapter, recognized] of [
     const adapter = createFixture(createAdapter, [], [profile]);
     const result = await adapter.attachFiles([new File(['text'], 'sample.txt')]);
     assert.equal(result.ok, false);
-    assert.match(result.error, /Attach the files manually/);
+    assert.match(result.error, /Attach them yourself/);
     assert.equal(profile.files.length, 0);
   });
   test(`${name}: multiple generic local uploaders are rejected`, async () => {
@@ -114,7 +114,7 @@ test('ChatGPT rejects a recognized uploader without an acceptance context before
   const adapter = createFixture(createChatGPTAdapter, [], [external], false);
   const result = await adapter.attachFiles([new File(['text'], 'sample.txt')]);
   assert.equal(result.ok, false);
-  assert.match(result.error, /acceptance cannot be checked/);
+  assert.match(result.error, /confirm uploads on this page/);
   assert.equal(external.files.length, 0);
   assert.equal(external.events, 0);
 });

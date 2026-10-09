@@ -27,42 +27,49 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
 
   function render() {
     const snapshot = queue.getSnapshot();
+    // A cancel the user asked for that left nothing behind is not an error to report
+    const queueError = snapshot.error === 'QUEUE_CANCELLED' && !snapshot.items.length ? null : snapshot.error;
     const currentProgress = chain.getSnapshot();
-    const progress = currentProgress.totalSteps ? currentProgress : null;
+    const progress = currentProgress.totalSteps && currentProgress.error !== 'CHAIN_CANCELLED' ? currentProgress : null;
     const runningChain = chain.isRunning();
     const labels: Record<string, string> = {
       idle: 'Ready', waiting: 'Waiting', uploading: 'Uploading', sending: 'Sending', awaiting_response: 'Responding',
       failed: 'Stopped', cancelled: 'Cancelled', starting: 'Starting', delayed: 'Waiting', completed: 'Done', error: 'Stopped',
     };
     const errors: Record<string, string> = {
-      QUEUE_CANCELLED: 'Queue cancelled.',
-      QUEUE_CANCELLED_ATTACHMENTS: 'Queue cancelled. Attachments may still be in the composer.',
-      CONVERSATION_REQUIRED: 'Start a conversation first.',
-      CONVERSATION_CHANGED: 'Conversation changed. Go back to it to retry.',
-      COMPOSER_CHANGED: 'Clear the new draft to retry.',
-      COMPOSER_BUSY: 'Finish the queue first.',
-      INPUT_NOT_FOUND: 'Chat input not found.',
+      // The user just pressed Cancel, so these two need no message
+      QUEUE_CANCELLED: '',
+      CHAIN_CANCELLED: '',
+      QUEUE_CANCELLED_ATTACHMENTS: 'Files may still be attached in the chat box.',
+      CONVERSATION_REQUIRED: 'Send a message to start this chat first.',
+      CONVERSATION_CHANGED: 'This belongs to another chat. Go back to it to retry.',
+      COMPOSER_CHANGED: 'Clear your draft from the chat box, then retry.',
+      COMPOSER_BUSY: 'Finish or cancel the queue first.',
+      INPUT_NOT_FOUND: 'Couldn\'t find the chat box.',
       SEND_FAILED: 'Send failed.',
-      MODEL_IDLE_TIMEOUT: 'Chat wasn\'t ready in time.',
-      RESPONSE_TIMEOUT: 'Response timed out.',
-      GENERATION_START_TIMEOUT: 'No response detected. It may have been sent.',
-      ATTACHMENT_UPLOAD_TIMEOUT: 'Upload not confirmed. Check the attachments.',
+      SEND_UNCERTAIN: 'This may have been sent. Check the chat before you send it again.',
+      MODEL_IDLE_TIMEOUT: 'The chat was still busy after 30 minutes.',
+      RESPONSE_TIMEOUT: 'The response didn\'t finish within 30 minutes.',
+      GENERATION_START_TIMEOUT: 'No response started. This may have been sent, so check the chat.',
+      ATTACHMENT_UPLOAD_TIMEOUT: 'Couldn\'t confirm the upload. Check the files in the chat box.',
       ATTACHMENT_UPLOAD_FAILED: 'Upload failed.',
+      ATTACHMENT_NOT_FOUND: 'A file saved with this prompt is missing. Add it to the prompt again.',
+      EXECUTION_FAILED: 'Something went wrong.',
     };
-    host.hidden = !snapshot.items.length && !notice && !progress && !snapshot.error;
+    host.hidden = !snapshot.items.length && !notice && !progress && !queueError;
     status.textContent = runningChain && progress
       ? `Chain · ${progress.stepIndex + 1}/${progress.totalSteps} · ${labels[progress.status] || progress.status}`
       : snapshot.items.length ? `Queue · ${snapshot.items.length} · ${labels[snapshot.status] || snapshot.status}`
-      : snapshot.error ? `Queue · ${labels[snapshot.status] || snapshot.status}`
+      : queueError ? `Queue · ${labels[snapshot.status] || snapshot.status}`
       : progress ? `Chain · ${labels[progress.status] || progress.status}` : '';
     status.hidden = !status.textContent;
-    const error = snapshot.error || (!snapshot.items.length ? progress?.error : undefined);
+    const error = queueError || (!snapshot.items.length ? progress?.error : undefined);
     const errorCode = error?.split(/[: ]/, 1)[0];
-    const detail = error ? errors[errorCode || ''] || error.replaceAll('_', ' ') : '';
-    const recovery = snapshot.items[0]?.attachmentAttempted && snapshot.status === 'failed'
-      ? ' Clear the attachments, then remove and re-add this item.'
-      : error?.includes('may have been sent') && !detail.includes('may have been sent') ? ' It may have been sent.' : '';
-    message.textContent = notice || detail + recovery;
+    const detail = error ? errors[errorCode || ''] ?? error.replaceAll('_', ' ') : '';
+    const recovery = snapshot.items[0]?.attachmentAttempted && !snapshot.items[0].sent && snapshot.status === 'failed'
+      ? 'Remove the files from the chat box, then remove this item and queue it again.'
+      : error?.includes('may have been sent') && !detail.includes('may have been sent') ? 'The last prompt may have been sent.' : '';
+    message.textContent = notice || [detail, recovery].filter(Boolean).join(' ');
     message.hidden = !message.textContent;
     list.replaceChildren();
     for (const item of snapshot.items) {
@@ -74,7 +81,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
       if (item.sent) {
         const sent = document.createElement('span');
         sent.className = 'sent';
-        sent.textContent = 'Sent · won\'t resend';
+        sent.textContent = snapshot.running ? 'Sent' : 'Remove this to continue';
         row.append(sent);
       }
       const remove = document.createElement('button');

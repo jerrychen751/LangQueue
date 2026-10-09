@@ -78,7 +78,7 @@ export default function App() {
   useEffect(() => {
     const handler: Parameters<typeof chrome.runtime.onMessage.addListener>[0] = (message) => {
       if (typeof message === 'object' && message && (message as { type?: string }).type === 'CHAIN_PROGRESS') {
-          const { stepIndex, totalSteps, status, error } = (message as { payload?: { stepIndex?: number; totalSteps?: number; status?: string; error?: string } }).payload || {};
+          const { stepIndex, totalSteps, status } = (message as { payload?: { stepIndex?: number; totalSteps?: number; status?: string } }).payload || {};
           if (!status || typeof stepIndex !== 'number' || typeof totalSteps !== 'number') {
             return;
           }
@@ -89,7 +89,7 @@ export default function App() {
             showToast({ variant: 'success', message: 'Chain complete' });
           }
           if (status === 'error') {
-            showToast({ variant: 'error', message: `Chain error: ${error ?? 'Unknown error'}` });
+            showToast({ variant: 'error', message: 'Chain stopped. See the chat tab for why.' });
           }
           if (status === 'cancelled') {
             showToast({ variant: 'info', message: 'Chain cancelled' });
@@ -226,11 +226,7 @@ export default function App() {
   async function handleDelete(p: Prompt) {
     await deletePrompt(p.id);
     setPrompts((items) => items.filter((item) => item.id !== p.id));
-    try {
-      await handleRefresh();
-    } catch {
-      showToast({ variant: 'info', message: 'Prompt deleted, but counts could not refresh.' });
-    }
+    await handleRefresh().catch(() => {});
   }
 
   async function handleInsert(p: Prompt) {
@@ -241,19 +237,11 @@ export default function App() {
     try {
       try {
         await sendPromptToTab(p.content, p.attachments || []);
-        showToast({ variant: 'success', message: `Inserted into ${platform === 'gemini' ? 'Gemini' : platform === 'claude' ? 'Claude' : 'ChatGPT'}` });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Insertion failed';
-        showToast({ variant: 'error', message: `${message}. Check the composer and any active queue.` });
+        showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Couldn\'t insert the prompt.' });
         return;
       }
-      try {
-        await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id });
-        await handleRefresh();
-      } catch {
-        showToast({ variant: 'info', message: 'Prompt inserted, but usage counts could not refresh.' });
-        return;
-      }
+      await logUsage({ timestamp: Date.now(), platform: compatible ? platform : 'other', promptId: p.id }).catch(() => {});
       window.close();
     } finally {
       insertingRef.current = false;
@@ -297,7 +285,7 @@ export default function App() {
               title={!checking && !compatible ? 'Open ChatGPT, Gemini, or Claude' : undefined}
             >
               <span className={`status-dot ${checking ? 'animate-pulse' : ''}`} aria-hidden />
-              <span>{checking ? 'Detecting' : compatible ? platformName : 'Offline'}</span>
+              <span>{checking ? 'Checking' : compatible ? platformName : 'No chat open'}</span>
             </div>
             <button className="icon-button" onClick={() => setView('settings')} aria-label="Settings">
               <SettingsIcon size={15} />
@@ -358,10 +346,9 @@ export default function App() {
                   insertingRef.current = true;
                   try {
                     await insertAndSendPromptToTab(prompt.content, prompt.attachments || []);
-                    showToast({ variant: 'success', message: 'Send requested' });
                     window.close();
                   } catch (err: unknown) {
-                    const message = err instanceof Error ? err.message : 'Failed to send';
+                    const message = err instanceof Error ? err.message : 'Couldn\'t send the prompt.';
                     showToast({ variant: 'error', message });
                   } finally {
                     insertingRef.current = false;
@@ -409,7 +396,7 @@ export default function App() {
                             await runChainOnTab(c.steps);
                             showToast({ variant: 'success', message: 'Chain started' });
                           } catch (error) {
-                            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not start chain.' });
+                            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Couldn\'t start the chain.' });
                           } finally {
                             startingChainRef.current = false;
                             setStartingChain(null);
@@ -525,14 +512,9 @@ export default function App() {
             await deleteChain(deleteChainTarget.id);
             setChains((items) => items.filter((item) => item.id !== deleteChainTarget.id));
             setDeleteChainTarget(null);
-            showToast({ variant: 'success', message: 'Chain deleted' });
-            try {
-              await handleRefresh();
-            } catch {
-              showToast({ variant: 'info', message: 'Chain deleted, but counts could not refresh.' });
-            }
+            await handleRefresh().catch(() => {});
           } catch (error) {
-            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Could not delete chain.' });
+            showToast({ variant: 'error', message: error instanceof Error ? error.message : 'Couldn\'t delete the chain.' });
           } finally {
             deletingChainRef.current = false;
             setDeletingChain(false);

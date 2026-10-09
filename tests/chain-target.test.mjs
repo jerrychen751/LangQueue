@@ -56,14 +56,14 @@ test('chain caller pins the original tab and URL across readiness checks', async
     query(options, callback) { queries++; callback([{ id: 12, url: 'https://chatgpt.com/c/original' }]); },
     async sendMessage(id, message) { messages.push({ id, message }); return message.type === 'COMPAT_CHECK' ? { ok: true, result: { ready: true } } : { ok: true, result: { ok: false, reason: 'CONVERSATION_CHANGED' } }; },
   } };
-  await assert.rejects(runChainOnTab([{ content: 'private' }]), /conversation changed before the chain started/);
+  await assert.rejects(runChainOnTab([{ content: 'private' }]), /switched chats/);
   assert.equal(queries, 1);
   assert.deepEqual(messages.map(item => item.id), [12, 12]);
   assert.equal(messages[1].message.payload.expectedHref, 'https://chatgpt.com/c/original');
 });
 
 test('chain caller explains settings and changed draft failures', async () => {
-  for (const [reason, expected] of [['SETTINGS_UNAVAILABLE', /Settings are unavailable.*reload settings/], ['COMPOSER_CHANGED', /draft changed.*Start the chain again/], ['CANCELLED', /cancelled before it started.*draft was kept/]]) {
+  for (const [reason, expected] of [['SETTINGS_UNAVAILABLE', /couldn't load on that page/], ['COMPOSER_CHANGED', /draft changed.*Run the chain again/], ['CANCELLED', /Chain cancelled/]]) {
     globalThis.chrome = { tabs: {
       query(options, callback) { callback([{ id: 12, url: 'https://chatgpt.com/c/original' }]); },
       async sendMessage(id, message) { return message.type === 'COMPAT_CHECK' ? { ok: true, result: { ready: true } } : { ok: true, result: { ok: false, reason } }; },

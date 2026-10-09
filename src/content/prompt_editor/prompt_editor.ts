@@ -73,7 +73,7 @@ export function createPromptEditor(callbacks: {
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete';
   deleteBtn.type = 'button';
-  deleteBtn.setAttribute('aria-label', 'Delete prompt');
+  deleteBtn.setAttribute('aria-label', 'Delete shortcut');
   deleteBtn.innerHTML = trashSvg;
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn btn-secondary';

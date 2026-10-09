@@ -15,10 +15,10 @@ export async function insertComposerPrompt(
   expectedHref: string,
 ): Promise<InsertPromptResult> {
   if (!content.trim() && attachments.length === 0) {
-    return { ok: false, sendAttempted: false, reason: 'This prompt has no text or enabled attachments. Your draft was kept.' };
+    return { ok: false, sendAttempted: false, reason: 'This prompt has no text to insert. If it only has files, turn on Attachments in Settings.' };
   }
   if (!coordinator.tryAcquire('manual')) {
-    return { ok: false, sendAttempted: false, reason: 'Finish or cancel the current queue or chain before inserting another prompt.' };
+    return { ok: false, sendAttempted: false, reason: 'A queue or chain is running. Wait for it or cancel it first.' };
   }
   let input: HTMLTextAreaElement | null = null;
   let draftChanged = false;
@@ -27,22 +27,22 @@ export async function insertComposerPrompt(
   try {
     input = adapter.getInputElement();
     if (!input) {
-      throw new Error('The chat input is unavailable. Return to the conversation and try again.');
+      throw new Error('Couldn\'t find the chat box. Open a chat and try again.');
     }
     const originalInput = input;
     const initialText = getInputText(input);
     function assertComposerUnchanged() {
       if (getConversationHref() !== expectedHref) {
-        throw new Error('The conversation changed. Prompt insertion was stopped.');
+        throw new Error('You switched chats, so nothing was inserted.');
       }
       if (!originalInput.isConnected || adapter.getInputElement() !== originalInput) {
-        throw new Error('The chat input changed. Your draft was kept; try again in the current composer.');
+        throw new Error('The chat box reloaded, so nothing was inserted. Try again.');
       }
       if (draftChanged || getInputText(originalInput) !== initialText) {
-        throw new Error('The composer changed. Your draft was kept; finish editing before trying again.');
+        throw new Error('Your draft changed, so nothing was inserted. Try again.');
       }
       if (shouldSend && adapter.isGenerating()) {
-        throw new Error('The model is generating a response. Wait for it to finish before sending another prompt.');
+        throw new Error('Wait for the response to finish, then send.');
       }
     }
     assertComposerUnchanged();
@@ -52,12 +52,12 @@ export async function insertComposerPrompt(
       assertComposerUnchanged();
       const attached = await adapter.attachFiles(files);
       if (!attached.ok) {
-        throw new Error(attached.error || 'An attachment could not be uploaded. Check the files in the composer before retrying.');
+        throw new Error(attached.error || 'A file didn\'t upload. Check the files in the chat box, then try again.');
       }
       const uploaded = await adapter.waitForUploadsComplete({ timeoutMs: 120000, pollMs: 250, files });
       assertComposerUnchanged();
       if (!uploaded) {
-        throw new Error('Attachment upload could not be confirmed. Check the files in the composer before retrying.');
+        throw new Error('Couldn\'t confirm the upload. Check the files in the chat box, then try again.');
       }
     }
     assertComposerUnchanged();
@@ -77,9 +77,14 @@ export async function insertComposerPrompt(
     return { ok: true, sendAttempted };
   } catch (cause) {
     if (cause instanceof Error && cause.message === 'SEND_FAILED') {
-      return { ok: false, sendAttempted: false, reason: 'The send button is unavailable. Your prompt remains in the composer.' };
+      return { ok: false, sendAttempted: false, reason: 'Couldn\'t press Send. Your prompt is in the chat box.' };
     }
-    return { ok: false, sendAttempted, reason: cause instanceof Error ? cause.message : 'Prompt insertion failed. Check the composer before trying again.' };
+    const message = cause instanceof Error ? cause.message : '';
+    const reason = message.startsWith('CONVERSATION_CHANGED') ? 'You switched chats before the prompt was sent.'
+      : message.startsWith('COMPOSER_CHANGED') ? 'The chat box changed before the prompt was sent. Check it, then send it yourself.'
+      : message === 'ATTACHMENT_NOT_FOUND' ? 'A file saved with this prompt is missing. Add it to the prompt again.'
+      : message || 'Couldn\'t insert the prompt.';
+    return { ok: false, sendAttempted, reason };
   } finally {
     input?.removeEventListener('input', handleDraftChange);
     coordinator.release();

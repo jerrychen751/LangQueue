@@ -98,7 +98,7 @@ test('an edited draft during upload is preserved even if the user restores its t
   };
   const result = await insert(fixture, attachments);
   assert.equal(result.ok, false);
-  assert.match(result.reason, /composer changed/);
+  assert.match(result.reason, /draft changed/);
   assert.equal(fixture.adapter.input.value, 'original draft');
   assert.equal(fixture.adapter.sends, 0);
 });
@@ -126,7 +126,7 @@ test('navigation during upload prevents insertion in the destination', async () 
   try {
     const result = await insert(fixture, attachments);
     assert.equal(result.ok, false);
-    assert.match(result.reason, /conversation changed/);
+    assert.match(result.reason, /switched chats/);
     assert.equal(fixture.adapter.sends, 0);
     assert.equal(fixture.adapter.input.value, '');
   } finally {
@@ -161,7 +161,7 @@ test('new model activity during upload stops combined send without overwriting',
   fixture.adapter.waitForUploadsComplete = async () => { fixture.adapter.generating = true; return true; };
   const result = await insert(fixture, attachments);
   assert.equal(result.ok, false);
-  assert.match(result.reason, /model is generating/);
+  assert.match(result.reason, /Wait for the response to finish/);
   assert.equal(fixture.adapter.input.value, 'my draft');
   assert.equal(fixture.adapter.sends, 0);
 });
@@ -221,7 +221,7 @@ test('uncertain transport failures never retry or query a second tab', async () 
     query(options, callback) { queries++; callback([{ id: 41, url: 'https://chatgpt.com/c/original' }]); },
     async sendMessage() { sends++; throw new Error('Message port closed'); },
   } };
-  await assert.rejects(insertAndSendPromptToTab('saved prompt'), /could not be confirmed.*may have been sent/);
+  await assert.rejects(insertAndSendPromptToTab('saved prompt'), /may have been sent/);
   assert.equal(queries, 1);
   assert.equal(sends, 1);
 });
@@ -253,7 +253,7 @@ test('empty effective operations never insert or send an existing draft', async 
       const result = await insertComposerPrompt(fixture.adapter, fixture.coordinator, content, [], 'overwrite', shouldSend, globalThis.location.href);
       assert.equal(result.ok, false);
       assert.equal(result.sendAttempted, false);
-      assert.match(result.reason, /no text or enabled attachments/);
+      assert.match(result.reason, /no text to insert/);
       assert.equal(fixture.adapter.input.value, 'existing draft');
       assert.equal(fixture.adapter.sends, 0);
       assert.equal(fixture.adapter.uploads, 0);

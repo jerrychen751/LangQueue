@@ -71,8 +71,8 @@ export function createChainExecutor(adapter: Adapter, getInput: () => InputEleme
       return true;
     } catch (cause) {
       const changedConversation = cause instanceof Error && cause.message === 'CONVERSATION_CHANGED';
-      const error = changedConversation ? 'CONVERSATION_CHANGED' : controller.signal.aborted ? 'Chain cancelled' : cause instanceof Error ? cause.message : 'EXECUTION_FAILED';
-      terminal = { stepIndex, totalSteps, status: controller.signal.aborted && !changedConversation ? 'cancelled' : 'error', error: sent && error !== 'SEND_FAILED' ? `${error}: the prompt may have been sent. Check the conversation before restarting.` : error };
+      const error = changedConversation ? 'CONVERSATION_CHANGED' : controller.signal.aborted ? 'CHAIN_CANCELLED' : cause instanceof Error ? cause.message : 'EXECUTION_FAILED';
+      terminal = { stepIndex, totalSteps, status: controller.signal.aborted && !changedConversation ? 'cancelled' : 'error', error: sent && error !== 'SEND_FAILED' ? `${error}: the prompt may have been sent.` : error };
       return false;
     } finally {
       running = false;

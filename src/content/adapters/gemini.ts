@@ -77,7 +77,7 @@ class GeminiAdapter extends Adapter {
       return true;
     } catch {
       // Preserve uncertainty after an attempted click
-      throw new Error('The send click may have been attempted. Check the conversation before sending again.');
+      throw new Error('This may have been sent. Check the chat before you send it again.');
     }
   }
 
@@ -88,7 +88,7 @@ class GeminiAdapter extends Adapter {
     this.uploadAttempt = null;
     const composer = this.getInputElement();
     const input = findEnabledFileInput(composer, []);
-    const failure = { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' };
+    const failure = { ok: false, error: 'Couldn\'t find where to upload files on this page. Attach them yourself.' };
     const area = composer?.closest('input-area-v2');
     if (!composer || area?.localName !== 'input-area-v2') {
       return failure;
@@ -154,13 +154,13 @@ class GeminiAdapter extends Adapter {
 
   private assignUploadFiles(input: HTMLInputElement, files: File[], composer: HTMLTextAreaElement, area: Element) {
     if (!composer.isConnected || !area.isConnected || this.getInputElement() !== composer) {
-      return { ok: false, error: 'The chat composer changed before attachment upload.' };
+      return { ok: false, error: 'The chat box changed before the upload started. Try again.' };
     }
     const counts = new Map<string, number>();
     for (const preview of area.querySelectorAll('uploader-file-preview')) {
       const name = this.getUploadFilename(preview);
       if (!name) {
-        return { ok: false, error: 'An existing attachment is not ready to identify. Finish or remove it before uploading another prompt.' };
+        return { ok: false, error: 'A file in the chat box is still uploading. Wait for it or remove it, then try again.' };
       }
       counts.set(name, (counts.get(name) || 0) + 1);
     }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LangQueue",
-  "description": "Streamline LLM workflows on ChatGPT, Gemini, and Claude with storage, insertion, and queuing of multi-modal prompt chains.",
+  "description": "Save prompts for ChatGPT, Claude, and Gemini. Insert them with $, run them as chains, and queue messages during a response.",
   "version": "0.4.4",
   "action": {
     "default_title": "LangQueue",

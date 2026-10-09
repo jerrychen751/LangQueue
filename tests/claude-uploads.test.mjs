@@ -169,7 +169,7 @@ test('Claude rejects unknown acceptance context before assigning files', async c
   fixture.input.closest = () => null;
   const result = await fixture.adapter.attachFiles([{ name: 'notes.txt' }]);
   assert.equal(result.ok, false);
-  assert.match(result.error, /acceptance cannot be checked/);
+  assert.match(result.error, /confirm uploads on this page/);
   assert.equal(fixture.uploader.events, 0);
   assert.equal(fixture.uploader.files.length, 0);
 });
@@ -234,7 +234,7 @@ test('Claude rejects unidentified existing attachment tiles before assigning mor
   tile.hasRemove = false;
   const result = await fixture.adapter.attachFiles([{ name: 'notes.txt' }]);
   assert.equal(result.ok, false);
-  assert.match(result.error, /still being identified/);
+  assert.match(result.error, /still uploading/);
   assert.equal(fixture.uploader.events, 0);
   assert.equal(fixture.uploader.files.length, 0);
 });

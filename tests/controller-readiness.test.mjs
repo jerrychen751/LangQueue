@@ -81,7 +81,7 @@ test('failed settings keep the draft and require another explicit action before 
   const failed = fixture.receive();
   fixture.loads[1].reject(new Error('unavailable'));
   assert.equal((await failed).result.ok, false);
-  assert.match(fixture.notices.at(-1), /Details: unavailable/);
+  assert.match(fixture.notices.at(-1), /couldn't load/);
   assert.equal(fixture.input.value, 'My draft');
   assert.equal(fixture.inserted.length, 0);
   const retried = fixture.receive();
@@ -124,22 +124,21 @@ test('search failure displays an error while successful empty search remains emp
   fixture.search(true);
   await settle();
   assert.equal(fixture.shown.length, 0);
-  assert.match(fixture.notices.at(-1), /Library unavailable/);
-  assert.match(fixture.notices.at(-1), /Details: read failed/);
+  assert.match(fixture.notices.at(-1), /couldn't load/);
   fixture.search(false);
   await settle();
   assert.equal(fixture.shown.length, 1);
   assert.equal(fixture.shown[0][1].length, 0);
 });
 
-test('usage failure reports success of insertion without retrying it', async () => {
+test('usage failure after insertion shows no notice and never retries the insertion', async () => {
   const fixture = createController();
   fixture.loads[0].resolve({});
   await settle();
   fixture.select();
   await settle();
   assert.equal(fixture.inserted.length, 1);
-  assert.match(fixture.notices.at(-1), /Prompt inserted.*usage count wasn.t saved/);
+  assert.equal(fixture.notices.length, 0);
 });
 
 test('a stale settings read cannot overwrite a newer disabled-attachments preference', async () => {

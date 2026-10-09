@@ -111,7 +111,7 @@ class ChatGPTAdapter extends Adapter {
       return true;
     } catch {
       // Preserve uncertainty after an attempted click
-      throw new Error('The send click may have been attempted. Check the conversation before sending again.');
+      throw new Error('This may have been sent. Check the chat before you send it again.');
     }
   }
 
@@ -124,11 +124,11 @@ class ChatGPTAdapter extends Adapter {
     // The composer also holds photo-only inputs, so pick the one that accepts every file type
     const input = findEnabledFileInput(composer, ['input[type="file"][aria-label="Attach files"]']);
     if (!input) {
-      return { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' };
+      return { ok: false, error: 'Couldn\'t find where to upload files on this page. Attach them yourself.' };
     }
     const form = composer?.closest('form[data-chatgpt-composer]');
     if (!composer || !form) {
-      return { ok: false, error: 'Attachment acceptance cannot be checked in this chat layout. Attach the files manually in the chat composer.' };
+      return { ok: false, error: 'Can\'t confirm uploads on this page. Attach the files yourself.' };
     }
     const counts = new Map<string, number>();
     for (const remove of form.querySelectorAll('button[aria-label^="Remove "]')) {

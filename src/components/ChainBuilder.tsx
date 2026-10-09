@@ -163,9 +163,8 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
       setItems((prev) => prev.map((item) => (
         item.id === stepId ? { ...item, attachments: [...item.attachments, ...next] } : item
       )));
-      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` });
     } catch (err) {
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to add attachment' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Couldn\'t add that file.' });
     } finally {
       setSaving(false);
       setPendingAttachmentStepId(null);
@@ -241,7 +240,6 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
         return;
       }
       pendingAttachments.current.clear();
-      showToast({ variant: 'success', message: initialChain ? 'Chain updated' : 'Chain saved' });
       try {
         await onSaved?.();
       } catch {
@@ -259,7 +257,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
       if (draftGeneration.current !== generation) {
         return;
       }
-      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Failed to save chain' });
+      showToast({ variant: 'error', message: err instanceof Error ? err.message : 'Couldn\'t save the chain.' });
     } finally {
       if (draftGeneration.current === generation) {
         savingRef.current = false;
@@ -449,6 +447,7 @@ export default function ChainBuilder({ open, initialChain, onClose, onSaved }: C
                   className="primary-button min-h-10 disabled:opacity-50"
                   onClick={handleSaveChain}
                   disabled={!canSave}
+                  title={canSave || saving ? undefined : 'Add a title and fill in every step'}
                 >
                   <Save size={15} /> {saving ? 'Saving…' : 'Save'}
                 </button>

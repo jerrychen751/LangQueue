@@ -162,25 +162,16 @@ export default function Settings({ onBack }: SettingsProps) {
       const text = await file.text();
       const parsed = JSON.parse(text);
       const results = await importLibrary(parsed);
-      const promptStats = results.prompts;
-      const chainStats = results.chains;
-      const summaryParts: string[] = [];
-      if (promptStats) {
-        summaryParts.push(
-          `prompts imported ${promptStats.imported}, replaced ${promptStats.replaced}, skipped ${promptStats.skipped}`
-        );
-      }
-      if (chainStats) {
-        summaryParts.push(
-          `chains imported ${chainStats.imported}, replaced ${chainStats.replaced}, skipped ${chainStats.skipped}`
-        );
-      }
-      if (results.attachments) {
-        summaryParts.push(`attachments imported ${results.attachments.imported}`);
-      }
-      const summary = summaryParts.join(' • ') || 'Nothing imported';
+      const prompts = (results.prompts?.imported ?? 0) + (results.prompts?.replaced ?? 0);
+      const chains = (results.chains?.imported ?? 0) + (results.chains?.replaced ?? 0);
+      const skipped = (results.prompts?.skipped ?? 0) + (results.chains?.skipped ?? 0);
+      const summaryParts = [
+        prompts ? `${prompts} prompt${prompts === 1 ? '' : 's'}` : '',
+        chains ? `${chains} chain${chains === 1 ? '' : 's'}` : '',
+      ].filter(Boolean);
+      const summary = (summaryParts.length ? `Imported ${summaryParts.join(' and ')}` : 'Nothing imported') + (skipped ? `, skipped ${skipped}` : '');
       setImportSummary(summary);
-      showToast({ variant: 'success', message: 'Imported' });
+      showToast({ variant: 'success', message: summary });
       chrome.runtime.sendMessage({ type: 'PROMPTS_IMPORTED' }).catch(() => {
         // best-effort notification
       });
@@ -314,7 +305,7 @@ export default function Settings({ onBack }: SettingsProps) {
                 </button>
               </div>
               <label className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="font-medium">Export attachments</div>
+                  <div className="font-medium">Include files in export</div>
                 <span className="relative inline-flex h-6 w-10 items-center">
                   <input
                     type="checkbox"

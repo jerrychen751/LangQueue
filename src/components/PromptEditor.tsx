@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Loader2, Paperclip, Trash2 } from 'lucide-react';
 import type { AttachmentRef, Prompt } from '../library/model';
 import { savePrompt, updatePrompt } from '../library/storage';
-import { useToast } from './useToast';
 import { createAttachmentDraft } from '../library/attachments';
 
 type PromptEditorProps = {
@@ -28,7 +27,6 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
   const draftGeneration = useRef(0);
   const filePickerGeneration = useRef<number | null>(null);
   const handleSaveRef = useRef<() => Promise<void>>(async () => {});
-  const { showToast } = useToast();
 
   const [title, setTitle] = useState(initialPrompt?.title ?? '');
   const [content, setContent] = useState(initialPrompt?.content ?? '');
@@ -86,9 +84,8 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
         return ref;
       });
       setAttachments((prev) => [...prev, ...next]);
-      showToast({ variant: 'success', message: `${next.length} attachment${next.length === 1 ? '' : 's'} added` });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add attachment.');
+      setError(err instanceof Error ? err.message : 'Couldn\'t add that file.');
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -170,7 +167,6 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
         }
         pendingAttachments.current.clear();
         onSaved?.(newPrompt);
-        showToast({ variant: 'success', message: 'Prompt saved' });
         savingRef.current = false;
         close();
       }
@@ -178,7 +174,7 @@ export default function PromptEditor({ open, initialPrompt, onClose, onSaved }: 
       if (draftGeneration.current !== generation) {
         return;
       }
-      const message = err instanceof Error ? err.message : 'Failed to save prompt.';
+      const message = err instanceof Error ? err.message : 'Couldn\'t save the prompt.';
       setError(message);
     } finally {
       if (draftGeneration.current === generation) {

@@ -84,7 +84,7 @@ class ClaudeAdapter extends Adapter {
       return true;
     } catch {
       // Preserve uncertainty after an attempted click
-      throw new Error('The send click may have been attempted. Check the conversation before sending again.');
+      throw new Error('This may have been sent. Check the chat before you send it again.');
     }
   }
 
@@ -96,17 +96,17 @@ class ClaudeAdapter extends Adapter {
     const composer = this.getInputElement();
     const input = findEnabledFileInput(composer, ['input[data-testid="file-upload"][type="file"]']);
     if (!input) {
-      return { ok: false, error: 'A safe chat uploader was not found. Attach the files manually in the chat composer; automatic upload is unavailable.' };
+      return { ok: false, error: 'Couldn\'t find where to upload files on this page. Attach them yourself.' };
     }
     const scope = composer?.closest('[data-cds="ChatComposer"]');
     if (!composer || !scope || !composer.isConnected || !scope.isConnected || this.getInputElement() !== composer) {
-      return { ok: false, error: 'Attachment acceptance cannot be checked in this chat layout. Attach the files manually in the chat composer.' };
+      return { ok: false, error: 'Can\'t confirm uploads on this page. Attach the files yourself.' };
     }
     const counts = new Map<string, number>();
     for (const tile of scope.querySelectorAll('[data-testid="file-thumbnail"][data-cds-attachment]')) {
       const name = this.getAttachmentName(tile);
       if (!name) {
-        return { ok: false, error: 'An existing attachment is still being identified. Wait for it to finish or remove it before attaching more files.' };
+        return { ok: false, error: 'A file in the chat box is still uploading. Wait for it or remove it, then try again.' };
       }
       counts.set(name, (counts.get(name) || 0) + 1);
     }

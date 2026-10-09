@@ -205,7 +205,7 @@ test('Gemini refuses an unidentified existing preview before assigning new files
   const files = [new File(['new'], 'test.txt')];
   const result = await fixture.adapter.attachFiles(files);
   assert.equal(result.ok, false);
-  assert.match(result.error, /existing attachment is not ready to identify/);
+  assert.match(result.error, /still uploading/);
   assert.equal(fixture.input.files.length, 0);
   fixture.descriptions.set('file-0', description);
   assert.equal(await fixture.adapter.waitForUploadsComplete({ files }), false);

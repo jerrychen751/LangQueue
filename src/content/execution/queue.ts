@@ -71,9 +71,6 @@ export function createQueue(adapter: Adapter, getInput: () => InputElement | nul
           error = 'QUEUE_CANCELLED_ATTACHMENTS';
         }
       }
-      if (items[0]?.attachmentAttempted && !items[0].sent) {
-        error += ' Check and clear attachments in the composer before removing this item and adding it again.';
-      }
     } finally {
       running = false;
       controller = null;
