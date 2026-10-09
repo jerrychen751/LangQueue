@@ -78,6 +78,11 @@ class ChatGPTAdapter extends Adapter {
       return true;
     }
 
+    // A draft typed while the model thinks turns the Stop button back into Send; the response then shows only as a busy status line until its turn exists, and as an unfinished turn after that
+    if (document.querySelector('[role="status"][aria-busy="true"], [data-talvt-turn-state="in_progress"]')) {
+      return true;
+    }
+
     return false;
   }
 

@@ -231,6 +231,23 @@ test('ChatGPT sends through the current Send button and detects its Stop state',
   assert.equal(adapter.clickSend(input), false);
 });
 
+test('ChatGPT detects a thinking response while a typed draft shows Send in place of Stop', () => {
+  const { body, form } = createFixture();
+  const input = new FakeElement('div', { contenteditable: 'true', role: 'textbox' });
+  form.append(input, new FakeButton({ 'aria-label': 'Send', type: 'submit' }));
+  const status = new FakeElement('span', { role: 'status', 'aria-busy': 'true' });
+  const turn = new FakeElement('div', { 'data-talvt-turn-state': 'complete' });
+  body.append(status, turn);
+  const adapter = createChatGPTAdapter();
+  assert.equal(adapter.isGenerating(), true);
+  status.attributes = { role: 'status' };
+  assert.equal(adapter.isGenerating(), false);
+  turn.attributes = { 'data-talvt-turn-state': 'in_progress' };
+  assert.equal(adapter.isGenerating(), true);
+  turn.attributes = { 'data-talvt-turn-state': 'cancelled' };
+  assert.equal(adapter.isGenerating(), false);
+});
+
 test('Gemini treats a finished response footer as idle', () => {
   const { body, form } = createFixture();
   body.append(new FakeElement('div', { class: 'response-footer animated gap' }));
