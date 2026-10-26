@@ -4,7 +4,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { chromium } from 'playwright-core';
 import { buildSiteProbe } from '../scripts/build-site-probe.mjs';
 
-// Each fixture is a scrubbed page captured by `npm run check:sites -- --capture` after that step worked on the live site
+// Each fixture is a scrubbed page captured after that step worked on the live site
 const directory = 'tests/fixtures/sites';
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const fixtures = (await readdir(directory)).filter(file => file.endsWith('.html')).sort();

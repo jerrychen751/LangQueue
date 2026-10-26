@@ -1,4 +1,4 @@
-// Runs inside a live chat page or a replayed fixture; scripts/check-sites.mjs and tests/site-replay.test.mjs drive it through LangQueueProbe
+// Runs inside a live chat page or a replayed fixture; tests/site-replay.test.mjs drives it through LangQueueProbe
 import type { Adapter } from '../src/content/adapters/adapter';
 import { createChatGPTAdapter } from '../src/content/adapters/chatgpt';
 import { createClaudeAdapter } from '../src/content/adapters/claude';

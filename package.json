@@ -15,8 +15,7 @@
     "preview": "vite preview",
     "test": "node scripts/run-tests.mjs",
     "validate:build": "node scripts/validate-build.mjs",
-    "verify": "npm run test && npm run lint && npm run build && npm run validate:build",
-    "check:sites": "node scripts/check-sites.mjs"
+    "verify": "npm run test && npm run lint && npm run build && npm run validate:build"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
