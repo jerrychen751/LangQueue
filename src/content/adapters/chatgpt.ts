@@ -60,16 +60,19 @@ class ChatGPTAdapter extends Adapter {
   }
 
   isGenerating(): boolean {
+    // ChatGPT keeps each page the user left in the DOM under a display:none ancestor, frozen with the busy state it had, so only a visible indicator counts
+    const hasVisible = (selector: string) => Array.from(document.querySelectorAll(selector)).some(isVisible);
+
     // Stop button replaces send button during streaming — only exists in the DOM while generating
-    if (document.querySelector('button[data-testid="stop-button"]')) {
+    if (hasVisible('button[data-testid="stop-button"]')) {
       return true;
     }
-    if (document.querySelector('button[aria-label="Stop streaming"]')) {
+    if (hasVisible('button[aria-label="Stop streaming"]')) {
       return true;
     }
 
     // Active response's markdown container gets this class while streaming
-    if (document.querySelector('.streaming-animation')) {
+    if (hasVisible('.streaming-animation')) {
       return true;
     }
 
@@ -79,7 +82,7 @@ class ChatGPTAdapter extends Adapter {
     }
 
     // A draft typed while the model thinks turns the Stop button back into Send; the response then shows only as a busy status line until its turn exists, and as an unfinished turn after that
-    if (document.querySelector('[role="status"][aria-busy="true"], [data-talvt-turn-state="in_progress"]')) {
+    if (hasVisible('[role="status"][aria-busy="true"], [data-talvt-turn-state="in_progress"]')) {
       return true;
     }
 

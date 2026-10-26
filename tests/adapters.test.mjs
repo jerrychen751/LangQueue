@@ -248,6 +248,24 @@ test('ChatGPT detects a thinking response while a typed draft shows Send in plac
   assert.equal(adapter.isGenerating(), false);
 });
 
+test('ChatGPT ignores the busy state frozen in a hidden page the user left', () => {
+  const { body, form } = createFixture();
+  const input = new FakeElement('div', { contenteditable: 'true', role: 'textbox' });
+  form.append(input, new FakeButton({ 'aria-label': 'Send', type: 'submit' }));
+  const leftPage = new FakeElement('div');
+  const status = new FakeElement('span', { role: 'status', 'aria-busy': 'true' });
+  const stop = new FakeButton({ 'data-testid': 'stop-button' });
+  leftPage.append(status, stop);
+  body.append(leftPage);
+  for (const element of [leftPage, status, stop]) {
+    element.offsetParent = null;
+  }
+  const adapter = createChatGPTAdapter();
+  assert.equal(adapter.isGenerating(), false);
+  status.offsetParent = {};
+  assert.equal(adapter.isGenerating(), true);
+});
+
 test('Gemini treats a finished response footer as idle', () => {
   const { body, form } = createFixture();
   body.append(new FakeElement('div', { class: 'response-footer animated gap' }));
