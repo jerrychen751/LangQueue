@@ -302,7 +302,7 @@ export function initController(adapter: Adapter) {
         if (!queue.enqueue({ content: text })) {
           setInputText(input, text);
           executionPanel.showMessage(queue.getSnapshot().error === 'CONVERSATION_REQUIRED'
-            ? 'Send a message to start this chat first.'
+            ? 'Send the first message and let the chat load, then try again.'
             : 'Still cancelling. Try again in a moment.');
         }
       });

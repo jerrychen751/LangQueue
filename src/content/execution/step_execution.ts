@@ -42,7 +42,8 @@ export function isConversationReady(href = getConversationHref()) {
   }
   const { hostname, pathname } = new URL(href);
   if (/(^|\.)chatgpt\.com$/.test(hostname) || /(^|\.)chat\.openai\.com$/.test(hostname)) {
-    return /^\/(?:g\/[^/]+\/)?c\/[^/]+\/?$/.test(pathname);
+    // A new chat shows a temporary /c/local-chatgpt:<uuid> address until the server assigns its id, and the swap would look like a switch to another chat
+    return /^\/(?:g\/[^/]+\/)?c\/(?!local-chatgpt(?::|%3A))[^/]+\/?$/i.test(pathname);
   }
   if (/(^|\.)claude\.ai$/.test(hostname)) {
     return /^\/chat\/[^/]+\/?$/.test(pathname);

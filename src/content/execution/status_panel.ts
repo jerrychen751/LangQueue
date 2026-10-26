@@ -44,7 +44,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
       QUEUE_CANCELLED: '',
       CHAIN_CANCELLED: '',
       QUEUE_CANCELLED_ATTACHMENTS: 'Files may still be attached in the chat box.',
-      CONVERSATION_REQUIRED: 'Send a message to start this chat first.',
+      CONVERSATION_REQUIRED: 'Send the first message and let the chat load, then try again.',
       CONVERSATION_CHANGED: 'This belongs to another chat. Go back to it to retry.',
       COMPOSER_CHANGED: 'Clear your draft from the chat box, then retry.',
       COMPOSER_BUSY: 'Finish or cancel the queue first.',

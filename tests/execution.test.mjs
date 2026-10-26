@@ -435,6 +435,8 @@ for (const href of [
   'https://chatgpt.com/',
   'https://chatgpt.com/?temporary-chat=true',
   'https://chatgpt.com/g/example-gpt',
+  'https://chatgpt.com/c/local-chatgpt%3A00000000-0000-0000-0000-000000000000',
+  'https://chatgpt.com/c/local-chatgpt:00000000-0000-0000-0000-000000000000',
   'https://claude.ai/new',
   'https://claude.ai/project/example-project',
   'https://gemini.google.com/',

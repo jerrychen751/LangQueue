@@ -112,7 +112,7 @@ export async function runChainOnTab(steps: ChainStep[], insertionModeOverride?: 
     const result = await sendToTab(tab.id, 'RUN_CHAIN', { steps, expectedHref: tab.url, insertionModeOverride });
     if (!result.ok) {
       throw new Error(result.reason === 'CONVERSATION_REQUIRED'
-      ? 'Send a message to start the chat, then run the chain.'
+      ? 'Send the first message and let the chat load, then run the chain.'
       : result.reason === 'SETTINGS_UNAVAILABLE'
         ? 'LangQueue couldn\'t load on that page. Try again, or reload it.'
         : result.reason === 'COMPOSER_CHANGED'
