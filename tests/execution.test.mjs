@@ -32,7 +32,7 @@ function createAdapter() {
   };
 }
 
-const timing = { timeoutMs: 30, startTimeoutMs: 30, pollMs: 2 };
+const timing = { timeoutMs: 30, startTimeoutMs: 30, pollMs: 2, settleMs: 4 };
 
 function runStep(adapter, signal = new AbortController().signal) {
   return executeStep(adapter, () => adapter.input, { content: 'prompt' }, 'overwrite', signal, () => {}, () => {}, timing);
@@ -62,16 +62,16 @@ test('waits for delayed generation before completing', async context => {
   let completed = false;
   const pending = runStep(adapter).then(() => { completed = true; });
   await Promise.resolve();
-  // Send waits one poll (2 ms) before clicking, so generation runs from 7 ms to 17 ms
-  for (let elapsed = 1; elapsed <= 18; elapsed++) {
+  // Idle must hold for 4 ms and Send waits one more poll (2 ms) before clicking, so generation runs from 11 ms to 21 ms
+  for (let elapsed = 1; elapsed <= 22; elapsed++) {
     await new Promise(resolve => setImmediate(resolve));
     context.mock.timers.tick(1);
     await Promise.resolve();
     await Promise.resolve();
-    if (elapsed < 17) {
+    if (elapsed < 21) {
       assert.equal(completed, false);
     }
-    if (elapsed === 8) {
+    if (elapsed === 12) {
       assert.equal(adapter.generating, true);
     }
   }
@@ -185,7 +185,7 @@ test('chain timeout stops before the next step and publishes a settled terminal 
   });
   const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
   await new Promise(resolve => setImmediate(resolve));
-  await advanceTimers(context, 1800401);
+  await advanceTimers(context, 1801401);
   assert.equal(await pending, false);
   assert.match(chain.getSnapshot().error, /RESPONSE_TIMEOUT/);
   assert.equal(adapter.sends, 1);
@@ -200,7 +200,7 @@ test('queue response timeout keeps the sent item and stops later work', async co
   queue.enqueue({ content: 'first' });
   queue.enqueue({ content: 'second' });
   await new Promise(resolve => setImmediate(resolve));
-  await advanceTimers(context, 1800401);
+  await advanceTimers(context, 1801401);
   assert.equal(queue.getSnapshot().status, 'failed');
   assert.equal(queue.size(), 2);
   assert.equal(queue.getSnapshot().canRetry, false);
@@ -240,7 +240,9 @@ test('queue pauses on a draft typed while waiting for the model and sends once i
     adapter.sends++;
     return true;
   };
-  await advanceTimers(context, 1400);
+  await advanceTimers(context, 800);
+  assert.equal(adapter.sends, 0);
+  await advanceTimers(context, 600);
   assert.equal(adapter.sends, 1);
   queue.cancel();
 });
@@ -255,6 +257,25 @@ test('queue pauses on a pre-existing draft when it acquires the composer', async
   assert.equal(adapter.input.value, 'unsent draft');
   assert.equal(adapter.sends, 0);
   assert.equal(queue.getSnapshot().status, 'paused');
+  queue.cancel();
+});
+
+test('queue waits for idle to hold before writing when busy signals flicker', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const adapter = createAdapter();
+  // A response whose busy markers drop out for one poll at a time, as ChatGPT's can while a quoted selection hides its Stop button
+  let polls = 0;
+  let responding = true;
+  adapter.isGenerating = () => responding && polls++ % 3 !== 0;
+  const queue = createQueue(adapter, () => adapter.input);
+  queue.enqueue({ content: 'queued prompt' });
+  await advanceTimers(context, 5000);
+  assert.equal(adapter.input.value, '');
+  assert.equal(adapter.sends, 0);
+  responding = false;
+  await advanceTimers(context, 1400);
+  assert.equal(adapter.input.value, 'queued prompt');
+  assert.equal(adapter.sends, 1);
   queue.cancel();
 });
 
@@ -457,7 +478,7 @@ test('chain stops on navigation during its inter-step delay', async context => {
     const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
     await Promise.resolve();
     await new Promise(resolve => setImmediate(resolve));
-    await advanceTimers(context, 2500);
+    await advanceTimers(context, 3500);
     assert.equal(await pending, false);
     assert.equal(adapter.sends, 1);
     assert.match(chain.getSnapshot().error, /CONVERSATION_CHANGED/);
@@ -574,7 +595,7 @@ test('readiness timeout leaves the queue retryable and retry sends prepared text
   adapter.getSendButton = () => null;
   const queue = createQueue(adapter, () => adapter.input);
   queue.enqueue({ content: 'prepared prompt' });
-  await advanceTimers(context, 5400);
+  await advanceTimers(context, 6400);
   assert.equal(queue.getSnapshot().error, 'SEND_FAILED');
   assert.equal(queue.getSnapshot().canRetry, true);
   assert.equal(adapter.sends, 0);
@@ -590,7 +611,7 @@ test('readiness timeout leaves the queue retryable and retry sends prepared text
     return true;
   };
   queue.retry();
-  await advanceTimers(context, 1000);
+  await advanceTimers(context, 2000);
   assert.equal(adapter.sends, 1);
   assert.equal(queue.size(), 0);
 });
@@ -635,7 +656,7 @@ test('cancelling between chain steps does not claim the finished step may have b
     }
   });
   const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
-  await advanceTimers(context, 1000);
+  await advanceTimers(context, 2000);
   assert.equal(await pending, false);
   assert.equal(adapter.sends, 1);
   assert.equal(chain.getSnapshot().status, 'cancelled');

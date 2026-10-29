@@ -139,7 +139,7 @@ export async function executeStep(
   signal: AbortSignal,
   onStatus: (status: ExecutionStatus) => void,
   onSend: () => void,
-  timing = { timeoutMs: 120000, startTimeoutMs: 15000, pollMs: 200 },
+  timing = { timeoutMs: 120000, startTimeoutMs: 15000, pollMs: 200, settleMs: 1000 },
   allowedInput?: string,
   href = getConversationHref(),
 ) {
@@ -152,22 +152,27 @@ export async function executeStep(
   let status: ExecutionStatus = 'waiting';
   onStatus(status);
   let startedAt = Date.now();
+  let idleSince: number | null = null;
+  // ChatGPT hides its Stop button while the chat box holds a draft or a quoted selection, leaving only busy markers that hand off to each other, so idle must hold before anything is written
   while (true) {
     assertExecutionContext(signal, href);
     const now = Date.now();
     if (adapter.isGenerating() || !isInputReady(adapter.getInputElement())) {
+      idleSince = null;
       if (now - startedAt >= timing.timeoutMs) {
         throw new Error('MODEL_IDLE_TIMEOUT');
       }
     } else {
       // A pause for the user's draft can outlast the busy timeout, so only an unbroken busy stretch counts toward it
       startedAt = now;
+      idleSince ??= now;
       const nextStatus = canReplaceDraft(getInputText(getInput() || adapter.getInputElement())) ? 'waiting' : 'paused';
       if (nextStatus !== status) {
         status = nextStatus;
+        idleSince = now;
         onStatus(status);
       }
-      if (status === 'waiting') {
+      if (status === 'waiting' && now - idleSince >= timing.settleMs) {
         break;
       }
     }

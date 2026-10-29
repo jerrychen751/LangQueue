@@ -53,7 +53,7 @@ export function createQueue(adapter: Adapter, getInput: () => InputElement | nul
             item.preparedContent = item.content;
           }
           publish();
-        }, () => { item.sent = true; }, { timeoutMs: 1800000, startTimeoutMs: 15000, pollMs: 200 }, item.preparedContent, item.href);
+        }, () => { item.sent = true; }, { timeoutMs: 1800000, startTimeoutMs: 15000, pollMs: 200, settleMs: 1000 }, item.preparedContent, item.href);
         items.shift();
         publish();
       }
