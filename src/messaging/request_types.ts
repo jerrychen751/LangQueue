@@ -50,7 +50,7 @@ export type ChainProgressMessage = {
   payload: {
     stepIndex: number;
     totalSteps: number;
-    status: 'starting' | 'waiting' | 'uploading' | 'sending' | 'awaiting_response' | 'delayed' | 'completed' | 'cancelled' | 'error';
+    status: 'starting' | 'waiting' | 'paused' | 'uploading' | 'sending' | 'awaiting_response' | 'delayed' | 'completed' | 'cancelled' | 'error';
     error?: string;
   };
 };

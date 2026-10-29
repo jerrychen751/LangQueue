@@ -65,7 +65,7 @@ export function assertExecutionContext(signal: AbortSignal, href: string) {
   }
 }
 
-export type ExecutionStatus = 'waiting' | 'uploading' | 'sending' | 'awaiting_response';
+export type ExecutionStatus = 'waiting' | 'paused' | 'uploading' | 'sending' | 'awaiting_response';
 
 export async function waitForExecutionDelay(ms: number, signal: AbortSignal) {
   signal.throwIfAborted();
@@ -145,15 +145,31 @@ export async function executeStep(
 ) {
   assertExecutionContext(signal, href);
   const initialText = getInputText(getInput() || adapter.getInputElement());
-  onStatus('waiting');
-  if (allowedInput !== undefined && initialText !== '' && !isSameComposerText(initialText, allowedInput)) {
-    throw new Error('COMPOSER_CHANGED: save or clear your draft, then retry.');
+  // Any step may write into an empty chat box, a queued item or later chain step also over the text it put there itself, and a chain's first step over the draft it started with
+  function canReplaceDraft(text: string) {
+    return isSameComposerText(text, '') || isSameComposerText(text, allowedInput ?? initialText);
   }
+  let status: ExecutionStatus = 'waiting';
+  onStatus(status);
   let startedAt = Date.now();
-  while (adapter.isGenerating() || !isInputReady(adapter.getInputElement())) {
+  while (true) {
     assertExecutionContext(signal, href);
-    if (Date.now() - startedAt >= timing.timeoutMs) {
-      throw new Error('MODEL_IDLE_TIMEOUT');
+    const now = Date.now();
+    if (adapter.isGenerating() || !isInputReady(adapter.getInputElement())) {
+      if (now - startedAt >= timing.timeoutMs) {
+        throw new Error('MODEL_IDLE_TIMEOUT');
+      }
+    } else {
+      // A pause for the user's draft can outlast the busy timeout, so only an unbroken busy stretch counts toward it
+      startedAt = now;
+      const nextStatus = canReplaceDraft(getInputText(getInput() || adapter.getInputElement())) ? 'waiting' : 'paused';
+      if (nextStatus !== status) {
+        status = nextStatus;
+        onStatus(status);
+      }
+      if (status === 'waiting') {
+        break;
+      }
     }
     await waitForExecutionDelay(timing.pollMs, signal);
   }
@@ -178,7 +194,7 @@ export async function executeStep(
     throw new Error('INPUT_NOT_FOUND');
   }
   const currentText = getInputText(input);
-  if (currentText !== initialText || (allowedInput !== undefined && currentText !== '' && !isSameComposerText(currentText, allowedInput))) {
+  if (!canReplaceDraft(currentText)) {
     throw new Error('COMPOSER_CHANGED: save or clear your draft, then retry.');
   }
   if (mode === 'append') {

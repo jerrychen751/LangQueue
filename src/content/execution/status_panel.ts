@@ -36,7 +36,7 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
     const progress = currentProgress.totalSteps && currentProgress.error !== 'CHAIN_CANCELLED' ? currentProgress : null;
     const runningChain = chain.isRunning();
     const labels: Record<string, string> = {
-      idle: 'Ready', waiting: 'Waiting', uploading: 'Uploading', sending: 'Sending', awaiting_response: 'Responding',
+      idle: 'Ready', waiting: 'Waiting', paused: 'Paused', uploading: 'Uploading', sending: 'Sending', awaiting_response: 'Responding',
       failed: 'Stopped', cancelled: 'Cancelled', starting: 'Starting', delayed: 'Waiting', completed: 'Done', error: 'Stopped',
     };
     const errors: Record<string, string> = {
@@ -77,7 +77,8 @@ export function createQueuePanel(queue: ReturnType<typeof createQueue>, chain: R
     const recovery = snapshot.items[0]?.attachmentAttempted && !snapshot.items[0].sent && snapshot.status === 'failed'
       ? 'Remove the files from the chat box, then remove this item and queue it again.'
       : error?.includes('may have been sent') && !detail.includes('may have been sent') ? 'The last prompt may have been sent.' : '';
-    message.textContent = notice || [detail, recovery].filter(Boolean).join(' ');
+    const pausedHint = shown?.state === 'paused' ? 'Send or clear what\'s in the chat box to continue.' : '';
+    message.textContent = notice || [detail, pausedHint, recovery].filter(Boolean).join(' ');
     message.dataset.tone = !notice && (snapshot.status === 'failed' || progress?.status === 'error') ? 'error' : '';
     message.hidden = !message.textContent;
     list.replaceChildren();

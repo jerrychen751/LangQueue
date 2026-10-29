@@ -220,7 +220,7 @@ test('cancel removes an unsent active queue item after the wait aborts', async (
   assert.equal(adapter.sends, 0);
 });
 
-test('queue preserves a draft typed while waiting for the model', async context => {
+test('queue pauses on a draft typed while waiting for the model and sends once it is cleared', async context => {
   context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
   const adapter = createAdapter();
   adapter.generating = true;
@@ -229,26 +229,32 @@ test('queue preserves a draft typed while waiting for the model', async context 
   adapter.input.value = 'new draft';
   adapter.generating = false;
   await new Promise(resolve => setImmediate(resolve));
-  context.mock.timers.tick(200);
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  await advanceTimers(context, 3000);
   assert.equal(adapter.input.value, 'new draft');
   assert.equal(adapter.sends, 0);
-  assert.match(queue.getSnapshot().error, /COMPOSER_CHANGED/);
-  assert.equal(queue.getSnapshot().canRetry, true);
+  assert.equal(queue.getSnapshot().status, 'paused');
+  assert.equal(queue.getSnapshot().error, null);
+  adapter.input.value = '';
+  adapter.clickSend = () => {
+    assert.equal(adapter.input.value, 'queued prompt');
+    adapter.sends++;
+    return true;
+  };
+  await advanceTimers(context, 1400);
+  assert.equal(adapter.sends, 1);
   queue.cancel();
 });
 
-test('queue refuses a pre-existing draft when it acquires the composer', async () => {
+test('queue pauses on a pre-existing draft when it acquires the composer', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
   const adapter = createAdapter();
   adapter.input.value = 'unsent draft';
   const queue = createQueue(adapter, () => adapter.input);
   queue.enqueue({ content: 'queued prompt' });
-  await Promise.resolve();
+  await advanceTimers(context, 3000);
   assert.equal(adapter.input.value, 'unsent draft');
   assert.equal(adapter.sends, 0);
-  assert.match(queue.getSnapshot().error, /COMPOSER_CHANGED/);
+  assert.equal(queue.getSnapshot().status, 'paused');
   queue.cancel();
 });
 
@@ -382,7 +388,7 @@ test('navigation during uploads stops chain sends after upload drains', async ()
   }
 });
 
-test('chain preserves drafts entered between steps', async context => {
+test('chain pauses on a draft entered between steps', async context => {
   context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
   const adapter = createAdapter();
   let generationReads = 0;
@@ -397,11 +403,40 @@ test('chain preserves drafts entered between steps', async context => {
   const pending = chain.run([{ content: 'first' }, { content: 'second' }], {});
   await Promise.resolve();
   await new Promise(resolve => setImmediate(resolve));
-  await advanceTimers(context, 2500);
+  await advanceTimers(context, 6000);
+  assert.equal(chain.getSnapshot().status, 'paused');
+  assert.equal(adapter.input.value, 'my new draft');
+  assert.equal(adapter.sends, 1);
+  chain.cancel();
   assert.equal(await pending, false);
   assert.equal(adapter.input.value, 'my new draft');
   assert.equal(adapter.sends, 1);
-  assert.match(chain.getSnapshot().error, /COMPOSER_CHANGED/);
+});
+
+test('chain resumes its first step once a paused draft is cleared', async context => {
+  context.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const adapter = createAdapter();
+  adapter.input.value = 'draft before the chain';
+  adapter.generating = true;
+  const chain = createChainExecutor(adapter, () => adapter.input);
+  const pending = chain.run([{ content: 'first' }], {});
+  await new Promise(resolve => setImmediate(resolve));
+  adapter.input.value = 'draft being edited';
+  adapter.generating = false;
+  await advanceTimers(context, 3000);
+  assert.equal(chain.getSnapshot().status, 'paused');
+  assert.equal(adapter.sends, 0);
+  adapter.input.value = '';
+  adapter.clickSend = () => {
+    assert.equal(adapter.input.value, 'first');
+    adapter.sends++;
+    adapter.generating = true;
+    setTimeout(() => { adapter.generating = false; }, 100);
+    return true;
+  };
+  await advanceTimers(context, 2000);
+  assert.equal(adapter.sends, 1);
+  assert.equal(await pending, true);
 });
 
 test('chain stops on navigation during its inter-step delay', async context => {
